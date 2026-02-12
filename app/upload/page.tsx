@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { analyzeVideo } from '@/lib/mock-ai';
+import { useState, useRef, useCallback } from 'react';
 import BottomNav from '@/components/BottomNav';
-import { Upload, Video, Zap, CheckCircle, ChevronRight } from 'lucide-react';
+import { Upload, Video, Zap, CheckCircle, ChevronRight, AlertCircle } from 'lucide-react';
 
 type AnalysisResult = {
   overall_score: number;
@@ -11,38 +10,121 @@ type AnalysisResult = {
   strengths: string[];
   weaknesses: string[];
   drills: string[];
+  summary?: string;
   xp: number;
+  model?: string;
+  framesAnalyzed?: number;
 };
+
+// Extract evenly-spaced frames from a video file
+async function extractFrames(file: File, count: number = 10): Promise<string[]> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d')!;
+    const frames: string[] = [];
+
+    video.preload = 'auto';
+    video.muted = true;
+    video.playsInline = true;
+
+    video.onloadedmetadata = () => {
+      canvas.width = 512;  // Keep small for API costs
+      canvas.height = Math.round(512 * (video.videoHeight / video.videoWidth));
+      const duration = video.duration;
+      const interval = duration / (count + 1);
+      let currentFrame = 0;
+
+      const captureFrame = () => {
+        if (currentFrame >= count) {
+          URL.revokeObjectURL(video.src);
+          resolve(frames);
+          return;
+        }
+
+        const time = interval * (currentFrame + 1);
+        video.currentTime = time;
+      };
+
+      video.onseeked = () => {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+        frames.push(dataUrl);
+        currentFrame++;
+        captureFrame();
+      };
+
+      captureFrame();
+    };
+
+    video.onerror = () => reject(new Error('Failed to load video'));
+    video.src = URL.createObjectURL(file);
+  });
+}
 
 export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [progress, setProgress] = useState(0);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [error, setError] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleUpload = async () => {
+  const handleUpload = useCallback(async () => {
     if (!file) return;
     setAnalyzing(true);
     setProgress(0);
+    setError('');
 
-    // Simulate progress
-    const interval = setInterval(() => {
-      setProgress(prev => {
-        if (prev >= 90) { clearInterval(interval); return 90; }
-        return prev + Math.random() * 15;
+    try {
+      // Step 1: Extract frames
+      setStatusMessage('Extracting key frames...');
+      setProgress(10);
+      const frames = await extractFrames(file, 10);
+      setProgress(30);
+
+      // Step 2: Send to API
+      setStatusMessage('AI analyzing technique...');
+      const progressInterval = setInterval(() => {
+        setProgress(prev => {
+          if (prev >= 85) { clearInterval(progressInterval); return 85; }
+          return prev + Math.random() * 8;
+        });
+      }, 500);
+
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ frames }),
       });
-    }, 300);
 
-    const data = await analyzeVideo(URL.createObjectURL(file));
-    clearInterval(interval);
-    setProgress(100);
+      clearInterval(progressInterval);
 
-    setTimeout(() => {
-      setResult(data);
+      if (!response.ok && response.status === 401) {
+        throw new Error('API key not configured. Add OPENAI_API_KEY to Vercel environment variables.');
+      }
+
+      const data = await response.json();
+
+      if (data.error && response.status !== 200) {
+        throw new Error(data.error);
+      }
+
+      setProgress(100);
+      setStatusMessage('Analysis complete!');
+
+      setTimeout(() => {
+        setResult(data);
+        setAnalyzing(false);
+      }, 500);
+    } catch (err: any) {
+      setError(err.message || 'Analysis failed. Please try again.');
       setAnalyzing(false);
-    }, 500);
-  };
+      setProgress(0);
+      setStatusMessage('');
+    }
+  }, [file]);
 
   return (
     <div className="min-h-screen pb-20">
@@ -64,7 +146,7 @@ export default function UploadPage() {
               type="file"
               accept="video/*"
               className="hidden"
-              onChange={e => setFile(e.target.files?.[0] || null)}
+              onChange={e => { setFile(e.target.files?.[0] || null); setError(''); }}
             />
             {file ? (
               <div className="space-y-3">
@@ -81,6 +163,17 @@ export default function UploadPage() {
             )}
           </div>
 
+          {/* Error */}
+          {error && (
+            <div className="mt-4 bg-red-500/10 border border-red-500/30 rounded-2xl p-4 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-red-400 text-sm font-medium">Analysis Error</p>
+                <p className="text-red-400/70 text-xs mt-1">{error}</p>
+              </div>
+            </div>
+          )}
+
           {/* Analyze Button */}
           {file && !analyzing && (
             <button
@@ -96,7 +189,7 @@ export default function UploadPage() {
           {analyzing && (
             <div className="mt-6 space-y-3">
               <div className="flex justify-between text-sm">
-                <span className="text-zinc-400">Analyzing footage...</span>
+                <span className="text-zinc-400">{statusMessage}</span>
                 <span className="text-[#E91E8C] font-medium">{Math.round(progress)}%</span>
               </div>
               <div className="h-3 bg-zinc-800 rounded-full overflow-hidden">
@@ -106,10 +199,14 @@ export default function UploadPage() {
                 />
               </div>
               <div className="grid grid-cols-3 gap-3 mt-4">
-                {['Detecting takedowns...', 'Scoring positions...', 'Building drills...'].map((step, i) => (
+                {[
+                  { label: 'Extracting frames...', threshold: 20 },
+                  { label: 'Scoring positions...', threshold: 50 },
+                  { label: 'Building drills...', threshold: 75 },
+                ].map((step, i) => (
                   <div key={i} className="bg-zinc-900 rounded-2xl p-3 text-center">
-                    <div className={`text-xs ${progress > (i + 1) * 30 ? 'text-[#2563EB]' : 'text-zinc-500'}`}>
-                      {step}
+                    <div className={`text-xs ${progress > step.threshold ? 'text-[#2563EB]' : 'text-zinc-500'}`}>
+                      {step.label}
                     </div>
                   </div>
                 ))}
@@ -120,6 +217,19 @@ export default function UploadPage() {
       ) : (
         /* Results */
         <div className="p-6 space-y-6">
+          {/* AI Model Badge */}
+          {result.model && (
+            <div className="flex justify-center">
+              <span className={`text-[10px] px-3 py-1 rounded-full ${
+                result.model === 'gpt-4o'
+                  ? 'bg-green-500/20 text-green-400'
+                  : 'bg-zinc-800 text-zinc-400'
+              }`}>
+                {result.model === 'gpt-4o' ? `GPT-4o • ${result.framesAnalyzed} frames analyzed` : 'Demo Mode'}
+              </span>
+            </div>
+          )}
+
           {/* Overall Score */}
           <div className="bg-zinc-900 rounded-3xl p-6 text-center border border-[#2563EB]/30">
             <p className="text-zinc-400 text-sm mb-2">OVERALL TECH SCORE</p>
@@ -131,6 +241,14 @@ export default function UploadPage() {
               <span className="bg-[#E91E8C]/20 text-[#E91E8C] text-xs px-3 py-1 rounded-full">Match Analyzed</span>
             </div>
           </div>
+
+          {/* AI Summary */}
+          {result.summary && (
+            <div className="bg-zinc-900 rounded-3xl p-5 border border-zinc-800">
+              <p className="text-zinc-400 text-xs mb-2">AI ASSESSMENT</p>
+              <p className="text-sm text-zinc-300 leading-relaxed">{result.summary}</p>
+            </div>
+          )}
 
           {/* Position Scores */}
           <div className="grid grid-cols-3 gap-3">
@@ -179,7 +297,7 @@ export default function UploadPage() {
 
           {/* Upload Another */}
           <button
-            onClick={() => { setResult(null); setFile(null); setProgress(0); }}
+            onClick={() => { setResult(null); setFile(null); setProgress(0); setError(''); setStatusMessage(''); }}
             className="w-full bg-zinc-800 text-white font-heading font-bold py-4 rounded-2xl text-lg"
           >
             UPLOAD ANOTHER MATCH
