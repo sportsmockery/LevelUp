@@ -1,14 +1,15 @@
 'use client';
 
-import { Home, Upload, LineChart, Calendar } from 'lucide-react';
+import { Home, Upload, Swords, Calendar, User } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 
 const navItems = [
   { href: '/', icon: Home, label: 'Home' },
   { href: '/upload', icon: Upload, label: 'Upload' },
-  { href: '/stats', icon: LineChart, label: 'Stats' },
+  { href: '/matches', icon: Swords, label: 'Matches' },
   { href: '/plan', icon: Calendar, label: 'Plan' },
+  { href: '/profile', icon: User, label: 'Profile' },
 ];
 
 export default function BottomNav() {
