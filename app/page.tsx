@@ -15,7 +15,7 @@ export default function Dashboard() {
   const [streak, setStreak] = useState(7);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    supabase?.auth?.getUser().then(({ data }: any) => setUser(data.user));
   }, []);
 
   return (
