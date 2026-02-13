@@ -7,9 +7,48 @@ function getOpenAI() {
   });
 }
 
-const SYSTEM_PROMPT = `You are an expert youth wrestling coach and video analyst. You analyze wrestling match footage frame by frame.
+function buildSystemPrompt(singletColor?: string): string {
+  const athleteId = singletColor
+    ? `IMPORTANT: The athlete you are analyzing is the wrestler wearing the ${singletColor.toUpperCase()} singlet/uniform. Focus ALL analysis, scores, strengths, weaknesses, and drill recommendations exclusively on this wrestler. Ignore the opponent except as context for the athlete's reactions and positioning.`
+    : 'Analyze the primary wrestler visible in the footage.';
 
-Given images from a wrestling match, provide a detailed technical analysis in the following JSON format ONLY (no markdown, no extra text):
+  return `You are LevelUp, an expert youth wrestling AI coach and video analyst. You analyze wrestling match footage frame by frame using a structured grading rubric.
+
+${athleteId}
+
+If a reference photo of the athlete is included (the first image), use it to visually confirm which wrestler is the athlete throughout the match frames. The reference photo is NOT a match frame — it is a portrait/selfie for identification only.
+
+GRADING RUBRIC — You MUST score each position using these specific sub-criteria:
+
+STANDING (Neutral Position) — 5 sub-criteria, 20 pts each = 100:
+- Stance & Motion (0-20): Level, balance, hand fighting, circle movement, head position
+- Shot Selection (0-20): Penetration step depth, level change speed, setup quality (fakes, ties)
+- Shot Finishing (0-20): Drive through, corner pressure, chain wrestling, trip/sweep combos
+- Sprawl & Defense (0-20): Reaction time, hip pressure, whizzer, re-positioning after sprawl
+- Re-attacks & Chains (0-20): Second/third effort, scramble offense, scoring off failed first shot
+
+TOP (Riding/Breakdown) — 4 sub-criteria, 25 pts each = 100:
+- Ride Tightness (0-25): Waist control, chest-to-back pressure, hip-to-hip contact, leg rides
+- Breakdowns (0-25): Chop, tight-waist/half, ankle breakdown execution, spiral rides
+- Turns & Near Falls (0-25): Tilt series, half nelson, cradle attempts, arm bars, back exposure
+- Mat Returns (0-25): Ability to return opponent to mat after stand-up or escape attempts
+
+BOTTOM (Escape/Reversal) — 4 sub-criteria, 25 pts each = 100:
+- Base & Posture (0-25): Tripod position, head up, elbows tight, wrist control
+- Stand-ups (0-25): Timing, hand control clearing, posture during rise, stepping away
+- Sit-outs & Switches (0-25): Hip heist speed, switch execution, granby rolls
+- Reversals (0-25): Ability to gain control from bottom position, roll-throughs
+
+OVERALL SCORE = Standing (40%) + Top (30%) + Bottom (30%)
+
+Score interpretation:
+- 90-100: Elite technique, state/national caliber
+- 80-89: Advanced, very clean execution
+- 70-79: Solid fundamentals, some areas to polish
+- 60-69: Developing, inconsistent technique
+- Below 60: Beginner, focus on fundamental positions
+
+Given sequentially numbered images from a wrestling match (Frame 1 through Frame N), provide a detailed technical analysis in the following JSON format ONLY (no markdown, no extra text):
 
 {
   "overall_score": <number 0-100>,
@@ -18,24 +57,41 @@ Given images from a wrestling match, provide a detailed technical analysis in th
     "top": <number 0-100>,
     "bottom": <number 0-100>
   },
+  "position_reasoning": {
+    "standing": "<2-3 sentences: what you observed for standing, what earned points under the rubric sub-criteria, what lost points and why>",
+    "top": "<2-3 sentences: what you observed for top position, what earned points, what lost points>",
+    "bottom": "<2-3 sentences: what you observed for bottom position, what earned points, what lost points>"
+  },
+  "frame_annotations": [
+    {
+      "frame_number": <1 to N>,
+      "position": "<standing|top|bottom|transition|other>",
+      "action": "<3-6 word technique description>",
+      "is_key_moment": <true if takedown/escape/near_fall/reversal/pin_attempt>,
+      "key_moment_type": "<takedown|escape|near_fall|reversal|pin_attempt — omit if not key moment>",
+      "detail": "<1 sentence, max 30 words: what you observe about technique in THIS specific frame>",
+      "wrestler_visible": <true if the athlete in the specified singlet color is clearly identifiable in this frame>
+    }
+  ],
   "strengths": [<3 specific technique strengths observed>],
   "weaknesses": [<2-3 specific areas needing improvement>],
   "drills": [<3 specific drill recommendations with reps/sets>],
   "summary": "<2-3 sentence overall assessment>"
 }
 
-Scoring guide:
-- 90-100: Elite technique, state/national level
-- 80-89: Advanced, very clean execution
-- 70-79: Solid fundamentals, some areas to polish
-- 60-69: Developing, clear weaknesses to address
-- Below 60: Beginner, focus on fundamentals
-
-Be specific about wrestling techniques (e.g., "high crotch finish", "tight waist ride", "stand-up from bottom"). Reference actual positions and transitions you observe. Drills should directly address the weaknesses found.`;
+CRITICAL RULES:
+- frame_annotations MUST have exactly one entry per frame image, in chronological order.
+- Keep action descriptions to 3-6 words (e.g., "Single leg shot attempt").
+- Keep detail to one sentence under 30 words.
+- wrestler_visible must be true only when the athlete in the specified singlet color is clearly identifiable in the frame. Set false if obscured, off-screen, or unidentifiable.
+- For each position_reasoning entry, reference specific rubric sub-criteria by name (e.g., "Shot Finishing was strong at 18/20 due to excellent drive-through on the high crotch").
+- Be specific about wrestling techniques (e.g., "high crotch finish", "tight waist ride", "stand-up from bottom"). Reference actual positions and transitions you observe in each frame.
+- Drills should directly address the weaknesses found.`;
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const { frames } = await request.json();
+    const { frames, singletColor, referencePhoto } = await request.json();
 
     if (!frames || !Array.isArray(frames) || frames.length === 0) {
       return NextResponse.json(
@@ -46,33 +102,56 @@ export async function POST(request: NextRequest) {
 
     const openai = getOpenAI();
 
-    // Build the message with image frames
-    const imageMessages: OpenAI.Chat.Completions.ChatCompletionContentPart[] = frames.map(
-      (frame: string) => ({
+    // Build interleaved text+image content: label each frame for GPT-4o to reference
+    const frameContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [];
+
+    if (referencePhoto) {
+      frameContent.push({
+        type: 'text' as const,
+        text: '[Reference Photo — not a match frame]',
+      });
+      frameContent.push({
+        type: 'image_url' as const,
+        image_url: {
+          url: referencePhoto.startsWith('data:') ? referencePhoto : `data:image/jpeg;base64,${referencePhoto}`,
+          detail: 'low' as const,
+        },
+      });
+    }
+
+    frames.forEach((frame: string, index: number) => {
+      frameContent.push({
+        type: 'text' as const,
+        text: `[Frame ${index + 1}]`,
+      });
+      frameContent.push({
         type: 'image_url' as const,
         image_url: {
           url: frame.startsWith('data:') ? frame : `data:image/jpeg;base64,${frame}`,
-          detail: 'low' as const, // Keep costs down, sufficient for wrestling analysis
+          detail: 'low' as const,
         },
-      })
-    );
+      });
+    });
+
+    const colorNote = singletColor ? ` The athlete is wearing a ${singletColor} singlet.` : '';
+    const refNote = referencePhoto ? ' The FIRST image is a reference photo of the athlete (not a match frame). Use it to identify them in the match frames that follow.' : '';
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: buildSystemPrompt(singletColor) },
         {
           role: 'user',
           content: [
             {
               type: 'text',
-              text: `Analyze these ${frames.length} frames from a youth wrestling match. Provide technique scores, strengths, weaknesses, and drill recommendations.`,
+              text: `Analyze these ${frames.length} sequentially numbered frames (Frame 1 through Frame ${frames.length}) from a youth wrestling match in chronological order.${colorNote}${refNote} For each frame, identify the wrestler's position, the specific action/technique occurring, and whether it captures a key moment (takedown, escape, near fall, reversal, or pin attempt). Provide overall technique scores with rubric-based reasoning, strengths, weaknesses, and drill recommendations for the identified athlete only.`,
             },
-            ...imageMessages,
+            ...frameContent,
           ],
         },
       ],
-      max_tokens: 1000,
+      max_tokens: 2800,
       temperature: 0.3,
     });
 
@@ -84,6 +163,28 @@ export async function POST(request: NextRequest) {
     // Parse the JSON response (strip any markdown fences if present)
     const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     const analysis = JSON.parse(cleaned);
+
+    // Validate frame_annotations: ensure correct count, pad if GPT-4o returned fewer
+    if (analysis.frame_annotations) {
+      if (!Array.isArray(analysis.frame_annotations) || analysis.frame_annotations.length !== frames.length) {
+        const annotations = Array.isArray(analysis.frame_annotations) ? analysis.frame_annotations : [];
+        analysis.frame_annotations = frames.map((_: string, i: number) => {
+          return annotations[i] || {
+            frame_number: i + 1,
+            position: 'other',
+            action: 'Unable to analyze',
+            is_key_moment: false,
+            detail: 'Frame annotation was not generated for this frame.',
+            wrestler_visible: false,
+          };
+        });
+      }
+    }
+
+    // Log truncation warning
+    if (response.choices[0]?.finish_reason === 'length') {
+      console.warn('GPT-4o response was truncated — consider increasing max_tokens');
+    }
 
     return NextResponse.json({
       ...analysis,
@@ -103,6 +204,33 @@ export async function POST(request: NextRequest) {
     }
 
     // Fallback mock response so the UX never breaks
+    const mockPositions = ['standing', 'standing', 'transition', 'top', 'top', 'top', 'bottom', 'bottom', 'standing', 'standing'];
+    const mockActions = [
+      'Neutral stance hand fighting',
+      'Level change shot attempt',
+      'Scramble to top position',
+      'Riding with tight waist',
+      'Half nelson turn attempt',
+      'Mat return after standup',
+      'Building base on bottom',
+      'Standup escape attempt',
+      'Return to neutral stance',
+      'Post-whistle reset',
+    ];
+    const mockKeyMoments = [false, true, true, false, true, false, false, true, false, false];
+    const mockKeyTypes = [undefined, 'takedown', undefined, undefined, 'near_fall', undefined, undefined, 'escape', undefined, undefined];
+
+    const frameCount = (frames && Array.isArray(frames)) ? frames.length : 10;
+    const mockAnnotations = Array.from({ length: frameCount }, (_, i) => ({
+      frame_number: i + 1,
+      position: mockPositions[i % mockPositions.length],
+      action: mockActions[i % mockActions.length],
+      is_key_moment: mockKeyMoments[i % mockKeyMoments.length],
+      ...(mockKeyTypes[i % mockKeyTypes.length] ? { key_moment_type: mockKeyTypes[i % mockKeyTypes.length] } : {}),
+      detail: 'Demo mode — connect OpenAI API key for real frame analysis.',
+      wrestler_visible: true,
+    }));
+
     return NextResponse.json({
       overall_score: Math.floor(68 + Math.random() * 28),
       position_scores: {
@@ -110,6 +238,12 @@ export async function POST(request: NextRequest) {
         top: Math.floor(60 + Math.random() * 30),
         bottom: Math.floor(75 + Math.random() * 20),
       },
+      position_reasoning: {
+        standing: 'LevelUp fallback mode — connect OpenAI API key for real rubric-based analysis of standing technique.',
+        top: 'LevelUp fallback mode — connect OpenAI API key for real rubric-based analysis of top position.',
+        bottom: 'LevelUp fallback mode — connect OpenAI API key for real rubric-based analysis of bottom position.',
+      },
+      frame_annotations: mockAnnotations,
       strengths: ['Explosive level change', 'Tight waist rides', 'High-crotch finish'],
       weaknesses: ['Late sprawl reaction', 'Weak scramble defense'],
       drills: [
@@ -117,7 +251,7 @@ export async function POST(request: NextRequest) {
         '5x30s Sprawl + shot reaction drill',
         '3x8 Tight-waist tilts from top',
       ],
-      summary: 'Analysis ran in fallback mode. Upload video frames for real AI feedback.',
+      summary: 'LevelUp ran in fallback mode. Upload video frames with a valid API key for real AI feedback.',
       xp: 150,
       model: 'fallback',
       framesAnalyzed: 0,
