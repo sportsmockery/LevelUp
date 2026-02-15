@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { after } from 'next/server';
 import OpenAI from 'openai';
 import { buildKnowledgeBasePrompt, TECHNIQUE_TAXONOMY, DRILL_DATABASE } from '../../../lib/wrestling-knowledge';
 import { PASS2_RESPONSE_SCHEMA, OPPONENT_SCOUTING_SCHEMA, Pass2Response, OpponentScoutingResponse, FatigueAnalysis } from '../../../lib/analysis-schema';
@@ -19,18 +20,35 @@ function getOpenAI() {
   });
 }
 
-type MatchStyle = 'folkstyle' | 'hs_folkstyle' | 'college_folkstyle' | 'freestyle' | 'grecoRoman';
+type MatchStyle = 'youth_folkstyle' | 'folkstyle' | 'hs_folkstyle' | 'college_folkstyle' | 'freestyle' | 'grecoRoman';
 type AnalysisMode = 'athlete' | 'opponent';
 
+type WrestlerIdInfo = {
+  position_in_id_frame: 'left' | 'right';
+  uniform_description: string;
+  distinguishing_features: string;
+};
+
 // --- PASS 1: Perception-only prompt (no scoring, just observations) ---
-function buildPass1Prompt(singletColor?: string): string {
-  const athleteId = singletColor
-    ? `Focus on the wrestler wearing the ${singletColor.toUpperCase()} singlet/uniform.`
-    : 'Focus on the primary wrestler visible.';
+function buildPass1Prompt(athleteId?: WrestlerIdInfo, opponentId?: WrestlerIdInfo): string {
+  let athleteSection: string;
+
+  if (athleteId && opponentId) {
+    athleteSection = `WRESTLER IDENTIFICATION:
+In the identification frame provided, the athlete was identified as: ${athleteId.uniform_description}, positioned on the ${athleteId.position_in_id_frame} side. Distinguishing features: ${athleteId.distinguishing_features}.
+
+The opponent was identified as: ${opponentId.uniform_description}, positioned on the ${opponentId.position_in_id_frame} side. Distinguishing features: ${opponentId.distinguishing_features}.
+
+For every subsequent frame, track these two wrestlers consistently. Identify them by their uniform description and visible features — NOT by which side of the mat they are on, since positions change constantly during a match.
+
+In each frame observation, confirm which wrestler is the athlete and which is the opponent. If you cannot determine this for a specific frame (e.g., wrestlers are too entangled to distinguish), set wrestler_visible to false and note "wrestler identification uncertain" in the observation.`;
+  } else {
+    athleteSection = 'Focus on the primary wrestler visible.';
+  }
 
   return `You are a wrestling video perception system. Your job is to describe EXACTLY what you see in each frame — body positions, grips, stances, movements, contact points. Do NOT score, judge, or recommend. Just observe.
 
-${athleteId}
+${athleteSection}
 
 For each frame, output a JSON object with:
 {
@@ -59,13 +77,18 @@ Be precise and literal. Describe body angles, limb positions, and spatial relati
 
 // --- PASS 2: Reasoning prompt for athlete analysis ---
 function buildPass2AthletePrompt(
-  singletColor: string | undefined,
   matchStyle: MatchStyle,
   frameCount: number,
   matchContext?: MatchContext,
+  athleteId?: WrestlerIdInfo,
 ): string {
   const knowledgeBase = buildKnowledgeBasePrompt(matchStyle);
-  const colorNote = singletColor ? ` wearing a ${singletColor} singlet` : '';
+  const descriptors: string[] = [];
+  if (athleteId) {
+    descriptors.push(`identified as: ${athleteId.uniform_description}`);
+    if (athleteId.distinguishing_features) descriptors.push(athleteId.distinguishing_features);
+  }
+  const colorNote = descriptors.length > 0 ? ` ${descriptors.join(', ')}` : '';
 
   let contextSection = '';
   if (matchContext) {
@@ -131,11 +154,16 @@ The match had ${frameCount} frames analyzed.`;
 
 // --- PASS 2: Reasoning prompt for opponent scouting ---
 function buildPass2ScoutingPrompt(
-  singletColor: string | undefined,
   matchStyle: MatchStyle,
+  opponentId?: WrestlerIdInfo,
 ): string {
   const knowledgeBase = buildKnowledgeBasePrompt(matchStyle);
-  const colorNote = singletColor ? ` wearing a ${singletColor} singlet` : '';
+  const descriptors: string[] = [];
+  if (opponentId) {
+    descriptors.push(`identified as: ${opponentId.uniform_description}`);
+    if (opponentId.distinguishing_features) descriptors.push(opponentId.distinguishing_features);
+  }
+  const colorNote = descriptors.length > 0 ? ` ${descriptors.join(', ')}` : '';
 
   return `You are LevelUp, an expert wrestling scout and tactician. You are given raw frame-by-frame observations of an OPPONENT wrestler${colorNote} and must produce a tactical scouting report with a gameplan.
 
@@ -393,7 +421,7 @@ function normalizeResponse(
       drills: scouting.gameplan.key_techniques,
       summary: scouting.summary,
       xp: 150,
-      model: 'gpt-4o-2pass',
+      model: 'gpt-4o',
       framesAnalyzed: frameCount,
       scouting,
     };
@@ -461,12 +489,18 @@ function normalizeResponse(
   };
 }
 
-// Allow up to 180s for two-pass analysis
-export const maxDuration = 180;
+// Allow up to 300s for two-pass analysis (Fluid Compute recommended)
+export const maxDuration = 300;
+
+const ANALYSIS_TIMEOUT = 240_000; // 240s — leave 60s buffer before Vercel kills it
+const MAX_BATCHES = 15; // Cap Pass 1 at 15 batches (75 frames)
 
 export async function POST(request: NextRequest) {
+  let parsedFrameCount = 10;
   try {
-    const { frames, singletColor, referencePhoto, matchStyle = 'folkstyle', mode = 'athlete', matchContext } = await request.json();
+    const body = await request.json();
+    const { frames, matchStyle = 'folkstyle', mode = 'athlete', matchContext, athleteIdentification, opponentIdentification, idFrameBase64 } = body;
+    parsedFrameCount = (frames && Array.isArray(frames)) ? frames.length : 10;
 
     if (!frames || !Array.isArray(frames) || frames.length === 0) {
       return NextResponse.json(
@@ -475,40 +509,181 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const validMatchStyle: MatchStyle = ['folkstyle', 'hs_folkstyle', 'college_folkstyle', 'freestyle', 'grecoRoman'].includes(matchStyle) ? matchStyle : 'hs_folkstyle';
+    const validMatchStyle: MatchStyle = ['youth_folkstyle', 'folkstyle', 'hs_folkstyle', 'college_folkstyle', 'freestyle', 'grecoRoman'].includes(matchStyle) ? matchStyle : 'hs_folkstyle';
     const validMode: AnalysisMode = mode === 'opponent' ? 'opponent' : 'athlete';
-
     const validMatchContext: MatchContext | undefined = matchContext && typeof matchContext === 'object' ? matchContext : undefined;
+    const validAthleteId: WrestlerIdInfo | undefined = athleteIdentification && typeof athleteIdentification === 'object' ? athleteIdentification : undefined;
+    const validOpponentId: WrestlerIdInfo | undefined = opponentIdentification && typeof opponentIdentification === 'object' ? opponentIdentification : undefined;
 
-    console.log(`[LevelUp] 2-Pass analysis: ${frames.length} frames, singlet=${singletColor || 'none'}, style=${validMatchStyle}, mode=${validMode}, refPhoto=${!!referencePhoto}, context=${validMatchContext ? 'yes' : 'none'}`);
+    // Async mode: return jobId immediately, run analysis in background
+    const asyncMode = request.nextUrl.searchParams.get('async') === 'true';
+    if (asyncMode && supabase) {
+      const jobId = crypto.randomUUID();
+
+      // Create pending job in Supabase
+      await supabase.from('match_analyses').insert({
+        id: jobId,
+        athlete_id: '00000000-0000-0000-0000-000000000000',
+        overall_score: 0,
+        standing: 0,
+        top: 0,
+        bottom: 0,
+        job_status: 'processing',
+        match_style: validMatchStyle,
+      });
+
+      // Run analysis in background after response is sent
+      after(async () => {
+        try {
+          const result = await runAnalysisPipeline({
+            frames,
+            matchStyle: validMatchStyle, mode: validMode,
+            matchContext: validMatchContext,
+            athleteIdentification: validAthleteId, opponentIdentification: validOpponentId,
+            idFrameBase64,
+          });
+          await supabase!.from('match_analyses').update({
+            job_status: 'complete',
+            analysis_json: result,
+            overall_score: (result as any).overall_score || 0,
+            standing: (result as any).position_scores?.standing || 0,
+            top: (result as any).position_scores?.top || 0,
+            bottom: (result as any).position_scores?.bottom || 0,
+          }).eq('id', jobId);
+          console.log(`[LevelUp] Background job ${jobId} complete`);
+        } catch (err: any) {
+          console.error(`[LevelUp] Background job ${jobId} failed:`, err);
+          await supabase!.from('match_analyses').update({
+            job_status: 'failed',
+            error_message: err?.message || 'Analysis failed',
+          }).eq('id', jobId);
+        }
+      });
+
+      return NextResponse.json({ jobId, status: 'processing' });
+    }
+
+    // Synchronous mode (default): run analysis and return result
+    const result = await runAnalysisPipeline({
+      frames,
+      matchStyle: validMatchStyle, mode: validMode,
+      matchContext: validMatchContext,
+      athleteIdentification: validAthleteId, opponentIdentification: validOpponentId,
+      idFrameBase64,
+    });
+    return NextResponse.json(result);
+
+  } catch (error: any) {
+    console.error('Analysis error:', error);
+
+    if (error?.message === 'ANALYSIS_TIMEOUT') {
+      console.error(`[LevelUp] Analysis timed out after ${ANALYSIS_TIMEOUT / 1000}s`);
+      return NextResponse.json(
+        { error: 'Analysis timed out. Your video may be too long — try a shorter clip (under 7 minutes).', partial: true },
+        { status: 504 }
+      );
+    }
+
+    if (error?.status === 401 || error?.code === 'invalid_api_key') {
+      return NextResponse.json(
+        { error: 'Invalid API key. Check OPENAI_API_KEY in Vercel environment variables.' },
+        { status: 401 }
+      );
+    }
+
+    // Fallback mock response
+    return NextResponse.json(buildFallbackResponse(parsedFrameCount));
+  }
+}
+
+// Shared analysis config type
+type AnalysisConfig = {
+  frames: string[];
+  matchStyle: MatchStyle;
+  mode: AnalysisMode;
+  matchContext?: MatchContext;
+  athleteIdentification?: WrestlerIdInfo;
+  opponentIdentification?: WrestlerIdInfo;
+  idFrameBase64?: string;
+};
+
+// Fallback mock response
+function buildFallbackResponse(frameCount: number) {
+  const mockPositions = ['standing', 'standing', 'transition', 'top', 'top', 'top', 'bottom', 'bottom', 'standing', 'standing'];
+  const mockActions = ['Neutral stance hand fighting', 'Level change shot attempt', 'Scramble to top position', 'Riding with tight waist', 'Half nelson turn attempt', 'Mat return after standup', 'Building base on bottom', 'Standup escape attempt', 'Return to neutral stance', 'Post-whistle reset'];
+  const mockKeyMoments = [false, true, true, false, true, false, false, true, false, false];
+  const mockKeyTypes: (string | undefined)[] = [undefined, 'takedown', undefined, undefined, 'near_fall', undefined, undefined, 'escape', undefined, undefined];
+
+  return {
+    overall_score: Math.floor(68 + Math.random() * 28),
+    position_scores: { standing: Math.floor(70 + Math.random() * 25), top: Math.floor(60 + Math.random() * 30), bottom: Math.floor(75 + Math.random() * 20) },
+    position_reasoning: { standing: 'LevelUp fallback mode.', top: 'LevelUp fallback mode.', bottom: 'LevelUp fallback mode.' },
+    frame_annotations: Array.from({ length: frameCount }, (_, i) => ({
+      frame_number: i + 1, position: mockPositions[i % mockPositions.length], action: mockActions[i % mockActions.length],
+      is_key_moment: mockKeyMoments[i % mockKeyMoments.length],
+      ...(mockKeyTypes[i % mockKeyTypes.length] ? { key_moment_type: mockKeyTypes[i % mockKeyTypes.length] } : {}),
+      detail: 'Demo mode — connect OpenAI API key for real frame analysis.', wrestler_visible: true,
+    })),
+    strengths: ['Explosive level change', 'Tight waist rides', 'High-crotch finish'],
+    weaknesses: ['Late sprawl reaction', 'Weak scramble defense'],
+    drills: ['10x Chain wrestling shots', '5x30s Sprawl + shot reaction drill', '3x8 Tight-waist tilts from top'],
+    summary: 'LevelUp ran in fallback mode. Upload video frames with a valid API key for real AI feedback.',
+    xp: 150, model: 'fallback', framesAnalyzed: 0,
+  };
+}
+
+// Core analysis pipeline — extracted so it can be called synchronously or in after()
+async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<string, unknown>> {
+  const { frames, matchStyle: validMatchStyle, mode: validMode, matchContext: validMatchContext, athleteIdentification: validAthleteId, opponentIdentification: validOpponentId, idFrameBase64 } = config;
 
     const openai = getOpenAI();
 
     // ===== PASS 1: Parallel perception calls =====
     const BATCH_SIZE = 5;
-    const batches: string[][] = [];
+    let batches: string[][] = [];
     for (let i = 0; i < frames.length; i += BATCH_SIZE) {
       batches.push(frames.slice(i, i + BATCH_SIZE));
     }
 
+    // Cap batches to prevent excessive API calls on very long videos
+    if (batches.length > MAX_BATCHES) {
+      console.log(`[LevelUp] Capping batches from ${batches.length} to ${MAX_BATCHES}`);
+      // Keep first and last batch, evenly sample the rest
+      const kept = [batches[0]];
+      const step = (batches.length - 2) / (MAX_BATCHES - 2);
+      for (let i = 1; i < MAX_BATCHES - 1; i++) {
+        kept.push(batches[Math.round(1 + (i - 1) * step)]);
+      }
+      kept.push(batches[batches.length - 1]);
+      batches = kept;
+    }
+
     console.log(`[LevelUp] Pass 1: ${batches.length} batches of up to ${BATCH_SIZE} frames`);
+
+    // Master timeout wrapper
+    const analysisStart = Date.now();
+    const checkTimeout = () => {
+      if (Date.now() - analysisStart > ANALYSIS_TIMEOUT) {
+        throw new Error('ANALYSIS_TIMEOUT');
+      }
+    };
 
     const pass1Results = await Promise.all(
       batches.map(async (batch, batchIndex) => {
         const batchStartIdx = batchIndex * BATCH_SIZE;
         const frameContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [];
 
-        // Include reference photo in first batch only
-        if (batchIndex === 0 && referencePhoto) {
+        // Include ID frame in first batch only (used for wrestler identification context)
+        if (batchIndex === 0 && idFrameBase64) {
           frameContent.push({
             type: 'text' as const,
-            text: '[Reference Photo — not a match frame, use to identify the athlete]',
+            text: '[Identification Frame — this is the frame used to identify the two wrestlers. Use it as a visual reference.]',
           });
           frameContent.push({
             type: 'image_url' as const,
             image_url: {
-              url: referencePhoto.startsWith('data:') ? referencePhoto : `data:image/jpeg;base64,${referencePhoto}`,
-              detail: 'low' as const,
+              url: idFrameBase64.startsWith('data:') ? idFrameBase64 : `data:image/jpeg;base64,${idFrameBase64}`,
+              detail: 'high' as const,
             },
           });
         }
@@ -531,7 +706,7 @@ export async function POST(request: NextRequest) {
         const response = await openai.chat.completions.create({
           model: 'gpt-4o',
           messages: [
-            { role: 'system', content: buildPass1Prompt(singletColor) },
+            { role: 'system', content: buildPass1Prompt(validAthleteId, validOpponentId) },
             {
               role: 'user',
               content: [
@@ -564,7 +739,9 @@ export async function POST(request: NextRequest) {
 
     // Merge all observations
     const allObservations = pass1Results.flatMap((r: any) => r.observations || []);
-    console.log(`[LevelUp] Pass 1 complete: ${allObservations.length} frame observations collected`);
+    console.log(`[LevelUp] Pass 1 complete: ${allObservations.length} frame observations collected (${Math.round((Date.now() - analysisStart) / 1000)}s elapsed)`);
+
+    checkTimeout();
 
     // ===== DISPLAY FRAME SELECTION (Tier 2 → Tier 3) =====
     const SIGNIFICANCE_PRIORITY: Record<string, number> = { CRITICAL: 0, IMPORTANT: 1, CONTEXT: 2, SKIP: 3 };
@@ -612,7 +789,7 @@ export async function POST(request: NextRequest) {
       const pass2Response = await openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [
-          { role: 'system', content: buildPass2ScoutingPrompt(singletColor, validMatchStyle) },
+          { role: 'system', content: buildPass2ScoutingPrompt(validMatchStyle, validOpponentId) },
           {
             role: 'user',
             content: `Here are the frame-by-frame observations of the opponent:\n\n${observationsText}\n\nProduce a tactical scouting report with a gameplan to beat this opponent.`,
@@ -634,7 +811,7 @@ export async function POST(request: NextRequest) {
       const normalized = normalizeResponse(scoutResult, frames.length, 'opponent');
 
       console.log(`[LevelUp] Scouting complete: ${scoutResult.attack_patterns.length} attack patterns, ${scoutResult.defense_patterns.length} defense patterns`);
-      return NextResponse.json(normalized);
+      return normalized;
     }
 
     // Athlete analysis — split observations into halves for fatigue detection
@@ -647,7 +824,7 @@ export async function POST(request: NextRequest) {
     const pass2Response = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
-        { role: 'system', content: buildPass2AthletePrompt(singletColor, validMatchStyle, frames.length, validMatchContext) },
+        { role: 'system', content: buildPass2AthletePrompt(validMatchStyle, frames.length, validMatchContext, validAthleteId) },
         {
           role: 'user',
           content: `Here are the frame-by-frame observations from the match (${frames.length} frames total):\n\n${observationsText}\n\nFor fatigue analysis, here are the observations split by match half:${periodLabel}\n\nScore this wrestler's technique using the rubric. Cite specific frame indices as evidence. Also complete the fatigue analysis comparing first half vs second half.`,
@@ -685,70 +862,5 @@ export async function POST(request: NextRequest) {
       console.warn('[LevelUp] Supabase background save failed:', err)
     );
 
-    return NextResponse.json(normalized);
-
-  } catch (error: any) {
-    console.error('Analysis error:', error);
-
-    if (error?.status === 401 || error?.code === 'invalid_api_key') {
-      return NextResponse.json(
-        { error: 'Invalid API key. Check OPENAI_API_KEY in Vercel environment variables.' },
-        { status: 401 }
-      );
-    }
-
-    // Fallback mock response so the UX never breaks
-    const mockPositions = ['standing', 'standing', 'transition', 'top', 'top', 'top', 'bottom', 'bottom', 'standing', 'standing'];
-    const mockActions = [
-      'Neutral stance hand fighting',
-      'Level change shot attempt',
-      'Scramble to top position',
-      'Riding with tight waist',
-      'Half nelson turn attempt',
-      'Mat return after standup',
-      'Building base on bottom',
-      'Standup escape attempt',
-      'Return to neutral stance',
-      'Post-whistle reset',
-    ];
-    const mockKeyMoments = [false, true, true, false, true, false, false, true, false, false];
-    const mockKeyTypes = [undefined, 'takedown', undefined, undefined, 'near_fall', undefined, undefined, 'escape', undefined, undefined];
-
-    const frameCount = (frames && Array.isArray(frames)) ? frames.length : 10;
-    const mockAnnotations = Array.from({ length: frameCount }, (_, i) => ({
-      frame_number: i + 1,
-      position: mockPositions[i % mockPositions.length],
-      action: mockActions[i % mockActions.length],
-      is_key_moment: mockKeyMoments[i % mockKeyMoments.length],
-      ...(mockKeyTypes[i % mockKeyTypes.length] ? { key_moment_type: mockKeyTypes[i % mockKeyTypes.length] } : {}),
-      detail: 'Demo mode — connect OpenAI API key for real frame analysis.',
-      wrestler_visible: true,
-    }));
-
-    return NextResponse.json({
-      overall_score: Math.floor(68 + Math.random() * 28),
-      position_scores: {
-        standing: Math.floor(70 + Math.random() * 25),
-        top: Math.floor(60 + Math.random() * 30),
-        bottom: Math.floor(75 + Math.random() * 20),
-      },
-      position_reasoning: {
-        standing: 'LevelUp fallback mode — connect OpenAI API key for real rubric-based analysis of standing technique.',
-        top: 'LevelUp fallback mode — connect OpenAI API key for real rubric-based analysis of top position.',
-        bottom: 'LevelUp fallback mode — connect OpenAI API key for real rubric-based analysis of bottom position.',
-      },
-      frame_annotations: mockAnnotations,
-      strengths: ['Explosive level change', 'Tight waist rides', 'High-crotch finish'],
-      weaknesses: ['Late sprawl reaction', 'Weak scramble defense'],
-      drills: [
-        '10x Chain wrestling shots (focus on re-attacks)',
-        '5x30s Sprawl + shot reaction drill',
-        '3x8 Tight-waist tilts from top',
-      ],
-      summary: 'LevelUp ran in fallback mode. Upload video frames with a valid API key for real AI feedback.',
-      xp: 150,
-      model: 'fallback',
-      framesAnalyzed: 0,
-    });
-  }
+    return normalized;
 }

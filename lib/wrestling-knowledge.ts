@@ -2,6 +2,18 @@
 // Used by the two-pass analysis pipeline (Pass 2: reasoning).
 
 export const SCORING_RULES = {
+  youth_folkstyle: {
+    takedown: { points: 3, description: 'Control opponent on mat from neutral (3 pts, same as HS folkstyle)' },
+    escape: { points: 1, description: 'Return to neutral standing from bottom' },
+    reversal: { points: 2, description: 'Go from bottom/defensive to top/offensive control' },
+    nearFall2: { points: 2, description: 'Expose opponent\'s back at <45° for 2-4 seconds' },
+    nearFall3: { points: 3, description: 'Expose opponent\'s back at <45° for 5+ seconds' },
+    nearFall4: { points: 4, description: 'Expose opponent\'s back at <45° for continuous 5+ seconds, near pin' },
+    penalty: { points: 1, description: 'Awarded to opponent for stalling, false start, illegal hold' },
+    technicalFall: { margin: 15, description: 'Match ends when lead reaches 15 points' },
+    periodLengths: { description: '8U/10U: 3×1min, 12U/14U: 1×1min + 2×1:30 (championship), 16U: 3×2min' },
+    notes: { description: 'Scoring rules identical to HS folkstyle. Period lengths vary by age division.' },
+  },
   hs_folkstyle: {
     takedown: { points: 3, description: 'Control opponent on mat from neutral (NFHS 2024-25: 3 pts)' },
     escape: { points: 1, description: 'Return to neutral standing from bottom' },
@@ -176,7 +188,7 @@ export function recommendDrills(weaknesses: string[], position?: string): Drill[
 }
 
 // Build the knowledge base string for Pass 2 prompt injection
-export type MatchStyleKey = 'folkstyle' | 'hs_folkstyle' | 'college_folkstyle' | 'freestyle' | 'grecoRoman';
+export type MatchStyleKey = 'youth_folkstyle' | 'folkstyle' | 'hs_folkstyle' | 'college_folkstyle' | 'freestyle' | 'grecoRoman';
 
 export function buildKnowledgeBasePrompt(matchStyle: MatchStyleKey = 'folkstyle'): string {
   const rules = SCORING_RULES[matchStyle];
