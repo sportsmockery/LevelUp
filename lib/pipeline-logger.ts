@@ -2,10 +2,14 @@
 // Replaces ad-hoc console.log calls with typed, timestamped entries.
 
 export type PipelineStage =
+  | 'triage_start'
+  | 'triage_complete'
   | 'pass1_start'
   | 'pass1_batch'
   | 'pass1_complete'
   | 'identity_check'
+  | 'pose_estimation'
+  | 'temporal_analysis'
   | 'pass2_start'
   | 'pass2_complete'
   | 'validation'

@@ -10,6 +10,9 @@ import { buildAnalysisError } from '../../../lib/analysis-errors';
 import { validatePipelineInvariants } from '../../../lib/pipeline-invariants';
 import { crossValidatePasses } from '../../../lib/pass-validation';
 import { PipelineLogger } from '../../../lib/pipeline-logger';
+import { triageFrames, applyTriage } from '../../../lib/frame-triage';
+import { extractSoftPoseMetrics, computePoseTrends, formatPoseContext } from '../../../lib/pose-estimation';
+import { detectActionWindows, buildTemporalSummary, formatTemporalContext } from '../../../lib/temporal-actions';
 
 type MatchContext = {
   weightClass?: string;
@@ -339,6 +342,11 @@ type AnalysisMetadata = {
   qualityFlags?: Array<{ check: string; severity: string; detail: string }>;
   hallucinationWarnings?: string[];
   pipelineLog?: Record<string, unknown>;
+  triageSummary?: Record<string, unknown>;
+  temporalSummary?: Record<string, unknown>;
+  poseMetrics?: Record<string, unknown>;
+  framesTriaged?: number;
+  framesAfterTriage?: number;
 };
 
 async function saveToSupabase(
@@ -390,6 +398,11 @@ async function saveToSupabase(
         quality_flags: metadata?.qualityFlags,
         hallucination_warnings: metadata?.hallucinationWarnings,
         pipeline_version: 'v2',
+        triage_summary: metadata?.triageSummary,
+        temporal_summary: metadata?.temporalSummary,
+        pose_metrics: metadata?.poseMetrics,
+        frames_triaged: metadata?.framesTriaged,
+        frames_after_triage: metadata?.framesAfterTriage,
       }).select('id').single(),
     ]);
 
@@ -692,11 +705,52 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
     const logger = new PipelineLogger();
     const openai = getOpenAI();
 
+    // ===== FRAME TRIAGE (Gap 1): Pre-filter non-action frames =====
+    let analysisFrames = frames;
+    let originalFrameIndices: number[] | null = null;
+    let triageSummaryData: Record<string, unknown> | undefined;
+
+    // Only triage if we have enough frames to make it worthwhile (>10)
+    if (frames.length > 10) {
+      logger.log('triage_start', { total_frames: frames.length });
+      try {
+        const { results: triageResults, summary: tSummary } = await triageFrames(openai, frames, {
+          minIntensity: 'low',
+          alwaysIncludeEdgeFrames: 2,
+        });
+
+        const { filteredFrames, originalIndices } = applyTriage(frames, triageResults);
+
+        // Only use triage results if we kept at least 60% of frames
+        // (if triage is too aggressive, skip it and use all frames)
+        if (filteredFrames.length >= frames.length * 0.6) {
+          analysisFrames = filteredFrames;
+          originalFrameIndices = originalIndices;
+          triageSummaryData = tSummary as unknown as Record<string, unknown>;
+          logger.log('triage_complete', {
+            kept: filteredFrames.length,
+            filtered: frames.length - filteredFrames.length,
+            duration_ms: tSummary.triage_duration_ms,
+          });
+        } else {
+          logger.log('triage_complete', {
+            skipped: true,
+            reason: 'Triage too aggressive',
+            would_keep: filteredFrames.length,
+            total: frames.length,
+          });
+        }
+      } catch (err: any) {
+        // Triage failure is non-fatal — continue with all frames
+        logger.warn('triage_complete', { error: err?.message || 'Triage failed', using_all_frames: true });
+      }
+    }
+
     // ===== PASS 1: Parallel perception calls =====
     const BATCH_SIZE = 5;
     let batches: string[][] = [];
-    for (let i = 0; i < frames.length; i += BATCH_SIZE) {
-      batches.push(frames.slice(i, i + BATCH_SIZE));
+    for (let i = 0; i < analysisFrames.length; i += BATCH_SIZE) {
+      batches.push(analysisFrames.slice(i, i + BATCH_SIZE));
     }
 
     // Cap batches to prevent excessive API calls on very long videos
@@ -880,6 +934,27 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
 
     logger.log('pass1_complete', { display_frames: displayFrameIndices.size, critical: critical.length, important: important.length, context: context.length });
 
+    // ===== TEMPORAL ACTION DETECTION (Gap 3): Group observations into action windows =====
+    const actionWindows = detectActionWindows(allObservations);
+    const temporalSummary = buildTemporalSummary(actionWindows, frames.length);
+    const temporalContext = formatTemporalContext(actionWindows, temporalSummary);
+    logger.log('temporal_analysis', {
+      windows: actionWindows.length,
+      scoring_windows: temporalSummary.scoring_windows,
+      tempo: temporalSummary.tempo,
+    });
+
+    // ===== POSE ESTIMATION (Gap 2): Extract soft pose metrics from Pass 1 =====
+    const softPoseMetrics = extractSoftPoseMetrics(allObservations);
+    const poseTrends = computePoseTrends(softPoseMetrics);
+    const poseContext = formatPoseContext(softPoseMetrics);
+    logger.log('pose_estimation', {
+      metrics_count: softPoseMetrics.length,
+      hip_trend: poseTrends.hip_height_trend,
+      stance_trend: poseTrends.stance_width_trend,
+      fatigue_indicators: poseTrends.fatigue_indicators.length,
+    });
+
     // ALL observations still go to Pass 2 for scoring (no data loss)
     // ===== PASS 2: Reasoning call (text-only) =====
     const observationsText = allObservations
@@ -930,7 +1005,7 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
         { role: 'system', content: buildPass2AthletePrompt(validMatchStyle, frames.length, validMatchContext, validAthleteId, validAthletePosition) },
         {
           role: 'user',
-          content: `Here are the frame-by-frame observations from the match (${frames.length} frames total):\n\n${observationsText}\n\nFor fatigue analysis, here are the observations split by match half:${periodLabel}\n\nScore this wrestler's technique using the rubric. Cite specific frame indices as evidence. Also complete the fatigue analysis comparing first half vs second half.`,
+          content: `Here are the frame-by-frame observations from the match (${frames.length} frames total):\n\n${observationsText}${temporalContext}${poseContext}\n\nFor fatigue analysis, here are the observations split by match half:${periodLabel}\n\nScore this wrestler's technique using the rubric. Cite specific frame indices as evidence. Also complete the fatigue analysis comparing first half vs second half.${poseTrends.fatigue_indicators.length > 0 ? `\n\nPOSE-BASED FATIGUE INDICATORS:\n${poseTrends.fatigue_indicators.join('\n')}` : ''}`,
         },
       ],
       response_format: {
@@ -975,12 +1050,25 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
 
     const normalized = normalizeResponse(pass2Result, frames.length, 'athlete');
 
-    // Enrich with hardening metadata
+    // Enrich with hardening metadata + Tier 1 data
     (normalized as any).enriched = {
       ...(normalized as any).enriched,
       identity_confidence: identityConfidence,
       position_confidence: positionConfidence,
       analysis_quality_flags: allQualityFlags,
+      triage_summary: triageSummaryData ? {
+        total_frames: frames.length,
+        included_frames: analysisFrames.length,
+        filtered_frames: frames.length - analysisFrames.length,
+      } : undefined,
+      temporal_summary: {
+        total_windows: temporalSummary.total_windows,
+        scoring_windows: temporalSummary.scoring_windows,
+        tempo: temporalSummary.tempo,
+        match_phases: temporalSummary.match_phases,
+      },
+      action_windows: actionWindows.filter(w => w.significance !== 'context').slice(0, 20),
+      pose_trends: poseTrends.fatigue_indicators.length > 0 ? poseTrends : undefined,
     };
 
     logger.log('save', { overall: pass2Result.overall_score, confidence: pass2Result.confidence, evidence: pass2Result.frame_evidence.length, identity_confidence: identityConfidence });
@@ -994,6 +1082,11 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
       qualityFlags: allQualityFlags,
       hallucinationWarnings: warnings,
       pipelineLog: logger.summary(),
+      triageSummary: triageSummaryData,
+      temporalSummary: temporalSummary as unknown as Record<string, unknown>,
+      poseMetrics: poseTrends as unknown as Record<string, unknown>,
+      framesTriaged: frames.length,
+      framesAfterTriage: analysisFrames.length,
     }).catch((err) =>
       logger.warn('save', { error: err?.message || 'Supabase save failed' })
     );
