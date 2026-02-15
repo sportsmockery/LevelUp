@@ -103,6 +103,9 @@ CRITICAL RULES:
 - Drills should directly address the weaknesses found.`;
 }
 
+// Allow up to 60s for GPT-4o vision analysis with high-detail frames
+export const maxDuration = 60;
+
 export async function POST(request: NextRequest) {
   try {
     const { frames, singletColor, referencePhoto } = await request.json();
@@ -113,6 +116,9 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+
+    console.log(`[LevelUp] Analyzing ${frames.length} frames, singlet: ${singletColor || 'none'}, refPhoto: ${!!referencePhoto}`);
+    console.log(`[LevelUp] Frame sizes (bytes): ${frames.map((f: string) => f.length).join(', ')}`);
 
     const openai = getOpenAI();
 
@@ -142,7 +148,7 @@ export async function POST(request: NextRequest) {
         type: 'image_url' as const,
         image_url: {
           url: frame.startsWith('data:') ? frame : `data:image/jpeg;base64,${frame}`,
-          detail: 'low' as const,
+          detail: 'high' as const,
         },
       });
     });
@@ -165,11 +171,16 @@ export async function POST(request: NextRequest) {
           ],
         },
       ],
-      max_tokens: 2800,
-      temperature: 0.3,
+      max_tokens: 4096,
+      temperature: 0,
+      seed: 42,
     });
 
     const content = response.choices[0]?.message?.content;
+    const finishReason = response.choices[0]?.finish_reason;
+    const usage = response.usage;
+    console.log(`[LevelUp] GPT-4o responded: finish_reason=${finishReason}, tokens=${usage?.total_tokens}, prompt=${usage?.prompt_tokens}, completion=${usage?.completion_tokens}`);
+
     if (!content) {
       throw new Error('No response from AI');
     }
