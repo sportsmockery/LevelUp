@@ -24,7 +24,7 @@ LATEST_URL=$(vercel ls 2>/dev/null | head -1)
 if [ -n "$LATEST_URL" ]; then
   while true; do
     INSPECT=$(vercel inspect "$LATEST_URL" 2>&1 || true)
-    STATUS=$(echo "$INSPECT" | grep -oP 'status\s+●\s+\K\w+' || true)
+    STATUS=$(echo "$INSPECT" | sed -n 's/.*status[[:space:]]*●[[:space:]]*\([A-Za-z]*\).*/\1/p' | head -1)
 
     if [ "$STATUS" = "Ready" ] || [ "$STATUS" = "Canceled" ]; then
       break
@@ -96,7 +96,7 @@ VERIFY_MAX=180  # 3 minutes
 
 while true; do
   INSPECT=$(vercel inspect "$DEPLOY_URL" 2>&1 || true)
-  STATUS=$(echo "$INSPECT" | grep -oP 'status\s+●\s+\K\w+' || true)
+  STATUS=$(echo "$INSPECT" | sed -n 's/.*status[[:space:]]*●[[:space:]]*\([A-Za-z]*\).*/\1/p' | head -1)
 
   if [ "$STATUS" = "Ready" ]; then
     break
