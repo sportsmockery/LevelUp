@@ -6,6 +6,10 @@ import { PASS2_RESPONSE_SCHEMA, OPPONENT_SCOUTING_SCHEMA, Pass2Response, Opponen
 import { supabase } from '../../../lib/supabase';
 import { extractMatchStats } from '../../../lib/stats-extractor';
 import { checkBadges } from '../../../lib/badge-checker';
+import { buildAnalysisError } from '../../../lib/analysis-errors';
+import { validatePipelineInvariants } from '../../../lib/pipeline-invariants';
+import { crossValidatePasses } from '../../../lib/pass-validation';
+import { PipelineLogger } from '../../../lib/pipeline-logger';
 
 type MatchContext = {
   weightClass?: string;
@@ -27,6 +31,7 @@ type WrestlerIdInfo = {
   position_in_id_frame: 'left' | 'right';
   uniform_description: string;
   distinguishing_features: string;
+  bounding_box_pct?: { x: number; y: number; w: number; h: number };
 };
 
 // --- PASS 1: Perception-only prompt (no scoring, just observations) ---
@@ -66,6 +71,12 @@ For each frame, output a JSON object with:
       "contact_points": "<where are the wrestlers touching? grips, ties, holds>",
       "action": "<what movement/technique is happening in this frame>",
       "wrestler_visible": <true if athlete in specified singlet is clearly identifiable>,
+      "athlete_identity_consistent": <true if the athlete matches the identified wrestler from the ID frame>,
+      "identity_notes": "<if uncertain, explain why — e.g., 'wrestlers entangled, cannot distinguish'>",
+      "estimated_stance_height": "<low/medium/high — how tall is the athlete standing?>",
+      "estimated_knee_angle": "<deep_bend/moderate/straight>",
+      "relative_position": "<tied_up/separated/on_mat/scramble>",
+      "weight_distribution": "<forward/centered/backward>",
       "significance": "<CRITICAL/IMPORTANT/CONTEXT/SKIP>"
     }
   ]
@@ -76,6 +87,12 @@ SIGNIFICANCE LEVELS:
 - IMPORTANT: Scrambles with position changes, defensive wins, key transitions between positions
 - CONTEXT: Setup sequences, grip fighting establishing position, pre-shot setup
 - SKIP: Routine hand fighting with no position change, resets, referee stoppages, inactivity
+
+IDENTITY TRACKING: In each frame, confirm the athlete matches the wrestler identified in the ID frame by checking uniform description and visible features. Set "athlete_identity_consistent" to true only if you are confident. If the wrestlers are too entangled or the athlete is not visible, set it to false and explain in "identity_notes".
+
+POSE ESTIMATION: Use the structured stance/posture fields (estimated_stance_height, estimated_knee_angle, relative_position, weight_distribution) to ground your observations. These estimates help Pass 2 produce more accurate scoring.
+
+IMPORTANT: You MUST provide exactly one observation for EVERY frame provided. Do NOT skip any frames, even if they appear similar or unremarkable — mark those as significance "CONTEXT" or "SKIP" but still describe what you see.
 
 Be precise and literal. Describe body angles, limb positions, and spatial relationships. If you cannot see something clearly, say so.`;
 }
@@ -314,11 +331,22 @@ function detectHallucinations(result: Pass2Response, frameCount: number): string
 }
 
 // --- Fire-and-forget Supabase persistence ---
+type AnalysisMetadata = {
+  athleteSide?: 'left' | 'right';
+  athleteBoundingBox?: { x: number; y: number; w: number; h: number };
+  opponentBoundingBox?: { x: number; y: number; w: number; h: number };
+  identityConfidence?: number;
+  qualityFlags?: Array<{ check: string; severity: string; detail: string }>;
+  hallucinationWarnings?: string[];
+  pipelineLog?: Record<string, unknown>;
+};
+
 async function saveToSupabase(
   pass2Result: Pass2Response,
   normalized: Record<string, unknown>,
   matchStyle: string,
   matchContext?: MatchContext,
+  metadata?: AnalysisMetadata,
 ): Promise<void> {
   if (!supabase) return;
 
@@ -355,6 +383,13 @@ async function saveToSupabase(
         fatigue_flag: pass2Result.fatigue_analysis.conditioning_flag,
         first_half_score: pass2Result.fatigue_analysis.first_half_score,
         second_half_score: pass2Result.fatigue_analysis.second_half_score,
+        athlete_side: metadata?.athleteSide,
+        athlete_bounding_box: metadata?.athleteBoundingBox,
+        opponent_bounding_box: metadata?.opponentBoundingBox,
+        identity_confidence: metadata?.identityConfidence,
+        quality_flags: metadata?.qualityFlags,
+        hallucination_warnings: metadata?.hallucinationWarnings,
+        pipeline_version: 'v2',
       }).select('id').single(),
     ]);
 
@@ -409,19 +444,16 @@ function normalizeResponse(
   pass2: Pass2Response,
   frameCount: number,
   mode: 'athlete',
-  displayFrameIndices?: Set<number>,
 ): Record<string, unknown>;
 function normalizeResponse(
   pass2: OpponentScoutingResponse,
   frameCount: number,
   mode: 'opponent',
-  displayFrameIndices?: Set<number>,
 ): Record<string, unknown>;
 function normalizeResponse(
   pass2: Pass2Response | OpponentScoutingResponse,
   frameCount: number,
   mode: AnalysisMode,
-  displayFrameIndices?: Set<number>,
 ): Record<string, unknown> {
   if (mode === 'opponent') {
     const scouting = pass2 as OpponentScoutingResponse;
@@ -443,38 +475,39 @@ function normalizeResponse(
 
   const athlete = pass2 as Pass2Response;
 
-  // Build backwards-compatible frame_annotations from frame_evidence
-  // Only include display frames (Tier 3) if displayFrameIndices is provided
-  const evidenceToUse = displayFrameIndices
-    ? athlete.frame_evidence.filter((fe) => displayFrameIndices.has(fe.frame_index))
-    : athlete.frame_evidence;
+  // Build backwards-compatible frame_annotations from ALL frame_evidence
+  // Use an index map so each annotation[i] corresponds to frame i
+  const evidenceMap = new Map<number, (typeof athlete.frame_evidence)[0]>();
+  for (const fe of athlete.frame_evidence) {
+    evidenceMap.set(fe.frame_index, fe);
+  }
 
-  const frameAnnotations = evidenceToUse.map((fe) => ({
-    frame_number: fe.frame_index + 1,
-    position: fe.position,
-    action: fe.action,
-    is_key_moment: fe.is_key_moment,
-    ...(fe.key_moment_type && fe.key_moment_type !== '' ? { key_moment_type: fe.key_moment_type } : {}),
-    detail: fe.detail,
-    wrestler_visible: fe.wrestler_visible,
-    rubric_impact: fe.rubric_impact || undefined,
-    confidence: fe.wrestler_visible ? athlete.confidence : athlete.confidence * 0.5,
-  }));
-
-  // Pad remaining frames as "not analyzed"
-  while (frameAnnotations.length < frameCount) {
-    const idx = frameAnnotations.length;
-    frameAnnotations.push({
+  const frameAnnotations = Array.from({ length: frameCount }, (_, idx) => {
+    const fe = evidenceMap.get(idx);
+    if (fe) {
+      return {
+        frame_number: idx + 1,
+        position: fe.position,
+        action: fe.action,
+        is_key_moment: fe.is_key_moment,
+        ...(fe.key_moment_type && fe.key_moment_type !== '' ? { key_moment_type: fe.key_moment_type } : {}),
+        detail: fe.detail,
+        wrestler_visible: fe.wrestler_visible,
+        rubric_impact: fe.rubric_impact || undefined,
+        confidence: fe.wrestler_visible ? athlete.confidence : athlete.confidence * 0.5,
+      };
+    }
+    return {
       frame_number: idx + 1,
-      position: 'other',
+      position: 'other' as const,
       action: 'Frame not analyzed',
       is_key_moment: false,
       detail: 'This frame was not selected as key evidence.',
       wrestler_visible: false,
       rubric_impact: undefined,
       confidence: 0,
-    });
-  }
+    };
+  });
 
   // Flatten drills to string array for backwards compat
   const flatDrills = athlete.drills.map((d) => `${d.name}: ${d.reps} — ${d.description}`);
@@ -568,9 +601,11 @@ export async function POST(request: NextRequest) {
           console.log(`[LevelUp] Background job ${jobId} complete`);
         } catch (err: any) {
           console.error(`[LevelUp] Background job ${jobId} failed:`, err);
+          const errorCode = err?.message === 'ANALYSIS_TIMEOUT' ? 'ANALYSIS_TIMEOUT' : 'ANALYSIS_ERROR';
+          const structuredError = buildAnalysisError(errorCode as 'ANALYSIS_TIMEOUT' | 'ANALYSIS_ERROR', err?.message);
           await supabase!.from('match_analyses').update({
             job_status: 'failed',
-            error_message: err?.message || 'Analysis failed',
+            error_message: structuredError.userMessage,
           }).eq('id', jobId);
         }
       });
@@ -594,20 +629,22 @@ export async function POST(request: NextRequest) {
     if (error?.message === 'ANALYSIS_TIMEOUT') {
       console.error(`[LevelUp] Analysis timed out after ${ANALYSIS_TIMEOUT / 1000}s`);
       return NextResponse.json(
-        { error: 'Analysis timed out. Your video may be too long — try a shorter clip (under 7 minutes).', partial: true },
+        buildAnalysisError('ANALYSIS_TIMEOUT'),
         { status: 504 }
       );
     }
 
     if (error?.status === 401 || error?.code === 'invalid_api_key') {
       return NextResponse.json(
-        { error: 'Invalid API key. Check OPENAI_API_KEY in Vercel environment variables.' },
+        buildAnalysisError('INVALID_API_KEY'),
         { status: 401 }
       );
     }
 
-    // Fallback mock response
-    return NextResponse.json(buildFallbackResponse(parsedFrameCount));
+    return NextResponse.json(
+      buildAnalysisError('ANALYSIS_ERROR', error?.message),
+      { status: 500 }
+    );
   }
 }
 
@@ -623,7 +660,7 @@ type AnalysisConfig = {
   athletePosition?: 'left' | 'right';
 };
 
-// Fallback mock response
+/** @deprecated Use buildAnalysisError() for all error responses. Retained for reference only. */
 function buildFallbackResponse(frameCount: number) {
   const mockPositions = ['standing', 'standing', 'transition', 'top', 'top', 'top', 'bottom', 'bottom', 'standing', 'standing'];
   const mockActions = ['Neutral stance hand fighting', 'Level change shot attempt', 'Scramble to top position', 'Riding with tight waist', 'Half nelson turn attempt', 'Mat return after standup', 'Building base on bottom', 'Standup escape attempt', 'Return to neutral stance', 'Post-whistle reset'];
@@ -652,6 +689,7 @@ function buildFallbackResponse(frameCount: number) {
 async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<string, unknown>> {
   const { frames, matchStyle: validMatchStyle, mode: validMode, matchContext: validMatchContext, athleteIdentification: validAthleteId, opponentIdentification: validOpponentId, idFrameBase64, athletePosition: validAthletePosition } = config;
 
+    const logger = new PipelineLogger();
     const openai = getOpenAI();
 
     // ===== PASS 1: Parallel perception calls =====
@@ -674,7 +712,7 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
       batches = kept;
     }
 
-    console.log(`[LevelUp] Pass 1: ${batches.length} batches of up to ${BATCH_SIZE} frames`);
+    logger.log('pass1_start', { batches: batches.length, batch_size: BATCH_SIZE, total_frames: frames.length });
 
     // Master timeout wrapper
     const analysisStart = Date.now();
@@ -747,7 +785,7 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
           const parsed = JSON.parse(content);
           return parsed;
         } catch {
-          console.warn(`[LevelUp] Pass 1 batch ${batchIndex} JSON parse failed, returning empty`);
+          logger.warn('pass1_batch', { batch: batchIndex, error: 'JSON parse failed' });
           return { observations: [] };
         }
       })
@@ -755,7 +793,56 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
 
     // Merge all observations
     const allObservations = pass1Results.flatMap((r: any) => r.observations || []);
-    console.log(`[LevelUp] Pass 1 complete: ${allObservations.length} frame observations collected (${Math.round((Date.now() - analysisStart) / 1000)}s elapsed)`);
+
+    // Compute identity confidence from Pass 1
+    const visibleFrames = allObservations.filter((obs: any) => obs.wrestler_visible);
+    const identityConsistentFrames = allObservations.filter((obs: any) => obs.athlete_identity_consistent === true);
+    const identityConfidence = visibleFrames.length > 0
+      ? identityConsistentFrames.length / visibleFrames.length
+      : 0;
+
+    // Compute per-position confidence from frame visibility ratios
+    const positionFrames: Record<string, { total: number; visible: number }> = {
+      standing: { total: 0, visible: 0 },
+      top: { total: 0, visible: 0 },
+      bottom: { total: 0, visible: 0 },
+    };
+    for (const obs of allObservations) {
+      const pos = (obs as any).athlete_position;
+      if (pos in positionFrames) {
+        positionFrames[pos].total++;
+        if ((obs as any).wrestler_visible) positionFrames[pos].visible++;
+      }
+    }
+    const positionConfidence = {
+      standing: positionFrames.standing.total > 0 ? positionFrames.standing.visible / positionFrames.standing.total : 0,
+      top: positionFrames.top.total > 0 ? positionFrames.top.visible / positionFrames.top.total : 0,
+      bottom: positionFrames.bottom.total > 0 ? positionFrames.bottom.visible / positionFrames.bottom.total : 0,
+    };
+
+    logger.log('pass1_complete', {
+      observations: allObservations.length,
+      identity_confidence: identityConfidence,
+      position_confidence: positionConfidence,
+    });
+
+    // Validate Pass 1 coverage — warn if many frames were skipped
+    if (allObservations.length < frames.length * 0.7) {
+      logger.warn('pass1_complete', {
+        message: 'Under-reported',
+        observations: allObservations.length,
+        frames: frames.length,
+        coverage: Math.round(allObservations.length / frames.length * 100),
+      });
+    }
+
+    if (identityConfidence < 0.5) {
+      logger.warn('identity_check', {
+        identity_confidence: identityConfidence,
+        visible_frames: visibleFrames.length,
+        consistent_frames: identityConsistentFrames.length,
+      });
+    }
 
     checkTimeout();
 
@@ -791,7 +878,7 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
       }
     }
 
-    console.log(`[LevelUp] Display frames: ${displayFrameIndices.size} selected (${critical.length} critical, ${important.length} important, ${context.length} context)`);
+    logger.log('pass1_complete', { display_frames: displayFrameIndices.size, critical: critical.length, important: important.length, context: context.length });
 
     // ALL observations still go to Pass 2 for scoring (no data loss)
     // ===== PASS 2: Reasoning call (text-only) =====
@@ -801,7 +888,7 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
 
     if (validMode === 'opponent') {
       // Scouting analysis
-      console.log('[LevelUp] Pass 2: Opponent scouting analysis');
+      logger.log('pass2_start', { mode: 'opponent' });
       const pass2Response = await openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [
@@ -826,7 +913,7 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
       const scoutResult: OpponentScoutingResponse = JSON.parse(scoutContent);
       const normalized = normalizeResponse(scoutResult, frames.length, 'opponent');
 
-      console.log(`[LevelUp] Scouting complete: ${scoutResult.attack_patterns.length} attack patterns, ${scoutResult.defense_patterns.length} defense patterns`);
+      logger.log('pass2_complete', { attack_patterns: scoutResult.attack_patterns.length, defense_patterns: scoutResult.defense_patterns.length });
       return normalized;
     }
 
@@ -836,7 +923,7 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
     const secondHalfObs = allObservations.slice(halfIdx);
     const periodLabel = `\n\n--- FIRST HALF (frames 0-${halfIdx - 1}, early match) ---\n${firstHalfObs.map((obs: any) => `Frame ${obs.frame_index}: position=${obs.athlete_position}, body=${obs.athlete_body}, action=${obs.action}`).join('\n')}\n\n--- SECOND HALF (frames ${halfIdx}-${allObservations.length - 1}, late match) ---\n${secondHalfObs.map((obs: any) => `Frame ${obs.frame_index}: position=${obs.athlete_position}, body=${obs.athlete_body}, action=${obs.action}`).join('\n')}`;
 
-    console.log('[LevelUp] Pass 2: Athlete technique analysis with structured output');
+    logger.log('pass2_start', { mode: 'athlete', frame_count: frames.length });
     const pass2Response = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
@@ -857,7 +944,7 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
 
     const pass2Content = pass2Response.choices[0]?.message?.content;
     const usage = pass2Response.usage;
-    console.log(`[LevelUp] Pass 2 responded: tokens=${usage?.total_tokens}, prompt=${usage?.prompt_tokens}, completion=${usage?.completion_tokens}`);
+    logger.log('pass2_complete', { tokens: usage?.total_tokens, prompt_tokens: usage?.prompt_tokens, completion_tokens: usage?.completion_tokens });
 
     if (!pass2Content) throw new Error('No response from Pass 2');
 
@@ -866,16 +953,49 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
     // Hallucination checks
     const warnings = detectHallucinations(pass2Result, frames.length);
     if (warnings.length > 0) {
-      console.warn(`[LevelUp] Hallucination warnings: ${warnings.join('; ')}`);
+      logger.warn('validation', { hallucination_warnings: warnings });
     }
 
-    const normalized = normalizeResponse(pass2Result, frames.length, 'athlete', displayFrameIndices);
+    // Pipeline invariant checks
+    const invariantWarnings = validatePipelineInvariants(pass2Result, frames.length, allObservations.length);
+    if (invariantWarnings.length > 0) {
+      logger.warn('validation', { invariant_warnings: invariantWarnings });
+    }
 
-    console.log(`[LevelUp] Analysis complete: overall=${pass2Result.overall_score}, confidence=${pass2Result.confidence}, evidence=${pass2Result.frame_evidence.length} frames`);
+    // Cross-validate Pass 1 and Pass 2
+    const qualityFlags = crossValidatePasses(allObservations, pass2Result, frames.length);
+    if (qualityFlags.length > 0) {
+      logger.warn('validation', { quality_flags: qualityFlags });
+    }
+
+    const allQualityFlags = [
+      ...invariantWarnings.map(w => ({ check: w.check, severity: w.severity, detail: w.detail })),
+      ...qualityFlags.map(f => ({ check: f.check, severity: f.severity, detail: f.detail })),
+    ];
+
+    const normalized = normalizeResponse(pass2Result, frames.length, 'athlete');
+
+    // Enrich with hardening metadata
+    (normalized as any).enriched = {
+      ...(normalized as any).enriched,
+      identity_confidence: identityConfidence,
+      position_confidence: positionConfidence,
+      analysis_quality_flags: allQualityFlags,
+    };
+
+    logger.log('save', { overall: pass2Result.overall_score, confidence: pass2Result.confidence, evidence: pass2Result.frame_evidence.length, identity_confidence: identityConfidence });
 
     // Fire-and-forget Supabase save — client gets response immediately
-    saveToSupabase(pass2Result, normalized, validMatchStyle, validMatchContext).catch((err) =>
-      console.warn('[LevelUp] Supabase background save failed:', err)
+    saveToSupabase(pass2Result, normalized, validMatchStyle, validMatchContext, {
+      athleteSide: validAthletePosition,
+      athleteBoundingBox: validAthleteId?.bounding_box_pct,
+      opponentBoundingBox: validOpponentId?.bounding_box_pct,
+      identityConfidence,
+      qualityFlags: allQualityFlags,
+      hallucinationWarnings: warnings,
+      pipelineLog: logger.summary(),
+    }).catch((err) =>
+      logger.warn('save', { error: err?.message || 'Supabase save failed' })
     );
 
     return normalized;
