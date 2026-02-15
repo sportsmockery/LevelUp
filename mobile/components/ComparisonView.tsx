@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
-import { ArrowLeft, TrendingUp, TrendingDown, Minus, CheckCircle, AlertTriangle } from 'lucide-react-native';
+import { ArrowLeft, TrendingUp, TrendingDown, Minus, CheckCircle, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { AnalysisHistoryEntry } from '@/lib/types';
 
 type Props = {
@@ -22,16 +22,13 @@ const getDeltaColor = (delta: number) => {
   return '#71717A';
 };
 
-const getDeltaText = (delta: number) => {
-  if (delta > 0) return `+${delta}`;
-  if (delta < 0) return `${delta}`;
-  return '0';
-};
-
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
 export default function ComparisonView({ entryA, entryB, onBack }: Props) {
+  const [strengthsExpanded, setStrengthsExpanded] = useState(false);
+  const [weaknessesExpanded, setWeaknessesExpanded] = useState(false);
+
   const a = entryA.result;
   const b = entryB.result;
 
@@ -105,9 +102,6 @@ export default function ComparisonView({ entryA, entryB, onBack }: Props) {
 
         <View style={[styles.deltaCard, { backgroundColor: getDeltaColor(overallDelta) + '1A' }]}>
           <DeltaIcon delta={overallDelta} />
-          <Text style={[styles.deltaValue, { color: getDeltaColor(overallDelta) }]}>
-            {getDeltaText(overallDelta)}
-          </Text>
         </View>
 
         <View style={styles.overallCard}>
@@ -133,9 +127,6 @@ export default function ComparisonView({ entryA, entryB, onBack }: Props) {
               <DeltaIcon delta={pos.delta} />
             </View>
             <Text style={[styles.posScore, { color: getScoreColor(pos.scoreB) }]}>{pos.scoreB}</Text>
-            <Text style={[styles.posDelta, { color: getDeltaColor(pos.delta) }]}>
-              {getDeltaText(pos.delta)}
-            </Text>
           </View>
         ))}
       </View>
@@ -170,12 +161,17 @@ export default function ComparisonView({ entryA, entryB, onBack }: Props) {
               {group.items.map((item) => {
                 const d = item.b - item.a;
                 return (
-                  <View key={item.label} style={styles.subScoreRow}>
+                  <View key={item.label} style={styles.subScoreCard}>
                     <Text style={styles.subScoreLabel}>{item.label}</Text>
-                    <Text style={styles.subScoreVal}>{item.a}</Text>
-                    <View style={styles.subScoreArrow}><DeltaIcon delta={d} /></View>
-                    <Text style={styles.subScoreVal}>{item.b}</Text>
-                    <Text style={[styles.subScoreDelta, { color: getDeltaColor(d) }]}>{getDeltaText(d)}</Text>
+                    <View style={styles.subScoreStackedRow}>
+                      <Text style={styles.subScoreTag}>A</Text>
+                      <Text style={[styles.subScoreVal, { color: getScoreColor(item.a) }]}>{item.a}</Text>
+                    </View>
+                    <View style={styles.subScoreStackedRow}>
+                      <Text style={styles.subScoreTag}>B</Text>
+                      <Text style={[styles.subScoreVal, { color: getScoreColor(item.b) }]}>{item.b}</Text>
+                      <DeltaIcon delta={d} />
+                    </View>
                   </View>
                 );
               })}
@@ -184,79 +180,129 @@ export default function ComparisonView({ entryA, entryB, onBack }: Props) {
         </View>
       )}
 
-      {/* Strengths Comparison */}
+      {/* Strengths Comparison — Collapsible */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>STRENGTHS EVOLUTION</Text>
-        {newStrengths.length > 0 && (
-          <View style={styles.changeGroup}>
-            <Text style={styles.changeLabel}>NEW STRENGTHS</Text>
-            {newStrengths.map((s, i) => (
-              <View key={i} style={styles.changeItem}>
-                <CheckCircle size={14} color="#22C55E" />
-                <Text style={styles.changeText}>{s}</Text>
+        <TouchableOpacity
+          style={styles.accordionHeader}
+          onPress={() => setStrengthsExpanded(!strengthsExpanded)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.sectionTitle}>STRENGTHS EVOLUTION</Text>
+          <View style={styles.accordionBadgeRow}>
+            {newStrengths.length > 0 && (
+              <View style={[styles.accordionBadge, { backgroundColor: '#22C55E20' }]}>
+                <TrendingUp size={10} color="#22C55E" />
+                <Text style={[styles.accordionBadgeText, { color: '#22C55E' }]}>{newStrengths.length}</Text>
               </View>
-            ))}
-          </View>
-        )}
-        {keptStrengths.length > 0 && (
-          <View style={styles.changeGroup}>
-            <Text style={[styles.changeLabel, { color: '#71717A' }]}>MAINTAINED</Text>
-            {keptStrengths.map((s, i) => (
-              <View key={i} style={styles.changeItem}>
-                <Minus size={14} color="#71717A" />
-                <Text style={[styles.changeText, { color: '#71717A' }]}>{s}</Text>
+            )}
+            {lostStrengths.length > 0 && (
+              <View style={[styles.accordionBadge, { backgroundColor: '#EF444420' }]}>
+                <TrendingDown size={10} color="#EF4444" />
+                <Text style={[styles.accordionBadgeText, { color: '#EF4444' }]}>{lostStrengths.length}</Text>
               </View>
-            ))}
+            )}
+            {strengthsExpanded ? <ChevronUp size={16} color="#71717A" /> : <ChevronDown size={16} color="#71717A" />}
           </View>
-        )}
-        {lostStrengths.length > 0 && (
-          <View style={styles.changeGroup}>
-            <Text style={[styles.changeLabel, { color: '#EF4444' }]}>NO LONGER NOTED</Text>
-            {lostStrengths.map((s, i) => (
-              <View key={i} style={styles.changeItem}>
-                <TrendingDown size={14} color="#EF4444" />
-                <Text style={[styles.changeText, { color: '#A1A1AA' }]}>{s}</Text>
+        </TouchableOpacity>
+        {strengthsExpanded && (
+          <>
+            {newStrengths.length > 0 && (
+              <View style={styles.changeGroup}>
+                <Text style={styles.changeLabel}>NEW STRENGTHS</Text>
+                {newStrengths.map((s, i) => (
+                  <View key={i} style={styles.changeItem}>
+                    <CheckCircle size={14} color="#22C55E" />
+                    <Text style={styles.changeText}>{s}</Text>
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
+            )}
+            {keptStrengths.length > 0 && (
+              <View style={styles.changeGroup}>
+                <Text style={[styles.changeLabel, { color: '#71717A' }]}>MAINTAINED</Text>
+                {keptStrengths.map((s, i) => (
+                  <View key={i} style={styles.changeItem}>
+                    <Minus size={14} color="#71717A" />
+                    <Text style={[styles.changeText, { color: '#71717A' }]}>{s}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+            {lostStrengths.length > 0 && (
+              <View style={styles.changeGroup}>
+                <Text style={[styles.changeLabel, { color: '#EF4444' }]}>NO LONGER NOTED</Text>
+                {lostStrengths.map((s, i) => (
+                  <View key={i} style={styles.changeItem}>
+                    <TrendingDown size={14} color="#EF4444" />
+                    <Text style={[styles.changeText, { color: '#A1A1AA' }]}>{s}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </>
         )}
       </View>
 
-      {/* Weaknesses Comparison */}
+      {/* Weaknesses Comparison — Collapsible */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: '#E91E8C' }]}>WEAKNESSES EVOLUTION</Text>
-        {fixedWeaknesses.length > 0 && (
-          <View style={styles.changeGroup}>
-            <Text style={[styles.changeLabel, { color: '#22C55E' }]}>ADDRESSED</Text>
-            {fixedWeaknesses.map((w, i) => (
-              <View key={i} style={styles.changeItem}>
-                <CheckCircle size={14} color="#22C55E" />
-                <Text style={[styles.changeText, { textDecorationLine: 'line-through', color: '#52525B' }]}>{w}</Text>
+        <TouchableOpacity
+          style={styles.accordionHeader}
+          onPress={() => setWeaknessesExpanded(!weaknessesExpanded)}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.sectionTitle, { color: '#E91E8C' }]}>WEAKNESSES EVOLUTION</Text>
+          <View style={styles.accordionBadgeRow}>
+            {fixedWeaknesses.length > 0 && (
+              <View style={[styles.accordionBadge, { backgroundColor: '#22C55E20' }]}>
+                <CheckCircle size={10} color="#22C55E" />
+                <Text style={[styles.accordionBadgeText, { color: '#22C55E' }]}>{fixedWeaknesses.length}</Text>
               </View>
-            ))}
-          </View>
-        )}
-        {persistingWeaknesses.length > 0 && (
-          <View style={styles.changeGroup}>
-            <Text style={[styles.changeLabel, { color: '#EAB308' }]}>STILL PRESENT</Text>
-            {persistingWeaknesses.map((w, i) => (
-              <View key={i} style={styles.changeItem}>
-                <AlertTriangle size={14} color="#EAB308" />
-                <Text style={styles.changeText}>{w}</Text>
+            )}
+            {newWeaknesses.length > 0 && (
+              <View style={[styles.accordionBadge, { backgroundColor: '#EF444420' }]}>
+                <TrendingDown size={10} color="#EF4444" />
+                <Text style={[styles.accordionBadgeText, { color: '#EF4444' }]}>{newWeaknesses.length}</Text>
               </View>
-            ))}
+            )}
+            {weaknessesExpanded ? <ChevronUp size={16} color="#71717A" /> : <ChevronDown size={16} color="#71717A" />}
           </View>
-        )}
-        {newWeaknesses.length > 0 && (
-          <View style={styles.changeGroup}>
-            <Text style={[styles.changeLabel, { color: '#EF4444' }]}>NEW AREAS</Text>
-            {newWeaknesses.map((w, i) => (
-              <View key={i} style={styles.changeItem}>
-                <TrendingDown size={14} color="#EF4444" />
-                <Text style={styles.changeText}>{w}</Text>
+        </TouchableOpacity>
+        {weaknessesExpanded && (
+          <>
+            {fixedWeaknesses.length > 0 && (
+              <View style={styles.changeGroup}>
+                <Text style={[styles.changeLabel, { color: '#22C55E' }]}>ADDRESSED</Text>
+                {fixedWeaknesses.map((w, i) => (
+                  <View key={i} style={styles.changeItem}>
+                    <CheckCircle size={14} color="#22C55E" />
+                    <Text style={[styles.changeText, { textDecorationLine: 'line-through', color: '#52525B' }]}>{w}</Text>
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
+            )}
+            {persistingWeaknesses.length > 0 && (
+              <View style={styles.changeGroup}>
+                <Text style={[styles.changeLabel, { color: '#EAB308' }]}>STILL PRESENT</Text>
+                {persistingWeaknesses.map((w, i) => (
+                  <View key={i} style={styles.changeItem}>
+                    <AlertTriangle size={14} color="#EAB308" />
+                    <Text style={styles.changeText}>{w}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+            {newWeaknesses.length > 0 && (
+              <View style={styles.changeGroup}>
+                <Text style={[styles.changeLabel, { color: '#EF4444' }]}>NEW AREAS</Text>
+                {newWeaknesses.map((w, i) => (
+                  <View key={i} style={styles.changeItem}>
+                    <TrendingDown size={14} color="#EF4444" />
+                    <Text style={styles.changeText}>{w}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </>
         )}
       </View>
 
@@ -416,14 +462,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
   },
-  posDelta: {
-    fontSize: 14,
-    fontWeight: '700',
-    width: 40,
-    textAlign: 'right',
-  },
-
-  // Sub-scores
+  // Sub-scores (stacked layout)
   subScoreGroup: {
     marginBottom: 16,
   },
@@ -434,34 +473,35 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 6,
   },
-  subScoreRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1F1F23',
+  subScoreCard: {
+    backgroundColor: '#18181B',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: '#1F1F23',
   },
   subScoreLabel: {
-    flex: 1,
     fontSize: 12,
     color: '#A1A1AA',
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  subScoreStackedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 2,
+  },
+  subScoreTag: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#52525B',
+    width: 14,
   },
   subScoreVal: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#E4E4E7',
-    width: 32,
-    textAlign: 'center',
-  },
-  subScoreArrow: {
-    width: 24,
-    alignItems: 'center',
-  },
-  subScoreDelta: {
-    fontSize: 12,
-    fontWeight: '700',
-    width: 32,
-    textAlign: 'right',
+    fontSize: 16,
+    fontWeight: '800',
   },
 
   // Changes
@@ -487,5 +527,28 @@ const styles = StyleSheet.create({
     color: '#E4E4E7',
     flex: 1,
     lineHeight: 18,
+  },
+  accordionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  accordionBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  accordionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  accordionBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
   },
 });
