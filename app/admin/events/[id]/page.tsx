@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { parseFloEventId } from '@/lib/flo-api';
+import { useAuth } from '@/contexts/AuthContext';
 
 type EventData = {
   id: string;
@@ -51,6 +52,8 @@ const STYLE_OPTIONS = ['Folkstyle', 'Freestyle', 'Greco-Roman'];
 const AGE_OPTIONS = ['Youth', 'Middle School', 'High School', 'College', 'Open'];
 
 export default function EventEditPage() {
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'org_admin';
   const params = useParams();
   const eventId = params.id as string;
 
@@ -212,48 +215,52 @@ export default function EventEditPage() {
 
       <a href="/admin/events" style={{ color: '#71717a', fontSize: 14, textDecoration: 'none' }}>&larr; Back to Events</a>
 
-      <h1 style={{ fontSize: 24, fontWeight: 800, marginTop: 12, marginBottom: 24 }}>Edit Event</h1>
+      <h1 style={{ fontSize: 24, fontWeight: 800, marginTop: 12, marginBottom: 24 }}>{isAdmin ? 'Edit Event' : 'Event Details'}</h1>
 
       {/* Form */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
         <div style={{ gridColumn: '1 / -1' }}>
           <label style={labelStyle}>Event Name</label>
-          <input style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} />
+          <input style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} readOnly={!isAdmin} />
         </div>
         <div>
           <label style={labelStyle}>Start Date</label>
-          <input style={inputStyle} type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+          <input style={inputStyle} type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} readOnly={!isAdmin} />
         </div>
         <div>
           <label style={labelStyle}>End Date</label>
-          <input style={inputStyle} type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          <input style={inputStyle} type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} readOnly={!isAdmin} />
         </div>
         <div>
           <label style={labelStyle}>City</label>
-          <input style={inputStyle} value={city} onChange={(e) => setCity(e.target.value)} />
+          <input style={inputStyle} value={city} onChange={(e) => setCity(e.target.value)} readOnly={!isAdmin} />
         </div>
         <div>
           <label style={labelStyle}>State</label>
-          <input style={inputStyle} value={state} onChange={(e) => setState(e.target.value)} />
+          <input style={inputStyle} value={state} onChange={(e) => setState(e.target.value)} readOnly={!isAdmin} />
         </div>
         <div>
           <label style={labelStyle}>Venue</label>
-          <input style={inputStyle} value={venue} onChange={(e) => setVenue(e.target.value)} />
+          <input style={inputStyle} value={venue} onChange={(e) => setVenue(e.target.value)} readOnly={!isAdmin} />
         </div>
         <div>
           <label style={labelStyle}>Street</label>
-          <input style={inputStyle} value={street} onChange={(e) => setStreet(e.target.value)} />
+          <input style={inputStyle} value={street} onChange={(e) => setStreet(e.target.value)} readOnly={!isAdmin} />
         </div>
         <div>
           <label style={labelStyle}>Zip</label>
-          <input style={inputStyle} value={zip} onChange={(e) => setZip(e.target.value)} />
+          <input style={inputStyle} value={zip} onChange={(e) => setZip(e.target.value)} readOnly={!isAdmin} />
         </div>
         <div>
           <label style={labelStyle}>Style</label>
-          <select style={inputStyle} value={style} onChange={(e) => setStyle(e.target.value)}>
-            <option value="">Select style</option>
-            {STYLE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
+          {isAdmin ? (
+            <select style={inputStyle} value={style} onChange={(e) => setStyle(e.target.value)}>
+              <option value="">Select style</option>
+              {STYLE_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          ) : (
+            <input style={inputStyle} value={style || '--'} readOnly />
+          )}
         </div>
         <div style={{ gridColumn: '1 / -1' }}>
           <label style={labelStyle}>Age Divisions</label>
@@ -261,7 +268,7 @@ export default function EventEditPage() {
             {AGE_OPTIONS.map((a) => (
               <button
                 key={a}
-                onClick={() => setAgeDivisions((prev) =>
+                onClick={() => isAdmin && setAgeDivisions((prev) =>
                   prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a]
                 )}
                 style={{
@@ -269,7 +276,7 @@ export default function EventEditPage() {
                   borderColor: ageDivisions.includes(a) ? '#2563eb' : '#27272a',
                   backgroundColor: ageDivisions.includes(a) ? '#2563eb20' : '#18181b',
                   color: ageDivisions.includes(a) ? '#2563eb' : '#71717a',
-                  fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  fontSize: 13, fontWeight: 600, cursor: isAdmin ? 'pointer' : 'default',
                 }}
               >
                 {a}
@@ -279,11 +286,11 @@ export default function EventEditPage() {
         </div>
         <div>
           <label style={labelStyle}>TW Tournament ID</label>
-          <input style={inputStyle} value={twId} onChange={(e) => setTwId(e.target.value)} />
+          <input style={inputStyle} value={twId} onChange={(e) => setTwId(e.target.value)} readOnly={!isAdmin} />
         </div>
         <div>
           <label style={labelStyle}>Flo Bracket URL</label>
-          <input style={inputStyle} value={floBracketUrl} onChange={(e) => handleFloBracketUrlChange(e.target.value)} placeholder="https://www.flowrestling.org/nextgen/events/12345/brackets" />
+          <input style={inputStyle} value={floBracketUrl} onChange={(e) => handleFloBracketUrlChange(e.target.value)} readOnly={!isAdmin} placeholder="https://www.flowrestling.org/nextgen/events/12345/brackets" />
         </div>
         <div>
           <label style={labelStyle}>Flo Event ID (auto-filled)</label>
@@ -291,32 +298,34 @@ export default function EventEditPage() {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 12, marginBottom: 32 }}>
-        <button
-          onClick={saveEvent}
-          disabled={saving}
-          style={{
-            padding: '12px 24px', borderRadius: 10, border: 'none', cursor: 'pointer',
-            background: 'linear-gradient(90deg, #2563eb, #e91e8c)', color: '#fff',
-            fontWeight: 700, fontSize: 14, opacity: saving ? 0.7 : 1,
-          }}
-        >
-          {saving ? 'Saving...' : 'Save Event'}
-        </button>
-        {floEventId && (
+      {isAdmin && (
+        <div style={{ display: 'flex', gap: 12, marginBottom: 32 }}>
           <button
-            onClick={syncBrackets}
-            disabled={syncing}
+            onClick={saveEvent}
+            disabled={saving}
             style={{
-              padding: '12px 24px', borderRadius: 10, border: '1.5px solid #2563eb',
-              backgroundColor: '#2563eb20', color: '#2563eb', cursor: 'pointer',
-              fontWeight: 700, fontSize: 14, opacity: syncing ? 0.7 : 1,
+              padding: '12px 24px', borderRadius: 10, border: 'none', cursor: 'pointer',
+              background: 'linear-gradient(90deg, #2563eb, #e91e8c)', color: '#fff',
+              fontWeight: 700, fontSize: 14, opacity: saving ? 0.7 : 1,
             }}
           >
-            {syncing ? 'Syncing...' : 'Sync Brackets from Flo'}
+            {saving ? 'Saving...' : 'Save Event'}
           </button>
-        )}
-      </div>
+          {floEventId && (
+            <button
+              onClick={syncBrackets}
+              disabled={syncing}
+              style={{
+                padding: '12px 24px', borderRadius: 10, border: '1.5px solid #2563eb',
+                backgroundColor: '#2563eb20', color: '#2563eb', cursor: 'pointer',
+                fontWeight: 700, fontSize: 14, opacity: syncing ? 0.7 : 1,
+              }}
+            >
+              {syncing ? 'Syncing...' : 'Sync Brackets from Flo'}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Bracket Data */}
       {brackets.length > 0 && (

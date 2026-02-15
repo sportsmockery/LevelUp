@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { parseFloEventId } from '@/lib/flo-api';
+import { useAuth } from '@/contexts/AuthContext';
 
 type EventRow = {
   id: string;
@@ -34,6 +35,9 @@ type CandidateRow = {
 };
 
 export default function AdminEventsPage() {
+  const { profile, loading: authLoading } = useAuth();
+  const isAdmin = profile?.role === 'org_admin';
+
   const [tab, setTab] = useState<'approved' | 'candidates'>('approved');
   const [events, setEvents] = useState<EventRow[]>([]);
   const [candidates, setCandidates] = useState<CandidateRow[]>([]);
@@ -205,23 +209,34 @@ export default function AdminEventsPage() {
         </div>
       )}
 
-      <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 4 }}>Events Management</h1>
-      <p style={{ color: '#71717a', marginBottom: 24 }}>Manage wrestling events, brackets, and results</p>
-
-      {/* Top Bar */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
-        <button
-          onClick={discoverEvents}
-          disabled={actionLoading === 'discover'}
-          style={{
-            padding: '10px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
-            background: 'linear-gradient(90deg, #2563eb, #e91e8c)', color: '#fff',
-            fontWeight: 700, fontSize: 14, opacity: actionLoading === 'discover' ? 0.7 : 1,
-          }}
-        >
-          {actionLoading === 'discover' ? 'Discovering...' : 'Discover Events from TW'}
-        </button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <h1 style={{ fontSize: 28, fontWeight: 800 }}>Events {isAdmin ? 'Management' : ''}</h1>
+        {isAdmin && (
+          <a href="/admin/errors" style={{ color: '#ef4444', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
+            Error Monitoring &rarr;
+          </a>
+        )}
       </div>
+      <p style={{ color: '#71717a', marginBottom: 24 }}>
+        {isAdmin ? 'Manage wrestling events, brackets, and results' : 'Browse upcoming and recent wrestling events'}
+      </p>
+
+      {/* Top Bar — Admin only */}
+      {isAdmin && (
+        <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
+          <button
+            onClick={discoverEvents}
+            disabled={actionLoading === 'discover'}
+            style={{
+              padding: '10px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
+              background: 'linear-gradient(90deg, #2563eb, #e91e8c)', color: '#fff',
+              fontWeight: 700, fontSize: 14, opacity: actionLoading === 'discover' ? 0.7 : 1,
+            }}
+          >
+            {actionLoading === 'discover' ? 'Discovering...' : 'Discover Events from TW'}
+          </button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
@@ -235,28 +250,30 @@ export default function AdminEventsPage() {
             fontWeight: 700, fontSize: 14, cursor: 'pointer',
           }}
         >
-          Approved Events ({events.length})
+          {isAdmin ? 'Approved ' : ''}Events ({events.length})
         </button>
-        <button
-          onClick={() => setTab('candidates')}
-          style={{
-            padding: '10px 20px', borderRadius: 10, border: '1.5px solid',
-            borderColor: tab === 'candidates' ? '#e91e8c' : '#27272a',
-            backgroundColor: tab === 'candidates' ? '#e91e8c20' : '#18181b',
-            color: tab === 'candidates' ? '#e91e8c' : '#71717a',
-            fontWeight: 700, fontSize: 14, cursor: 'pointer', position: 'relative',
-          }}
-        >
-          Pending Candidates
-          {pendingCandidates.length > 0 && (
-            <span style={{
-              position: 'absolute', top: -6, right: -6, backgroundColor: '#e91e8c',
-              color: '#fff', fontSize: 11, fontWeight: 800, padding: '2px 6px', borderRadius: 10,
-            }}>
-              {pendingCandidates.length}
-            </span>
-          )}
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setTab('candidates')}
+            style={{
+              padding: '10px 20px', borderRadius: 10, border: '1.5px solid',
+              borderColor: tab === 'candidates' ? '#e91e8c' : '#27272a',
+              backgroundColor: tab === 'candidates' ? '#e91e8c20' : '#18181b',
+              color: tab === 'candidates' ? '#e91e8c' : '#71717a',
+              fontWeight: 700, fontSize: 14, cursor: 'pointer', position: 'relative',
+            }}
+          >
+            Pending Candidates
+            {pendingCandidates.length > 0 && (
+              <span style={{
+                position: 'absolute', top: -6, right: -6, backgroundColor: '#e91e8c',
+                color: '#fff', fontSize: 11, fontWeight: 800, padding: '2px 6px', borderRadius: 10,
+              }}>
+                {pendingCandidates.length}
+              </span>
+            )}
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -272,8 +289,8 @@ export default function AdminEventsPage() {
                 <th style={{ padding: '10px 12px', textAlign: 'left', color: '#71717a', fontWeight: 600, fontSize: 12, letterSpacing: 1 }}>CITY/STATE</th>
                 <th style={{ padding: '10px 12px', textAlign: 'center', color: '#71717a', fontWeight: 600, fontSize: 12, letterSpacing: 1 }}>FLO?</th>
                 <th style={{ padding: '10px 12px', textAlign: 'center', color: '#71717a', fontWeight: 600, fontSize: 12, letterSpacing: 1 }}>BRACKETS?</th>
-                <th style={{ padding: '10px 12px', textAlign: 'left', color: '#71717a', fontWeight: 600, fontSize: 12, letterSpacing: 1 }}>LAST SYNCED</th>
-                <th style={{ padding: '10px 12px', textAlign: 'right', color: '#71717a', fontWeight: 600, fontSize: 12, letterSpacing: 1 }}>ACTIONS</th>
+                {isAdmin && <th style={{ padding: '10px 12px', textAlign: 'left', color: '#71717a', fontWeight: 600, fontSize: 12, letterSpacing: 1 }}>LAST SYNCED</th>}
+                {isAdmin && <th style={{ padding: '10px 12px', textAlign: 'right', color: '#71717a', fontWeight: 600, fontSize: 12, letterSpacing: 1 }}>ACTIONS</th>}
               </tr>
             </thead>
             <tbody>
@@ -299,36 +316,40 @@ export default function AdminEventsPage() {
                       <span style={{ color: '#52525b' }}>{'\u2717'}</span>
                     )}
                   </td>
-                  <td style={{ padding: '12px', color: '#52525b', fontSize: 12 }}>
-                    {event.bracket_synced_at ? new Date(event.bracket_synced_at).toLocaleString() : '--'}
-                  </td>
-                  <td style={{ padding: '12px', textAlign: 'right' }}>
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                      <a href={`/admin/events/${event.id}`} style={{
-                        padding: '6px 12px', borderRadius: 8, backgroundColor: '#27272a',
-                        color: '#a1a1aa', fontSize: 12, fontWeight: 600, textDecoration: 'none',
-                      }}>Edit</a>
-                      {event.flo_event_id && (
-                        <button
-                          onClick={() => syncBrackets(event.id)}
-                          disabled={actionLoading === `sync-${event.id}`}
-                          style={{
-                            padding: '6px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
-                            backgroundColor: '#2563eb20', color: '#2563eb', fontSize: 12, fontWeight: 600,
-                            opacity: actionLoading === `sync-${event.id}` ? 0.7 : 1,
-                          }}
-                        >
-                          {actionLoading === `sync-${event.id}` ? 'Syncing...' : 'Sync Brackets'}
-                        </button>
-                      )}
-                    </div>
-                  </td>
+                  {isAdmin && (
+                    <td style={{ padding: '12px', color: '#52525b', fontSize: 12 }}>
+                      {event.bracket_synced_at ? new Date(event.bracket_synced_at).toLocaleString() : '--'}
+                    </td>
+                  )}
+                  {isAdmin && (
+                    <td style={{ padding: '12px', textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                        <a href={`/admin/events/${event.id}`} style={{
+                          padding: '6px 12px', borderRadius: 8, backgroundColor: '#27272a',
+                          color: '#a1a1aa', fontSize: 12, fontWeight: 600, textDecoration: 'none',
+                        }}>Edit</a>
+                        {event.flo_event_id && (
+                          <button
+                            onClick={() => syncBrackets(event.id)}
+                            disabled={actionLoading === `sync-${event.id}`}
+                            style={{
+                              padding: '6px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                              backgroundColor: '#2563eb20', color: '#2563eb', fontSize: 12, fontWeight: 600,
+                              opacity: actionLoading === `sync-${event.id}` ? 0.7 : 1,
+                            }}
+                          >
+                            {actionLoading === `sync-${event.id}` ? 'Syncing...' : 'Sync Brackets'}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
               {events.length === 0 && (
                 <tr>
-                  <td colSpan={7} style={{ padding: 40, textAlign: 'center', color: '#52525b' }}>
-                    No approved events yet. Discover events from TrackWrestling to get started.
+                  <td colSpan={isAdmin ? 7 : 5} style={{ padding: 40, textAlign: 'center', color: '#52525b' }}>
+                    {isAdmin ? 'No approved events yet. Discover events from TrackWrestling to get started.' : 'No events available yet.'}
                   </td>
                 </tr>
               )}

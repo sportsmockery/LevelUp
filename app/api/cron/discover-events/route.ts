@@ -30,6 +30,15 @@ export async function GET(request: Request) {
     log.push(msg);
   };
 
+  // Create cron log entry
+  const startTime = Date.now();
+  const { data: cronLog } = await supabase
+    .from('cron_logs')
+    .insert({ job_name: 'discover-events', status: 'running' })
+    .select('id')
+    .single();
+  const cronLogId = cronLog?.id;
+
   try {
     // Step 1: Scrape first 2 pages of TW events (60 most recent)
     addLog('Starting TW scrape...');
@@ -48,6 +57,12 @@ export async function GET(request: Request) {
 
     if (allEvents.length === 0) {
       addLog('No events scraped from TW');
+      if (cronLogId) {
+        await supabase.from('cron_logs').update({
+          status: 'success', finished_at: new Date().toISOString(),
+          duration_ms: Date.now() - startTime, scraped: 0, log_lines: log,
+        }).eq('id', cronLogId);
+      }
       return NextResponse.json({ success: true, log });
     }
 
@@ -73,6 +88,13 @@ export async function GET(request: Request) {
     addLog(`${newEvents.length} new events (${allEvents.length - newEvents.length} already known)`);
 
     if (newEvents.length === 0) {
+      if (cronLogId) {
+        await supabase.from('cron_logs').update({
+          status: 'success', finished_at: new Date().toISOString(),
+          duration_ms: Date.now() - startTime, scraped: allEvents.length,
+          new_candidates: 0, log_lines: log,
+        }).eq('id', cronLogId);
+      }
       return NextResponse.json({ success: true, newCandidates: 0, log });
     }
 
@@ -277,6 +299,24 @@ export async function GET(request: Request) {
         .upsert({ key: 'last_flo_event_id', value: String(maxFloId) }, { onConflict: 'key' });
     }
 
+    // Update cron log with results
+    if (cronLogId) {
+      await supabase
+        .from('cron_logs')
+        .update({
+          status: 'success',
+          finished_at: new Date().toISOString(),
+          duration_ms: Date.now() - startTime,
+          scraped: allEvents.length,
+          new_candidates: newEvents.length,
+          flo_matched: floMatchMap.size,
+          auto_approved: autoApproved,
+          auto_synced: autoSynced,
+          log_lines: log,
+        })
+        .eq('id', cronLogId);
+    }
+
     return NextResponse.json({
       success: true,
       scraped: allEvents.length,
@@ -288,6 +328,21 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     addLog(`Fatal error: ${error instanceof Error ? error.message : String(error)}`);
+
+    // Log cron failure
+    if (cronLogId) {
+      await supabase
+        .from('cron_logs')
+        .update({
+          status: 'error',
+          finished_at: new Date().toISOString(),
+          duration_ms: Date.now() - startTime,
+          error_message: error instanceof Error ? error.message : String(error),
+          log_lines: log,
+        })
+        .eq('id', cronLogId);
+    }
+
     return NextResponse.json({ success: false, error: 'Cron failed', log }, { status: 500 });
   }
 }
