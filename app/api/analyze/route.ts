@@ -1,5 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { buildKnowledgeBasePrompt, TECHNIQUE_TAXONOMY, DRILL_DATABASE } from '../../../lib/wrestling-knowledge';
+import { PASS2_RESPONSE_SCHEMA, OPPONENT_SCOUTING_SCHEMA, Pass2Response, OpponentScoutingResponse, FatigueAnalysis } from '../../../lib/analysis-schema';
+
+type MatchContext = {
+  weightClass?: string;
+  competitionName?: string;
+  roundNumber?: number;
+  daysFromWeighIn?: number;
+};
 
 function getOpenAI() {
   return new OpenAI({
@@ -7,108 +16,257 @@ function getOpenAI() {
   });
 }
 
-function buildSystemPrompt(singletColor?: string): string {
-  const athleteId = singletColor
-    ? `IMPORTANT: The athlete you are analyzing is the wrestler wearing the ${singletColor.toUpperCase()} singlet/uniform. Focus ALL analysis, scores, strengths, weaknesses, and drill recommendations exclusively on this wrestler. Ignore the opponent except as context for the athlete's reactions and positioning.`
-    : 'Analyze the primary wrestler visible in the footage.';
+type MatchStyle = 'folkstyle' | 'freestyle' | 'grecoRoman';
+type AnalysisMode = 'athlete' | 'opponent';
 
-  return `You are LevelUp, an expert youth wrestling AI coach and video analyst certified in USA Wrestling rules. You analyze wrestling match footage frame by frame using official scoring definitions and a structured grading rubric.
+// --- PASS 1: Perception-only prompt (no scoring, just observations) ---
+function buildPass1Prompt(singletColor?: string): string {
+  const athleteId = singletColor
+    ? `Focus on the wrestler wearing the ${singletColor.toUpperCase()} singlet/uniform.`
+    : 'Focus on the primary wrestler visible.';
+
+  return `You are a wrestling video perception system. Your job is to describe EXACTLY what you see in each frame — body positions, grips, stances, movements, contact points. Do NOT score, judge, or recommend. Just observe.
 
 ${athleteId}
 
-If a reference photo of the athlete is included (the first image), use it to visually confirm which wrestler is the athlete throughout the match frames. The reference photo is NOT a match frame — it is a portrait/selfie for identification only.
-
-USA WRESTLING OFFICIAL SCORING ACTIONS — Use these definitions to identify key moments:
-- TAKEDOWN (2 pts): Wrestler takes opponent to the mat and passes behind the hips while opponent hits 3 points of contact (head, hands, elbows, knees). Also: gaining control of legs while opponent is on hip with back <90° to mat. Look for level changes, shot entries, and finishes in the FIRST frames — opening takedowns happen early.
-- ESCAPE (1 pt): Defensive wrestler overcomes the offensive wrestler from bottom/par terre and returns to neutral standing position.
-- REVERSAL (1 pt): Defensive wrestler overcomes the dominant offensive wrestler from par terre and gains control (switches from bottom to top).
-- NEAR FALL / DANGER (2 pts): Attacker exposes opponent's back at less than 90° to mat while head, shoulder, or elbow contacts the mat. Includes tilts, half nelsons, cradles, and any back exposure.
-- FEET TO DANGER (4 pts): From standing, wrestler causes opponent to go into immediate danger on the mat (continuous motion, no pause).
-- GRAND AMPLITUDE THROW (4-5 pts): From standing, wrestler causes opponent to lose mat contact and describe a sweeping arc in the air. 5 pts if lands in danger, 4 pts otherwise.
-- PIN / FALL: Controlled compression of both shoulder blades simultaneously — match ends immediately.
-- TECHNICAL SUPERIORITY: 10-point lead in Folkstyle/Freestyle, 8-point lead in Greco-Roman.
-
-IMPORTANT: Takedowns frequently occur in the opening seconds of a period. If the first 1-3 frames show a level change, shot entry, or wrestler driving opponent to the mat, this is almost certainly a takedown — mark it as a key moment. Do NOT label early takedown action as merely "hand fighting" or "neutral stance."
-
-GRADING RUBRIC — You MUST score each position using these specific sub-criteria:
-
-STANDING (Neutral Position) — 5 sub-criteria, 20 pts each = 100:
-- Stance & Motion (0-20): Level, balance, hand fighting, circle movement, head position
-- Shot Selection (0-20): Penetration step depth, level change speed, setup quality (fakes, ties)
-- Shot Finishing (0-20): Drive through, corner pressure, chain wrestling, trip/sweep combos
-- Sprawl & Defense (0-20): Reaction time, hip pressure, whizzer, re-positioning after sprawl
-- Re-attacks & Chains (0-20): Second/third effort, scramble offense, scoring off failed first shot
-
-TOP (Riding/Breakdown) — 4 sub-criteria, 25 pts each = 100:
-- Ride Tightness (0-25): Waist control, chest-to-back pressure, hip-to-hip contact, leg rides
-- Breakdowns (0-25): Chop, tight-waist/half, ankle breakdown execution, spiral rides
-- Turns & Near Falls (0-25): Tilt series, half nelson, cradle attempts, arm bars, back exposure
-- Mat Returns (0-25): Ability to return opponent to mat after stand-up or escape attempts
-
-BOTTOM (Escape/Reversal) — 4 sub-criteria, 25 pts each = 100:
-- Base & Posture (0-25): Tripod position, head up, elbows tight, wrist control
-- Stand-ups (0-25): Timing, hand control clearing, posture during rise, stepping away
-- Sit-outs & Switches (0-25): Hip heist speed, switch execution, granby rolls
-- Reversals (0-25): Ability to gain control from bottom position, roll-throughs
-
-OVERALL SCORE = Standing (40%) + Top (30%) + Bottom (30%)
-
-Score interpretation:
-- 90-100: Elite technique, state/national caliber
-- 80-89: Advanced, very clean execution
-- 70-79: Solid fundamentals, some areas to polish
-- 60-69: Developing, inconsistent technique
-- Below 60: Beginner, focus on fundamental positions
-
-Given sequentially numbered images from a wrestling match (Frame 1 through Frame N), provide a detailed technical analysis in the following JSON format ONLY (no markdown, no extra text):
-
+For each frame, output a JSON object with:
 {
-  "overall_score": <number 0-100>,
-  "position_scores": {
-    "standing": <number 0-100>,
-    "top": <number 0-100>,
-    "bottom": <number 0-100>
-  },
-  "position_reasoning": {
-    "standing": "<2-3 sentences: what you observed for standing, what earned points under the rubric sub-criteria, what lost points and why>",
-    "top": "<2-3 sentences: what you observed for top position, what earned points, what lost points>",
-    "bottom": "<2-3 sentences: what you observed for bottom position, what earned points, what lost points>"
-  },
-  "frame_annotations": [
+  "observations": [
     {
-      "frame_number": <1 to N>,
-      "position": "<standing|top|bottom|transition|other>",
-      "action": "<3-6 word technique description>",
-      "is_key_moment": <true if takedown/escape/near_fall/reversal/pin_attempt>,
-      "key_moment_type": "<takedown|escape|near_fall|reversal|pin_attempt — omit if not key moment>",
-      "detail": "<1 sentence, max 30 words: what you observe about technique in THIS specific frame>",
-      "wrestler_visible": <true if the athlete in the specified singlet color is clearly identifiable in this frame>
+      "frame_index": <0-based>,
+      "athlete_position": "<standing/top/bottom/transition/not_visible>",
+      "athlete_body": "<describe stance width, knee bend, hip level, arm position, head position>",
+      "opponent_body": "<describe opponent's position relative to athlete>",
+      "contact_points": "<where are the wrestlers touching? grips, ties, holds>",
+      "action": "<what movement/technique is happening in this frame>",
+      "wrestler_visible": <true if athlete in specified singlet is clearly identifiable>
     }
-  ],
-  "strengths": [<3 specific technique strengths observed>],
-  "weaknesses": [<2-3 specific areas needing improvement>],
-  "drills": [<3 specific drill recommendations with reps/sets>],
-  "summary": "<2-3 sentence overall assessment>"
+  ]
 }
 
-CRITICAL RULES:
-- frame_annotations MUST have exactly one entry per frame image, in chronological order.
-- Keep action descriptions to 3-6 words (e.g., "Single leg shot attempt").
-- Keep detail to one sentence under 30 words.
-- wrestler_visible must be true only when the athlete in the specified singlet color is clearly identifiable in the frame. Set false if obscured, off-screen, or unidentifiable.
-- TAKEDOWN DETECTION: If any frame shows a wrestler shooting, driving through, or finishing on the mat with control, mark is_key_moment: true and key_moment_type: "takedown". Opening frames (1-3) often capture the first takedown — analyze them carefully.
-- Use the official USA Wrestling scoring definitions above to classify key moments. A wrestler going from standing to mat with control behind hips = takedown. Back exposure with shoulder/elbow on mat = near_fall.
-- For each position_reasoning entry, reference specific rubric sub-criteria by name (e.g., "Shot Finishing was strong at 18/20 due to excellent drive-through on the high crotch").
-- Be specific about wrestling techniques (e.g., "high crotch finish", "tight waist ride", "stand-up from bottom"). Reference actual positions and transitions you observe in each frame.
-- Drills should directly address the weaknesses found.`;
+Be precise and literal. Describe body angles, limb positions, and spatial relationships. If you cannot see something clearly, say so.`;
 }
 
-// Allow up to 60s for GPT-4o vision analysis with high-detail frames
-export const maxDuration = 60;
+// --- PASS 2: Reasoning prompt for athlete analysis ---
+function buildPass2AthletePrompt(
+  singletColor: string | undefined,
+  matchStyle: MatchStyle,
+  frameCount: number,
+  matchContext?: MatchContext,
+): string {
+  const knowledgeBase = buildKnowledgeBasePrompt(matchStyle);
+  const colorNote = singletColor ? ` wearing a ${singletColor} singlet` : '';
+
+  let contextSection = '';
+  if (matchContext) {
+    const parts: string[] = [];
+    if (matchContext.weightClass) parts.push(`Weight class: ${matchContext.weightClass}`);
+    if (matchContext.competitionName) parts.push(`Competition: ${matchContext.competitionName}`);
+    if (matchContext.roundNumber) parts.push(`Round/Match #: ${matchContext.roundNumber}`);
+    if (matchContext.daysFromWeighIn !== undefined) parts.push(`Days from weigh-in: ${matchContext.daysFromWeighIn}`);
+    if (parts.length > 0) {
+      contextSection = `\nMATCH CONTEXT:\n${parts.join('\n')}\nUse this context to inform your analysis — e.g., if the athlete weighed in recently, consider whether technique degradation might be fatigue from weight cut vs. skill gaps.\n`;
+    }
+  }
+
+  return `You are LevelUp, an expert youth wrestling AI coach and video analyst. You are given raw frame-by-frame observations from a wrestling match and must produce a detailed, rubric-based technical analysis.
+
+ATHLETE: The wrestler${colorNote}.
+${contextSection}
+${knowledgeBase}
+
+TECHNIQUE REFERENCE (use these terms in your analysis):
+Standing offense: ${Object.keys(TECHNIQUE_TAXONOMY.standing.offense).join(', ')}
+Standing defense: ${Object.keys(TECHNIQUE_TAXONOMY.standing.defense).join(', ')}
+Top techniques: ${Object.keys(TECHNIQUE_TAXONOMY.top).join(', ')}
+Bottom techniques: ${Object.keys(TECHNIQUE_TAXONOMY.bottom).join(', ')}
+
+INSTRUCTIONS:
+1. Read ALL frame observations carefully. Map each observation to the rubric sub-criteria.
+2. Score each sub-criterion based ONLY on evidence from the observations. If a position was not observed, score it based on what limited evidence exists (do not assume zero).
+3. Calculate position scores as the sum of their sub-criteria.
+4. Calculate overall = standing*0.4 + top*0.3 + bottom*0.3 (round to nearest integer).
+5. Cite specific frame indices as evidence for your scores.
+6. Recommend drills that directly address the weaknesses found.
+7. Set confidence based on: wrestler visibility across frames, variety of positions observed, video quality indicators.
+
+FATIGUE DETECTION:
+8. Split the frame observations into two halves (first half = early match, second half = late match).
+9. Compare technique quality between first half and second half:
+   - Did stance height increase (getting more upright = fatigue)?
+   - Did defensive reaction times slow?
+   - Did shot attempts become less explosive or less committed?
+   - Did scoring rate decrease?
+10. Calculate an estimated score for each half. If second_half is >10 points lower, set conditioning_flag=true.
+11. Consider match context (weight cut, round number) when interpreting fatigue signs.
+
+ANTI-HALLUCINATION RULES:
+- Do NOT invent techniques that were not described in the observations.
+- If the observations say "not visible" or "unclear", lower your confidence.
+- Sub-scores within a position should NOT all be identical — differentiate based on evidence.
+- Do NOT give round numbers (e.g., 70, 80, 90) for all sub-scores — use specific values justified by evidence.
+- If you see fewer than 3 frames in a position, note this limitation in your reasoning.
+
+The match had ${frameCount} frames analyzed.`;
+}
+
+// --- PASS 2: Reasoning prompt for opponent scouting ---
+function buildPass2ScoutingPrompt(
+  singletColor: string | undefined,
+  matchStyle: MatchStyle,
+): string {
+  const knowledgeBase = buildKnowledgeBasePrompt(matchStyle);
+  const colorNote = singletColor ? ` wearing a ${singletColor} singlet` : '';
+
+  return `You are LevelUp, an expert wrestling scout and tactician. You are given raw frame-by-frame observations of an OPPONENT wrestler${colorNote} and must produce a tactical scouting report with a gameplan.
+
+${knowledgeBase}
+
+INSTRUCTIONS:
+1. Analyze the opponent's attack patterns — what techniques they use most, how they set them up, how effective they are.
+2. Analyze their defense patterns — how they react to attacks, their sprawl quality, their counter-wrestling.
+3. Identify their position preferences and tendencies (do they prefer standing? Are they dangerous on top?).
+4. Look for conditioning indicators — do they slow down in later frames? Is their technique deteriorating?
+5. Build a period-by-period gameplan for how to beat this opponent.
+6. Recommend specific counter-techniques for their primary attacks.
+
+Be specific and tactical. This scouting report will be used by a wrestler preparing for a match against this opponent.`;
+}
+
+// --- Hallucination detection ---
+function detectHallucinations(result: Pass2Response): string[] {
+  const warnings: string[] = [];
+
+  // Check for identical position scores
+  const { standing, top, bottom } = result.position_scores;
+  if (standing === top && top === bottom) {
+    warnings.push('All position scores are identical — possible hallucination');
+  }
+
+  // Check for all-round-number sub-scores
+  const allSubScores = [
+    ...Object.values(result.sub_scores.standing),
+    ...Object.values(result.sub_scores.top),
+    ...Object.values(result.sub_scores.bottom),
+  ];
+  const roundCount = allSubScores.filter((s) => s % 5 === 0).length;
+  if (roundCount === allSubScores.length) {
+    warnings.push('All sub-scores are round numbers (multiples of 5) — possible lack of differentiation');
+  }
+
+  // Check for missing frame evidence
+  if (result.frame_evidence.length === 0) {
+    warnings.push('No frame evidence provided — analysis may not be grounded in observations');
+  }
+
+  // Check confidence vs evidence mismatch
+  if (result.confidence > 0.8 && result.frame_evidence.length < 5) {
+    warnings.push('High confidence with few frame evidence citations — may be overconfident');
+  }
+
+  // Verify overall score calculation
+  const expectedOverall = Math.round(standing * 0.4 + top * 0.3 + bottom * 0.3);
+  if (Math.abs(result.overall_score - expectedOverall) > 3) {
+    warnings.push(`Overall score ${result.overall_score} doesn't match calculated ${expectedOverall}`);
+    result.overall_score = expectedOverall; // Auto-correct
+  }
+
+  return warnings;
+}
+
+// --- Normalize enriched response to backwards-compatible format ---
+function normalizeResponse(
+  pass2: Pass2Response,
+  frameCount: number,
+  mode: 'athlete',
+): Record<string, unknown>;
+function normalizeResponse(
+  pass2: OpponentScoutingResponse,
+  frameCount: number,
+  mode: 'opponent',
+): Record<string, unknown>;
+function normalizeResponse(
+  pass2: Pass2Response | OpponentScoutingResponse,
+  frameCount: number,
+  mode: AnalysisMode,
+): Record<string, unknown> {
+  if (mode === 'opponent') {
+    const scouting = pass2 as OpponentScoutingResponse;
+    return {
+      overall_score: 0,
+      position_scores: { standing: 0, top: 0, bottom: 0 },
+      position_reasoning: scouting.position_tendencies,
+      frame_annotations: [],
+      strengths: scouting.attack_patterns.map((a) => `${a.technique} (${a.frequency})`),
+      weaknesses: scouting.defense_patterns.map((d) => d.vulnerability),
+      drills: scouting.gameplan.key_techniques,
+      summary: scouting.summary,
+      xp: 150,
+      model: 'gpt-4o-2pass',
+      framesAnalyzed: frameCount,
+      scouting,
+    };
+  }
+
+  const athlete = pass2 as Pass2Response;
+
+  // Build backwards-compatible frame_annotations from frame_evidence
+  const frameAnnotations = athlete.frame_evidence.map((fe, i) => ({
+    frame_number: fe.frame_index + 1,
+    position: fe.position,
+    action: fe.action,
+    is_key_moment: fe.is_key_moment,
+    ...(fe.key_moment_type && fe.key_moment_type !== '' ? { key_moment_type: fe.key_moment_type } : {}),
+    detail: fe.detail,
+    wrestler_visible: fe.wrestler_visible,
+    rubric_impact: fe.rubric_impact || undefined,
+  }));
+
+  // Pad to full frame count if needed
+  while (frameAnnotations.length < frameCount) {
+    const idx = frameAnnotations.length;
+    frameAnnotations.push({
+      frame_number: idx + 1,
+      position: 'other',
+      action: 'Frame not analyzed',
+      is_key_moment: false,
+      detail: 'This frame was not selected as key evidence.',
+      wrestler_visible: false,
+      rubric_impact: undefined,
+    });
+  }
+
+  // Flatten drills to string array for backwards compat
+  const flatDrills = athlete.drills.map((d) => `${d.name}: ${d.reps} — ${d.description}`);
+
+  return {
+    overall_score: athlete.overall_score,
+    position_scores: athlete.position_scores,
+    position_reasoning: athlete.position_reasoning,
+    frame_annotations: frameAnnotations,
+    strengths: athlete.strengths,
+    weaknesses: athlete.weaknesses,
+    drills: flatDrills,
+    summary: athlete.summary,
+    xp: 150,
+    model: 'gpt-4o-2pass',
+    framesAnalyzed: frameCount,
+    enriched: {
+      confidence: athlete.confidence,
+      sub_scores: athlete.sub_scores,
+      frame_evidence: athlete.frame_evidence,
+      drills: athlete.drills,
+      fatigue_analysis: athlete.fatigue_analysis,
+    },
+  };
+}
+
+// Allow up to 180s for two-pass analysis
+export const maxDuration = 180;
 
 export async function POST(request: NextRequest) {
   try {
-    const { frames, singletColor, referencePhoto } = await request.json();
+    const { frames, singletColor, referencePhoto, matchStyle = 'folkstyle', mode = 'athlete', matchContext } = await request.json();
 
     if (!frames || !Array.isArray(frames) || frames.length === 0) {
       return NextResponse.json(
@@ -117,110 +275,180 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`[LevelUp] Analyzing ${frames.length} frames, singlet: ${singletColor || 'none'}, refPhoto: ${!!referencePhoto}`);
-    console.log(`[LevelUp] Frame sizes (bytes): ${frames.map((f: string) => f.length).join(', ')}`);
+    const validMatchStyle: MatchStyle = ['folkstyle', 'freestyle', 'grecoRoman'].includes(matchStyle) ? matchStyle : 'folkstyle';
+    const validMode: AnalysisMode = mode === 'opponent' ? 'opponent' : 'athlete';
+
+    const validMatchContext: MatchContext | undefined = matchContext && typeof matchContext === 'object' ? matchContext : undefined;
+
+    console.log(`[LevelUp] 2-Pass analysis: ${frames.length} frames, singlet=${singletColor || 'none'}, style=${validMatchStyle}, mode=${validMode}, refPhoto=${!!referencePhoto}, context=${validMatchContext ? 'yes' : 'none'}`);
 
     const openai = getOpenAI();
 
-    // Build interleaved text+image content: label each frame for GPT-4o to reference
-    const frameContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [];
-
-    if (referencePhoto) {
-      frameContent.push({
-        type: 'text' as const,
-        text: '[Reference Photo — not a match frame]',
-      });
-      frameContent.push({
-        type: 'image_url' as const,
-        image_url: {
-          url: referencePhoto.startsWith('data:') ? referencePhoto : `data:image/jpeg;base64,${referencePhoto}`,
-          detail: 'low' as const,
-        },
-      });
+    // ===== PASS 1: Parallel perception calls =====
+    const BATCH_SIZE = 5;
+    const batches: string[][] = [];
+    for (let i = 0; i < frames.length; i += BATCH_SIZE) {
+      batches.push(frames.slice(i, i + BATCH_SIZE));
     }
 
-    frames.forEach((frame: string, index: number) => {
-      frameContent.push({
-        type: 'text' as const,
-        text: `[Frame ${index + 1}]`,
-      });
-      frameContent.push({
-        type: 'image_url' as const,
-        image_url: {
-          url: frame.startsWith('data:') ? frame : `data:image/jpeg;base64,${frame}`,
-          detail: 'high' as const,
+    console.log(`[LevelUp] Pass 1: ${batches.length} batches of up to ${BATCH_SIZE} frames`);
+
+    const pass1Results = await Promise.all(
+      batches.map(async (batch, batchIndex) => {
+        const batchStartIdx = batchIndex * BATCH_SIZE;
+        const frameContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [];
+
+        // Include reference photo in first batch only
+        if (batchIndex === 0 && referencePhoto) {
+          frameContent.push({
+            type: 'text' as const,
+            text: '[Reference Photo — not a match frame, use to identify the athlete]',
+          });
+          frameContent.push({
+            type: 'image_url' as const,
+            image_url: {
+              url: referencePhoto.startsWith('data:') ? referencePhoto : `data:image/jpeg;base64,${referencePhoto}`,
+              detail: 'low' as const,
+            },
+          });
+        }
+
+        batch.forEach((frame, i) => {
+          const globalIdx = batchStartIdx + i;
+          frameContent.push({
+            type: 'text' as const,
+            text: `[Frame ${globalIdx}]`,
+          });
+          frameContent.push({
+            type: 'image_url' as const,
+            image_url: {
+              url: frame.startsWith('data:') ? frame : `data:image/jpeg;base64,${frame}`,
+              detail: 'high' as const,
+            },
+          });
+        });
+
+        const response = await openai.chat.completions.create({
+          model: 'gpt-4o',
+          messages: [
+            { role: 'system', content: buildPass1Prompt(singletColor) },
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: `Observe these ${batch.length} frames (indices ${batchStartIdx} to ${batchStartIdx + batch.length - 1}). Describe exactly what you see in each frame.`,
+                },
+                ...frameContent,
+              ],
+            },
+          ],
+          response_format: { type: 'json_object' },
+          max_tokens: 2000,
+          temperature: 0,
+          seed: 42,
+        });
+
+        const content = response.choices[0]?.message?.content;
+        if (!content) return { observations: [] };
+
+        try {
+          const parsed = JSON.parse(content);
+          return parsed;
+        } catch {
+          console.warn(`[LevelUp] Pass 1 batch ${batchIndex} JSON parse failed, returning empty`);
+          return { observations: [] };
+        }
+      })
+    );
+
+    // Merge all observations
+    const allObservations = pass1Results.flatMap((r: any) => r.observations || []);
+    console.log(`[LevelUp] Pass 1 complete: ${allObservations.length} frame observations collected`);
+
+    // ===== PASS 2: Reasoning call (text-only) =====
+    const observationsText = allObservations
+      .map((obs: any) => `Frame ${obs.frame_index}: position=${obs.athlete_position}, body=${obs.athlete_body}, opponent=${obs.opponent_body}, contact=${obs.contact_points}, action=${obs.action}, visible=${obs.wrestler_visible}`)
+      .join('\n');
+
+    if (validMode === 'opponent') {
+      // Scouting analysis
+      console.log('[LevelUp] Pass 2: Opponent scouting analysis');
+      const pass2Response = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: buildPass2ScoutingPrompt(singletColor, validMatchStyle) },
+          {
+            role: 'user',
+            content: `Here are the frame-by-frame observations of the opponent:\n\n${observationsText}\n\nProduce a tactical scouting report with a gameplan to beat this opponent.`,
+          },
+        ],
+        response_format: {
+          type: 'json_schema',
+          json_schema: OPPONENT_SCOUTING_SCHEMA,
         },
+        max_tokens: 4096,
+        temperature: 0,
+        seed: 42,
       });
-    });
 
-    const colorNote = singletColor ? ` The athlete is wearing a ${singletColor} singlet.` : '';
-    const refNote = referencePhoto ? ' The FIRST image is a reference photo of the athlete (not a match frame). Use it to identify them in the match frames that follow.' : '';
+      const scoutContent = pass2Response.choices[0]?.message?.content;
+      if (!scoutContent) throw new Error('No response from Pass 2 scouting');
 
-    const response = await openai.chat.completions.create({
+      const scoutResult: OpponentScoutingResponse = JSON.parse(scoutContent);
+      const normalized = normalizeResponse(scoutResult, frames.length, 'opponent');
+
+      console.log(`[LevelUp] Scouting complete: ${scoutResult.attack_patterns.length} attack patterns, ${scoutResult.defense_patterns.length} defense patterns`);
+      return NextResponse.json(normalized);
+    }
+
+    // Athlete analysis — split observations into halves for fatigue detection
+    const halfIdx = Math.floor(allObservations.length / 2);
+    const firstHalfObs = allObservations.slice(0, halfIdx);
+    const secondHalfObs = allObservations.slice(halfIdx);
+    const periodLabel = `\n\n--- FIRST HALF (frames 0-${halfIdx - 1}, early match) ---\n${firstHalfObs.map((obs: any) => `Frame ${obs.frame_index}: position=${obs.athlete_position}, body=${obs.athlete_body}, action=${obs.action}`).join('\n')}\n\n--- SECOND HALF (frames ${halfIdx}-${allObservations.length - 1}, late match) ---\n${secondHalfObs.map((obs: any) => `Frame ${obs.frame_index}: position=${obs.athlete_position}, body=${obs.athlete_body}, action=${obs.action}`).join('\n')}`;
+
+    console.log('[LevelUp] Pass 2: Athlete technique analysis with structured output');
+    const pass2Response = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
-        { role: 'system', content: buildSystemPrompt(singletColor) },
+        { role: 'system', content: buildPass2AthletePrompt(singletColor, validMatchStyle, frames.length, validMatchContext) },
         {
           role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: `Analyze these ${frames.length} sequentially numbered frames (Frame 1 through Frame ${frames.length}) from a youth wrestling match in chronological order.${colorNote}${refNote} For each frame, identify the wrestler's position, the specific action/technique occurring, and whether it captures a key moment (takedown, escape, near fall, reversal, or pin attempt). Provide overall technique scores with rubric-based reasoning, strengths, weaknesses, and drill recommendations for the identified athlete only.`,
-            },
-            ...frameContent,
-          ],
+          content: `Here are the frame-by-frame observations from the match (${frames.length} frames total):\n\n${observationsText}\n\nFor fatigue analysis, here are the observations split by match half:${periodLabel}\n\nScore this wrestler's technique using the rubric. Cite specific frame indices as evidence. Also complete the fatigue analysis comparing first half vs second half.`,
         },
       ],
+      response_format: {
+        type: 'json_schema',
+        json_schema: PASS2_RESPONSE_SCHEMA,
+      },
       max_tokens: 4096,
       temperature: 0,
       seed: 42,
     });
 
-    const content = response.choices[0]?.message?.content;
-    const finishReason = response.choices[0]?.finish_reason;
-    const usage = response.usage;
-    console.log(`[LevelUp] GPT-4o responded: finish_reason=${finishReason}, tokens=${usage?.total_tokens}, prompt=${usage?.prompt_tokens}, completion=${usage?.completion_tokens}`);
+    const pass2Content = pass2Response.choices[0]?.message?.content;
+    const usage = pass2Response.usage;
+    console.log(`[LevelUp] Pass 2 responded: tokens=${usage?.total_tokens}, prompt=${usage?.prompt_tokens}, completion=${usage?.completion_tokens}`);
 
-    if (!content) {
-      throw new Error('No response from AI');
+    if (!pass2Content) throw new Error('No response from Pass 2');
+
+    const pass2Result: Pass2Response = JSON.parse(pass2Content);
+
+    // Hallucination checks
+    const warnings = detectHallucinations(pass2Result);
+    if (warnings.length > 0) {
+      console.warn(`[LevelUp] Hallucination warnings: ${warnings.join('; ')}`);
     }
 
-    // Parse the JSON response (strip any markdown fences if present)
-    const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const analysis = JSON.parse(cleaned);
+    const normalized = normalizeResponse(pass2Result, frames.length, 'athlete');
 
-    // Validate frame_annotations: ensure correct count, pad if GPT-4o returned fewer
-    if (analysis.frame_annotations) {
-      if (!Array.isArray(analysis.frame_annotations) || analysis.frame_annotations.length !== frames.length) {
-        const annotations = Array.isArray(analysis.frame_annotations) ? analysis.frame_annotations : [];
-        analysis.frame_annotations = frames.map((_: string, i: number) => {
-          return annotations[i] || {
-            frame_number: i + 1,
-            position: 'other',
-            action: 'Unable to analyze',
-            is_key_moment: false,
-            detail: 'Frame annotation was not generated for this frame.',
-            wrestler_visible: false,
-          };
-        });
-      }
-    }
+    console.log(`[LevelUp] Analysis complete: overall=${pass2Result.overall_score}, confidence=${pass2Result.confidence}, evidence=${pass2Result.frame_evidence.length} frames`);
+    return NextResponse.json(normalized);
 
-    // Log truncation warning
-    if (response.choices[0]?.finish_reason === 'length') {
-      console.warn('GPT-4o response was truncated — consider increasing max_tokens');
-    }
-
-    return NextResponse.json({
-      ...analysis,
-      xp: 150,
-      model: 'gpt-4o',
-      framesAnalyzed: frames.length,
-    });
   } catch (error: any) {
     console.error('Analysis error:', error);
 
-    // If OpenAI fails, fall back to mock so the app still works
     if (error?.status === 401 || error?.code === 'invalid_api_key') {
       return NextResponse.json(
         { error: 'Invalid API key. Check OPENAI_API_KEY in Vercel environment variables.' },
