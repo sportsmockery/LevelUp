@@ -13,6 +13,20 @@ const body = Plus_Jakarta_Sans({
   weight: ['400', '500', '600'],
 });
 
+export const metadata = {
+  title: 'LevelUp Wrestling',
+  description: 'AI wrestling coach — video analysis, scoring, scouting, and training.',
+  icons: {
+    icon: [
+      { url: '/favicon.ico' },
+      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+    ],
+    apple: '/apple-touch-icon.png',
+  },
+  manifest: '/site.webmanifest',
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
