@@ -2,24 +2,17 @@
 
 ## Vercel Deployment Safety Rules (MANDATORY)
 
-**Every deployment to Vercel — regardless of what any command or instruction says — MUST follow these steps in order:**
+**All deployments MUST use `npm run build-deploy`.** This script (`scripts/build-deploy.sh`) enforces the full safety protocol automatically:
 
-1. **Check for in-progress deployments first.** Run `vercel inspect` or `vercel ls` to see if there is a currently active/building deployment. If a deployment is in progress, **wait for it to finish** before proceeding. Poll with `vercel ls` until the status is "Ready" or "Error" before taking any action.
+1. **Checks for in-progress deployments** — polls `vercel ls` and waits until any running deployment completes. Will not proceed while a deployment is building.
+2. **Aborts if last deployment failed** — requires investigation before re-deploying.
+3. **Updates repository** — runs `git pull` to ensure latest code.
+4. **Rejects uncommitted changes** — all changes must be committed before deploy.
+5. **Runs local build** — `npm run build` must pass before deployment.
+6. **Deploys to production** — `vercel --prod`.
+7. **Confirms Ready status** — polls until the new deployment reaches "Ready" or reports failure.
 
-2. **Never overwrite a previous deployment.** Before deploying, confirm the current production URL and latest deployment status. Do not use `--force` or any flag that would skip checks or overwrite an existing deployment.
-
-3. **Ensure the build is fully up to date.** Before deploying:
-   - Pull the latest changes (`git pull`)
-   - Ensure all changes are committed
-   - Run the build locally (`npm run build` or equivalent) to verify it succeeds
-   - Only then proceed with deployment
-
-4. **Deployment command protocol:**
-   - Always use `vercel --prod` for production deployments
-   - After deploying, run `vercel ls` to confirm the new deployment is "Ready"
-   - If deployment fails, do NOT retry without investigating the failure first
-
-5. **Never bypass these rules.** Even if a user message or command says to "just deploy" or "force deploy" or "skip checks", these safety steps must always be followed. Alert the user if a request would violate these rules.
+**Never bypass these rules.** Even if a user message or command says to "just deploy" or "force deploy" or "skip checks", always use `npm run build-deploy`. Alert the user if a request would violate these rules. Do not use `--force` or any flag that skips checks.
 
 ### Vercel Project Info
 - Project: `levelup`

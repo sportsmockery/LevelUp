@@ -116,6 +116,31 @@ export const PASS2_RESPONSE_SCHEMA = {
         description: '3-5 specific drill recommendations',
       },
       summary: { type: 'string' as const, description: '2-3 sentence overall assessment referencing the athlete by LevelUp name' },
+      match_result: {
+        type: 'object' as const,
+        description: 'Match outcome if determinable from the video evidence',
+        properties: {
+          result: { type: 'string' as const, description: 'win, loss, draw, or unknown' },
+          result_type: { type: 'string' as const, description: 'pin, tech_fall, major_decision, decision, or unknown' },
+          match_duration_seconds: { type: 'number' as const, description: 'Estimated match duration in seconds based on frame timestamps, or 0 if unknown' },
+        },
+        required: ['result', 'result_type', 'match_duration_seconds'] as const,
+        additionalProperties: false,
+      },
+      match_stats: {
+        type: 'object' as const,
+        description: 'Count of scoring actions observed in the video',
+        properties: {
+          takedowns_scored: { type: 'number' as const },
+          takedowns_allowed: { type: 'number' as const },
+          reversals_scored: { type: 'number' as const },
+          escapes_scored: { type: 'number' as const },
+          near_falls_scored: { type: 'number' as const },
+          pins_scored: { type: 'number' as const },
+        },
+        required: ['takedowns_scored', 'takedowns_allowed', 'reversals_scored', 'escapes_scored', 'near_falls_scored', 'pins_scored'] as const,
+        additionalProperties: false,
+      },
       fatigue_analysis: {
         type: 'object' as const,
         description: 'Compare technique quality between first half and second half of frames to detect fatigue',
@@ -137,7 +162,7 @@ export const PASS2_RESPONSE_SCHEMA = {
     required: [
       'overall_score', 'confidence', 'position_scores', 'sub_scores',
       'position_reasoning', 'frame_evidence', 'strengths', 'weaknesses',
-      'drills', 'summary', 'fatigue_analysis',
+      'drills', 'summary', 'match_result', 'match_stats', 'fatigue_analysis',
     ] as const,
     additionalProperties: false,
   },
@@ -259,6 +284,8 @@ export type Pass2Response = {
   weaknesses: string[];
   drills: Array<{ name: string; description: string; reps: string; priority: string; addresses: string }>;
   summary: string;
+  match_result: { result: string; result_type: string; match_duration_seconds: number };
+  match_stats: { takedowns_scored: number; takedowns_allowed: number; reversals_scored: number; escapes_scored: number; near_falls_scored: number; pins_scored: number };
   fatigue_analysis: FatigueAnalysis;
 };
 

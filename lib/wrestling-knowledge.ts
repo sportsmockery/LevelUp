@@ -2,12 +2,34 @@
 // Used by the two-pass analysis pipeline (Pass 2: reasoning).
 
 export const SCORING_RULES = {
+  hs_folkstyle: {
+    takedown: { points: 3, description: 'Control opponent on mat from neutral (NFHS 2024-25: 3 pts)' },
+    escape: { points: 1, description: 'Return to neutral standing from bottom' },
+    reversal: { points: 2, description: 'Go from bottom/defensive to top/offensive control' },
+    nearFall2: { points: 2, description: 'Expose opponent\'s back at <45° for 2-4 seconds' },
+    nearFall3: { points: 3, description: 'Expose opponent\'s back at <45° for 5+ seconds' },
+    nearFall4: { points: 4, description: 'Expose opponent\'s back at <45° for continuous 5+ seconds, near pin' },
+    penalty: { points: 1, description: 'Awarded to opponent for stalling, false start, illegal hold' },
+    technicalFall: { margin: 15, description: 'Match ends when lead reaches 15 points' },
+  },
+  college_folkstyle: {
+    takedown: { points: 3, description: 'Control opponent on mat from neutral (NCAA 2024-25: 3 pts)' },
+    escape: { points: 1, description: 'Return to neutral standing from bottom' },
+    reversal: { points: 2, description: 'Go from bottom/defensive to top/offensive control' },
+    nearFall2: { points: 2, description: 'Expose opponent\'s back at <45° for 2-4 seconds' },
+    nearFall3: { points: 3, description: 'Expose opponent\'s back at <45° for 5+ seconds' },
+    nearFall4: { points: 4, description: 'Expose opponent\'s back at <45° for continuous 5+ seconds, near pin' },
+    penalty: { points: 1, description: 'Awarded to opponent for stalling, false start, illegal hold' },
+    ridingTime: { points: 1, description: '1 point for 1+ minute net riding time advantage (NCAA only)' },
+    technicalFall: { margin: 15, description: 'Match ends when lead reaches 15 points' },
+  },
   folkstyle: {
-    takedown: { points: 2, description: 'Control opponent on mat from neutral; pass behind hips, 3 pts of contact' },
+    takedown: { points: 3, description: 'Control opponent on mat from neutral (2024-25 rules: 3 pts)' },
     escape: { points: 1, description: 'Return to neutral standing from bottom/par terre' },
     reversal: { points: 2, description: 'Go from bottom/defensive to top/offensive control' },
     nearFall2: { points: 2, description: 'Expose opponent\'s back at <45° for 2-4 seconds' },
     nearFall3: { points: 3, description: 'Expose opponent\'s back at <45° for 5+ seconds' },
+    nearFall4: { points: 4, description: 'Expose opponent\'s back at <45° for continuous 5+ seconds, near pin' },
     penalty: { points: 1, description: 'Awarded to opponent for stalling, false start, illegal hold' },
     ridingTime: { points: 1, description: '1 point for 1+ minute net riding time advantage' },
     technicalFall: { margin: 15, description: 'Match ends when lead reaches 15 points' },
@@ -154,7 +176,9 @@ export function recommendDrills(weaknesses: string[], position?: string): Drill[
 }
 
 // Build the knowledge base string for Pass 2 prompt injection
-export function buildKnowledgeBasePrompt(matchStyle: 'folkstyle' | 'freestyle' | 'grecoRoman' = 'folkstyle'): string {
+export type MatchStyleKey = 'folkstyle' | 'hs_folkstyle' | 'college_folkstyle' | 'freestyle' | 'grecoRoman';
+
+export function buildKnowledgeBasePrompt(matchStyle: MatchStyleKey = 'folkstyle'): string {
   const rules = SCORING_RULES[matchStyle];
   const rulesText = Object.entries(rules)
     .map(([action, r]) => `- ${action.replace(/([A-Z])/g, ' $1').toUpperCase()}: ${'points' in r ? `${r.points} pts` : 'margin' in r ? `${r.margin}-pt lead` : ''} — ${r.description}`)
