@@ -43,6 +43,7 @@ next-env.d.ts
 
 # source assets
 /LevelUpLogos
+/docs
 
 # mobile app build artifacts
 /mobile/node_modules
