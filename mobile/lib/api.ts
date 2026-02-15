@@ -30,13 +30,14 @@ export async function analyzeFrames(
   athleteIdentification?: AthleteIdentification,
   opponentIdentification?: AthleteIdentification,
   idFrameBase64?: string,
+  athletePosition?: 'left' | 'right',
 ): Promise<AnalysisResult> {
-  console.log(`[LevelUp] Sending ${frames.length} frames to API (style: ${matchStyle}, mode: ${mode}, id: ${athleteIdentification ? 'yes' : 'none'}, context: ${matchContext ? 'yes' : 'none'})`);
+  console.log(`[LevelUp] Sending ${frames.length} frames to API (style: ${matchStyle}, mode: ${mode}, id: ${athleteIdentification ? 'yes' : 'none'}, position: ${athletePosition || 'none'}, context: ${matchContext ? 'yes' : 'none'})`);
 
   const response = await fetch(`${API_BASE}/api/analyze`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ frames, matchStyle, mode, matchContext, athleteIdentification, opponentIdentification, idFrameBase64 }),
+    body: JSON.stringify({ frames, matchStyle, mode, matchContext, athleteIdentification, opponentIdentification, idFrameBase64, athletePosition }),
   });
 
   if (!response.ok) {
@@ -65,13 +66,14 @@ export async function submitAnalysis(
   athleteIdentification?: AthleteIdentification,
   opponentIdentification?: AthleteIdentification,
   idFrameBase64?: string,
+  athletePosition?: 'left' | 'right',
 ): Promise<{ jobId: string }> {
-  console.log(`[LevelUp] Submitting async analysis: ${frames.length} frames`);
+  console.log(`[LevelUp] Submitting async analysis: ${frames.length} frames (position: ${athletePosition || 'none'})`);
 
   const response = await fetch(`${API_BASE}/api/analyze?async=true`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ frames, matchStyle, mode, matchContext, athleteIdentification, opponentIdentification, idFrameBase64 }),
+    body: JSON.stringify({ frames, matchStyle, mode, matchContext, athleteIdentification, opponentIdentification, idFrameBase64, athletePosition }),
   });
 
   if (!response.ok) {

@@ -30,7 +30,7 @@ type WrestlerIdInfo = {
 };
 
 // --- PASS 1: Perception-only prompt (no scoring, just observations) ---
-function buildPass1Prompt(athleteId?: WrestlerIdInfo, opponentId?: WrestlerIdInfo): string {
+function buildPass1Prompt(athleteId?: WrestlerIdInfo, opponentId?: WrestlerIdInfo, athletePosition?: 'left' | 'right'): string {
   let athleteSection: string;
 
   if (athleteId && opponentId) {
@@ -42,6 +42,11 @@ The opponent was identified as: ${opponentId.uniform_description}, positioned on
 For every subsequent frame, track these two wrestlers consistently. Identify them by their uniform description and visible features — NOT by which side of the mat they are on, since positions change constantly during a match.
 
 In each frame observation, confirm which wrestler is the athlete and which is the opponent. If you cannot determine this for a specific frame (e.g., wrestlers are too entangled to distinguish), set wrestler_visible to false and note "wrestler identification uncertain" in the observation.`;
+    if (athletePosition) {
+      athleteSection += `\n\nThe user confirmed their wrestler was initially on the ${athletePosition.toUpperCase()} side of the frame.`;
+    }
+  } else if (athletePosition) {
+    athleteSection = `Focus on the wrestler initially on the ${athletePosition.toUpperCase()} side of the frame. Note: "initially" means their position in the first few frames — wrestlers move throughout a match, so track by appearance, not position.`;
   } else {
     athleteSection = 'Focus on the primary wrestler visible.';
   }
@@ -81,12 +86,16 @@ function buildPass2AthletePrompt(
   frameCount: number,
   matchContext?: MatchContext,
   athleteId?: WrestlerIdInfo,
+  athletePosition?: 'left' | 'right',
 ): string {
   const knowledgeBase = buildKnowledgeBasePrompt(matchStyle);
   const descriptors: string[] = [];
   if (athleteId) {
     descriptors.push(`identified as: ${athleteId.uniform_description}`);
     if (athleteId.distinguishing_features) descriptors.push(athleteId.distinguishing_features);
+  }
+  if (athletePosition) {
+    descriptors.push(`initially on the ${athletePosition} side of the frame`);
   }
   const colorNote = descriptors.length > 0 ? ` ${descriptors.join(', ')}` : '';
 
@@ -156,12 +165,17 @@ The match had ${frameCount} frames analyzed.`;
 function buildPass2ScoutingPrompt(
   matchStyle: MatchStyle,
   opponentId?: WrestlerIdInfo,
+  athletePosition?: 'left' | 'right',
 ): string {
   const knowledgeBase = buildKnowledgeBasePrompt(matchStyle);
   const descriptors: string[] = [];
   if (opponentId) {
     descriptors.push(`identified as: ${opponentId.uniform_description}`);
     if (opponentId.distinguishing_features) descriptors.push(opponentId.distinguishing_features);
+  }
+  if (athletePosition) {
+    const opponentSide = athletePosition === 'left' ? 'right' : 'left';
+    descriptors.push(`initially on the ${opponentSide} side of the frame`);
   }
   const colorNote = descriptors.length > 0 ? ` ${descriptors.join(', ')}` : '';
 
@@ -499,7 +513,7 @@ export async function POST(request: NextRequest) {
   let parsedFrameCount = 10;
   try {
     const body = await request.json();
-    const { frames, matchStyle = 'folkstyle', mode = 'athlete', matchContext, athleteIdentification, opponentIdentification, idFrameBase64 } = body;
+    const { frames, matchStyle = 'folkstyle', mode = 'athlete', matchContext, athleteIdentification, opponentIdentification, idFrameBase64, athletePosition } = body;
     parsedFrameCount = (frames && Array.isArray(frames)) ? frames.length : 10;
 
     if (!frames || !Array.isArray(frames) || frames.length === 0) {
@@ -514,6 +528,7 @@ export async function POST(request: NextRequest) {
     const validMatchContext: MatchContext | undefined = matchContext && typeof matchContext === 'object' ? matchContext : undefined;
     const validAthleteId: WrestlerIdInfo | undefined = athleteIdentification && typeof athleteIdentification === 'object' ? athleteIdentification : undefined;
     const validOpponentId: WrestlerIdInfo | undefined = opponentIdentification && typeof opponentIdentification === 'object' ? opponentIdentification : undefined;
+    const validAthletePosition: 'left' | 'right' | undefined = (athletePosition === 'left' || athletePosition === 'right') ? athletePosition : undefined;
 
     // Async mode: return jobId immediately, run analysis in background
     const asyncMode = request.nextUrl.searchParams.get('async') === 'true';
@@ -540,7 +555,7 @@ export async function POST(request: NextRequest) {
             matchStyle: validMatchStyle, mode: validMode,
             matchContext: validMatchContext,
             athleteIdentification: validAthleteId, opponentIdentification: validOpponentId,
-            idFrameBase64,
+            idFrameBase64, athletePosition: validAthletePosition,
           });
           await supabase!.from('match_analyses').update({
             job_status: 'complete',
@@ -569,7 +584,7 @@ export async function POST(request: NextRequest) {
       matchStyle: validMatchStyle, mode: validMode,
       matchContext: validMatchContext,
       athleteIdentification: validAthleteId, opponentIdentification: validOpponentId,
-      idFrameBase64,
+      idFrameBase64, athletePosition: validAthletePosition,
     });
     return NextResponse.json(result);
 
@@ -605,6 +620,7 @@ type AnalysisConfig = {
   athleteIdentification?: WrestlerIdInfo;
   opponentIdentification?: WrestlerIdInfo;
   idFrameBase64?: string;
+  athletePosition?: 'left' | 'right';
 };
 
 // Fallback mock response
@@ -634,7 +650,7 @@ function buildFallbackResponse(frameCount: number) {
 
 // Core analysis pipeline — extracted so it can be called synchronously or in after()
 async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<string, unknown>> {
-  const { frames, matchStyle: validMatchStyle, mode: validMode, matchContext: validMatchContext, athleteIdentification: validAthleteId, opponentIdentification: validOpponentId, idFrameBase64 } = config;
+  const { frames, matchStyle: validMatchStyle, mode: validMode, matchContext: validMatchContext, athleteIdentification: validAthleteId, opponentIdentification: validOpponentId, idFrameBase64, athletePosition: validAthletePosition } = config;
 
     const openai = getOpenAI();
 
@@ -706,7 +722,7 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
         const response = await openai.chat.completions.create({
           model: 'gpt-4o',
           messages: [
-            { role: 'system', content: buildPass1Prompt(validAthleteId, validOpponentId) },
+            { role: 'system', content: buildPass1Prompt(validAthleteId, validOpponentId, validAthletePosition) },
             {
               role: 'user',
               content: [
@@ -789,7 +805,7 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
       const pass2Response = await openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [
-          { role: 'system', content: buildPass2ScoutingPrompt(validMatchStyle, validOpponentId) },
+          { role: 'system', content: buildPass2ScoutingPrompt(validMatchStyle, validOpponentId, validAthletePosition) },
           {
             role: 'user',
             content: `Here are the frame-by-frame observations of the opponent:\n\n${observationsText}\n\nProduce a tactical scouting report with a gameplan to beat this opponent.`,
@@ -824,7 +840,7 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
     const pass2Response = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
-        { role: 'system', content: buildPass2AthletePrompt(validMatchStyle, frames.length, validMatchContext, validAthleteId) },
+        { role: 'system', content: buildPass2AthletePrompt(validMatchStyle, frames.length, validMatchContext, validAthleteId, validAthletePosition) },
         {
           role: 'user',
           content: `Here are the frame-by-frame observations from the match (${frames.length} frames total):\n\n${observationsText}\n\nFor fatigue analysis, here are the observations split by match half:${periodLabel}\n\nScore this wrestler's technique using the rubric. Cite specific frame indices as evidence. Also complete the fatigue analysis comparing first half vs second half.`,

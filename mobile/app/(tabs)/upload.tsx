@@ -134,6 +134,11 @@ export default function UploadScreen() {
   const [selectedWrestler, setSelectedWrestler] = useState<'a' | 'b' | null>(null);
   const [identifyingWrestler, setIdentifyingWrestler] = useState(false);
   const [extractingIdFrames, setExtractingIdFrames] = useState(false);
+  // Split-frame wrestler side selection
+  const [wrestlerSide, setWrestlerSide] = useState<'left' | 'right' | null>(null);
+  const [leftHalfUri, setLeftHalfUri] = useState<string | null>(null);
+  const [rightHalfUri, setRightHalfUri] = useState<string | null>(null);
+  const [extractingPreview, setExtractingPreview] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState('');
@@ -172,6 +177,43 @@ export default function UploadScreen() {
     return true;
   };
 
+  // Extract a frame at 1.5s, split left/right for wrestler side picker
+  const extractWrestlerPreview = async (videoUri: string) => {
+    setExtractingPreview(true);
+    setWrestlerSide(null);
+    setLeftHalfUri(null);
+    setRightHalfUri(null);
+    try {
+      const { uri: thumbUri } = await VideoThumbnails.getThumbnailAsync(videoUri, {
+        time: 1500,
+        quality: 0.85,
+      });
+      // Get dimensions via no-op manipulate
+      const full = await ImageManipulator.manipulateAsync(thumbUri, []);
+      const w = full.width;
+      const h = full.height;
+      const halfW = Math.floor(w / 2);
+
+      const left = await ImageManipulator.manipulateAsync(
+        thumbUri,
+        [{ crop: { originX: 0, originY: 0, width: halfW, height: h } }],
+        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG },
+      );
+      const right = await ImageManipulator.manipulateAsync(
+        thumbUri,
+        [{ crop: { originX: halfW, originY: 0, width: w - halfW, height: h } }],
+        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG },
+      );
+
+      setLeftHalfUri(left.uri);
+      setRightHalfUri(right.uri);
+    } catch (err) {
+      console.warn('[LevelUp] Failed to extract wrestler preview:', err);
+    } finally {
+      setExtractingPreview(false);
+    }
+  };
+
   const pickVideo = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const res = await ImagePicker.launchImageLibraryAsync({
@@ -183,6 +225,7 @@ export default function UploadScreen() {
       if (!checkVideoDuration(res.assets[0])) return;
       setVideo(res.assets[0]);
       setResult(null);
+      extractWrestlerPreview(res.assets[0].uri);
       extractIdFrames(res.assets[0].uri, res.assets[0].duration ?? 60);
     }
   };
@@ -201,6 +244,7 @@ export default function UploadScreen() {
       if (!checkVideoDuration(res.assets[0])) return;
       setVideo(res.assets[0]);
       setResult(null);
+      extractWrestlerPreview(res.assets[0].uri);
       extractIdFrames(res.assets[0].uri, res.assets[0].duration ?? 60);
     }
   };
@@ -656,6 +700,7 @@ export default function UploadScreen() {
           athleteId,
           opponentId,
           idFrameBase64 ?? undefined,
+          wrestlerSide ?? undefined,
         );
         await savePendingJob(jobId);
 
@@ -683,6 +728,7 @@ export default function UploadScreen() {
           athleteId,
           opponentId,
           idFrameBase64 ?? undefined,
+          wrestlerSide ?? undefined,
         );
       }
 
@@ -737,6 +783,10 @@ export default function UploadScreen() {
     setSelectedWrestler(null);
     setIdentifyingWrestler(false);
     setExtractingIdFrames(false);
+    setWrestlerSide(null);
+    setLeftHalfUri(null);
+    setRightHalfUri(null);
+    setExtractingPreview(false);
     setThumbnailUri(null);
     setFrameUris([]);
     setFrameTimestamps([]);
@@ -840,6 +890,63 @@ export default function UploadScreen() {
             </View>
           )}
         </View>
+
+        {/* Split-Frame Wrestler Side Picker */}
+        {video && !analyzing && !result && (extractingPreview || leftHalfUri) && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>WHICH SIDE IS YOUR WRESTLER?</Text>
+            <Text style={styles.sectionHint}>Tap the side of the frame where your wrestler starts</Text>
+            {extractingPreview ? (
+              <View style={styles.wrestlerLoadingContainer}>
+                <ActivityIndicator size="small" color="#2563EB" />
+                <Text style={styles.wrestlerLoadingText}>Loading preview...</Text>
+              </View>
+            ) : (
+              <View style={styles.sideSplitRow}>
+                <TouchableOpacity
+                  style={[styles.sideSplitCard, wrestlerSide === 'left' && styles.sideSplitCardSelected]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    setWrestlerSide(wrestlerSide === 'left' ? null : 'left');
+                  }}
+                  activeOpacity={0.8}
+                >
+                  {leftHalfUri && (
+                    <Image source={{ uri: leftHalfUri }} style={styles.sideSplitImage} />
+                  )}
+                  <View style={styles.sideSplitLabelWrap}>
+                    <Text style={[styles.sideSplitLabel, wrestlerSide === 'left' && styles.sideSplitLabelSelected]}>LEFT</Text>
+                  </View>
+                  {wrestlerSide === 'left' && (
+                    <View style={styles.sideSplitBadge}>
+                      <Text style={styles.sideSplitBadgeText}>YOUR WRESTLER</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.sideSplitCard, wrestlerSide === 'right' && styles.sideSplitCardSelected]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    setWrestlerSide(wrestlerSide === 'right' ? null : 'right');
+                  }}
+                  activeOpacity={0.8}
+                >
+                  {rightHalfUri && (
+                    <Image source={{ uri: rightHalfUri }} style={styles.sideSplitImage} />
+                  )}
+                  <View style={styles.sideSplitLabelWrap}>
+                    <Text style={[styles.sideSplitLabel, wrestlerSide === 'right' && styles.sideSplitLabelSelected]}>RIGHT</Text>
+                  </View>
+                  {wrestlerSide === 'right' && (
+                    <View style={styles.sideSplitBadge}>
+                      <Text style={styles.sideSplitBadgeText}>YOUR WRESTLER</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Wrestler Identification — GPT-4o Detection */}
         {video && !analyzing && !result && (extractingIdFrames || identifyingWrestler || wrestlerDetection) && (
@@ -1479,5 +1586,53 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#fff',
+  },
+  sideSplitRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  sideSplitCard: {
+    flex: 1,
+    borderRadius: 14,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#27272A',
+    backgroundColor: '#18181B',
+  },
+  sideSplitCardSelected: {
+    borderColor: '#2563EB',
+  },
+  sideSplitImage: {
+    width: '100%',
+    aspectRatio: 9 / 16,
+    resizeMode: 'cover',
+  },
+  sideSplitLabelWrap: {
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  sideSplitLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#71717A',
+    letterSpacing: 1,
+  },
+  sideSplitLabelSelected: {
+    color: '#2563EB',
+  },
+  sideSplitBadge: {
+    position: 'absolute',
+    top: 8,
+    alignSelf: 'center',
+    backgroundColor: '#2563EB',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  sideSplitBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: 0.5,
   },
 });
