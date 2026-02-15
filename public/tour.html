@@ -1,0 +1,1306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LevelUp — App Tour</title>
+<style>
+  :root {
+    --lu-primary: #2563EB;
+    --lu-primary-glow: rgba(37, 99, 235, 0.25);
+    --lu-green: #22C55E;
+    --lu-red: #EF4444;
+    --lu-yellow: #EAB308;
+    --lu-orange: #F97316;
+    --lu-purple: #A855F7;
+    --lu-bg: #0A0A0A;
+    --lu-surface: #18181B;
+    --lu-surface2: #27272A;
+    --lu-text: #E4E4E7;
+    --lu-muted: #71717A;
+    --lu-dim: #52525B;
+    --lu-border: #27272A;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+    background: #000;
+    color: var(--lu-text);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .tour-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 16px;
+  }
+
+  .tour-container {
+    background: var(--lu-bg);
+    border: 1px solid var(--lu-border);
+    border-radius: 24px;
+    width: 100%;
+    max-width: 440px;
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255,255,255,0.04);
+  }
+
+  /* Header */
+  .tour-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--lu-border);
+  }
+
+  .tour-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .tour-logo-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--lu-primary), #1d4ed8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 800;
+    color: #fff;
+    box-shadow: 0 2px 12px var(--lu-primary-glow);
+  }
+
+  .tour-logo-text {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -0.5px;
+  }
+
+  .tour-logo-badge {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--lu-primary);
+    background: rgba(37, 99, 235, 0.12);
+    padding: 3px 8px;
+    border-radius: 6px;
+    letter-spacing: 0.5px;
+    margin-left: 4px;
+  }
+
+  .tour-skip {
+    background: none;
+    border: none;
+    color: var(--lu-muted);
+    font-size: 13px;
+    cursor: pointer;
+    padding: 6px 10px;
+    border-radius: 8px;
+    transition: all 0.2s;
+  }
+  .tour-skip:hover { color: var(--lu-text); background: var(--lu-surface); }
+
+  /* Progress */
+  .progress-section {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 14px 20px;
+  }
+
+  .progress-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 4px;
+    background: var(--lu-surface2);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: none;
+  }
+  .progress-dot.active {
+    width: 28px;
+    background: var(--lu-primary);
+    box-shadow: 0 0 10px var(--lu-primary-glow);
+  }
+  .progress-dot.completed {
+    background: var(--lu-dim);
+  }
+  .progress-dot:hover {
+    background: var(--lu-muted);
+  }
+
+  /* Content */
+  .tour-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 24px 20px;
+    scroll-behavior: smooth;
+  }
+
+  .tour-content::-webkit-scrollbar { width: 4px; }
+  .tour-content::-webkit-scrollbar-track { background: transparent; }
+  .tour-content::-webkit-scrollbar-thumb { background: var(--lu-surface2); border-radius: 2px; }
+
+  .tour-slide {
+    display: none;
+    animation: slideIn 0.35s ease;
+  }
+  .tour-slide.active { display: block; }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .slide-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    margin-bottom: 16px;
+  }
+
+  .slide-title {
+    font-size: 22px;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+    line-height: 1.2;
+  }
+
+  .slide-subtitle {
+    font-size: 14px;
+    color: var(--lu-muted);
+    line-height: 1.5;
+    margin-bottom: 20px;
+  }
+
+  /* Reusable card */
+  .demo-card {
+    background: var(--lu-surface);
+    border: 1px solid var(--lu-border);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 12px;
+    transition: transform 0.2s, border-color 0.2s;
+  }
+  .demo-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--lu-dim);
+  }
+
+  .demo-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .demo-card-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .demo-card-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  .demo-card-desc {
+    font-size: 13px;
+    color: var(--lu-muted);
+    line-height: 1.45;
+  }
+
+  /* Score bars */
+  .score-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .score-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--lu-muted);
+    width: 70px;
+    flex-shrink: 0;
+  }
+  .score-bar-track {
+    flex: 1;
+    height: 8px;
+    background: var(--lu-surface2);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .score-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    animation: growBar 0.8s ease forwards;
+    transform-origin: left;
+  }
+  @keyframes growBar {
+    from { transform: scaleX(0); }
+    to { transform: scaleX(1); }
+  }
+  .score-value {
+    font-size: 13px;
+    font-weight: 700;
+    width: 30px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  /* Steps list */
+  .step-list {
+    list-style: none;
+    counter-reset: steps;
+  }
+  .step-list li {
+    counter-increment: steps;
+    display: flex;
+    gap: 12px;
+    margin-bottom: 14px;
+    align-items: flex-start;
+  }
+  .step-list li::before {
+    content: counter(steps);
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    background: var(--lu-surface);
+    border: 1px solid var(--lu-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--lu-primary);
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .step-list .step-text {
+    font-size: 13px;
+    color: var(--lu-text);
+    line-height: 1.5;
+  }
+  .step-list .step-text strong {
+    color: #fff;
+    font-weight: 600;
+  }
+
+  /* Tags / chips */
+  .chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  .chip {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 5px 10px;
+    border-radius: 8px;
+    background: var(--lu-surface);
+    border: 1px solid var(--lu-border);
+    color: var(--lu-text);
+  }
+  .chip.active {
+    background: rgba(37, 99, 235, 0.12);
+    border-color: var(--lu-primary);
+    color: #fff;
+  }
+
+  /* Phone mockup */
+  .phone-mock {
+    background: var(--lu-surface);
+    border: 1px solid var(--lu-border);
+    border-radius: 20px;
+    padding: 12px;
+    margin-bottom: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .phone-mock-notch {
+    width: 100px;
+    height: 6px;
+    background: var(--lu-bg);
+    border-radius: 3px;
+    margin: 0 auto 12px;
+  }
+  .phone-mock-content {
+    min-height: 160px;
+  }
+
+  /* Wrestler ID demo */
+  .wrestler-id-frame {
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    border-radius: 12px;
+    height: 140px;
+    position: relative;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .wrestler-silhouette {
+    width: 60px;
+    height: 100px;
+    border-radius: 8px;
+    position: absolute;
+    top: 20px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .wrestler-silhouette.left {
+    left: 30px;
+    border: 2px solid var(--lu-primary);
+    background: rgba(37, 99, 235, 0.15);
+  }
+  .wrestler-silhouette.right {
+    right: 30px;
+    border: 2px solid var(--lu-orange);
+    background: rgba(249, 115, 22, 0.15);
+  }
+  .wrestler-label {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 5px;
+    border-radius: 4px;
+    color: #fff;
+  }
+  .wrestler-silhouette.left .wrestler-label { background: var(--lu-primary); }
+  .wrestler-silhouette.right .wrestler-label { background: var(--lu-orange); }
+
+  .wrestler-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--lu-surface);
+    border: 1px solid var(--lu-border);
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 8px;
+    transition: border-color 0.2s;
+  }
+  .wrestler-card.selected {
+    border-color: var(--lu-green);
+    background: rgba(34, 197, 94, 0.06);
+  }
+  .wrestler-card .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 5px;
+    flex-shrink: 0;
+  }
+  .wrestler-card .wc-info {
+    flex: 1;
+  }
+  .wrestler-card .wc-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+  }
+  .wrestler-card .wc-desc {
+    font-size: 11px;
+    color: var(--lu-muted);
+  }
+  .wrestler-card .wc-btn {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 5px 10px;
+    border-radius: 8px;
+    border: none;
+    cursor: default;
+  }
+
+  /* Stat grid */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .stat-box {
+    background: var(--lu-surface);
+    border: 1px solid var(--lu-border);
+    border-radius: 12px;
+    padding: 12px 8px;
+    text-align: center;
+  }
+  .stat-box .stat-val {
+    font-size: 20px;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .stat-box .stat-lbl {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--lu-muted);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  /* Tab pills for demo */
+  .tab-pills {
+    display: flex;
+    gap: 4px;
+    background: var(--lu-surface);
+    border-radius: 10px;
+    padding: 3px;
+    margin-bottom: 14px;
+  }
+  .tab-pill {
+    flex: 1;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--lu-muted);
+    padding: 7px 0;
+    border-radius: 8px;
+    transition: all 0.2s;
+  }
+  .tab-pill.active {
+    background: var(--lu-primary);
+    color: #fff;
+    box-shadow: 0 2px 8px var(--lu-primary-glow);
+  }
+
+  /* Rubric table */
+  .rubric-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin-bottom: 14px;
+    font-size: 12px;
+  }
+  .rubric-table th {
+    text-align: left;
+    font-weight: 700;
+    color: var(--lu-muted);
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--lu-border);
+    letter-spacing: 0.5px;
+    font-size: 10px;
+    text-transform: uppercase;
+  }
+  .rubric-table td {
+    padding: 8px 8px;
+    border-bottom: 1px solid rgba(39, 39, 42, 0.5);
+    color: var(--lu-text);
+  }
+  .rubric-table td:first-child { font-weight: 600; color: #fff; }
+  .rubric-table td:last-child { text-align: right; font-weight: 700; }
+
+  /* Highlight box */
+  .highlight-box {
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(37, 99, 235, 0.03));
+    border: 1px solid rgba(37, 99, 235, 0.2);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+  .highlight-box.green {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(34, 197, 94, 0.03));
+    border-color: rgba(34, 197, 94, 0.2);
+  }
+  .highlight-box.orange {
+    background: linear-gradient(135deg, rgba(249, 115, 22, 0.08), rgba(249, 115, 22, 0.03));
+    border-color: rgba(249, 115, 22, 0.2);
+  }
+  .highlight-box .hb-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+  .highlight-box .hb-text {
+    font-size: 12px;
+    color: var(--lu-muted);
+    line-height: 1.5;
+  }
+
+  /* Badge grid */
+  .badge-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .badge-item {
+    background: var(--lu-surface);
+    border: 1px solid var(--lu-border);
+    border-radius: 12px;
+    padding: 10px 4px;
+    text-align: center;
+  }
+  .badge-item .badge-icon { font-size: 22px; margin-bottom: 4px; }
+  .badge-item .badge-name { font-size: 9px; font-weight: 600; color: var(--lu-muted); }
+
+  /* Comparison */
+  .compare-row {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .compare-val {
+    font-size: 18px;
+    font-weight: 800;
+    text-align: center;
+  }
+  .compare-label {
+    font-size: 11px;
+    color: var(--lu-muted);
+    font-weight: 600;
+    text-align: center;
+  }
+  .compare-arrow {
+    font-size: 16px;
+    color: var(--lu-green);
+    text-align: center;
+  }
+
+  /* XP bar */
+  .xp-bar-wrap {
+    margin-bottom: 14px;
+  }
+  .xp-bar-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .xp-bar-header span {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--lu-muted);
+  }
+  .xp-bar-track {
+    height: 10px;
+    background: var(--lu-surface2);
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  .xp-bar-fill {
+    height: 100%;
+    border-radius: 5px;
+    background: linear-gradient(90deg, var(--lu-primary), #7c3aed);
+    animation: growBar 1s ease forwards;
+  }
+
+  /* Drill list */
+  .drill-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(39, 39, 42, 0.5);
+  }
+  .drill-item:last-child { border-bottom: none; }
+  .drill-check {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    border: 2px solid var(--lu-surface2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  .drill-check.done { border-color: var(--lu-green); background: rgba(34, 197, 94, 0.1); color: var(--lu-green); }
+  .drill-info { flex: 1; }
+  .drill-name { font-size: 13px; font-weight: 600; color: #fff; }
+  .drill-meta { font-size: 11px; color: var(--lu-muted); }
+  .drill-priority {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 7px;
+    border-radius: 6px;
+  }
+  .drill-priority.high { background: rgba(239, 68, 68, 0.12); color: var(--lu-red); }
+  .drill-priority.med { background: rgba(234, 179, 8, 0.12); color: var(--lu-yellow); }
+
+  /* Footer */
+  .tour-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-top: 1px solid var(--lu-border);
+  }
+
+  .tour-btn {
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .tour-btn-prev {
+    background: var(--lu-surface);
+    color: var(--lu-text);
+    border: 1px solid var(--lu-border);
+  }
+  .tour-btn-prev:hover { background: var(--lu-surface2); }
+
+  .tour-btn-next {
+    background: linear-gradient(135deg, var(--lu-primary), #1d4ed8);
+    color: #fff;
+    box-shadow: 0 2px 12px var(--lu-primary-glow);
+  }
+  .tour-btn-next:hover { transform: translateY(-1px); box-shadow: 0 4px 16px var(--lu-primary-glow); }
+
+  .tour-btn-next.finish {
+    background: linear-gradient(135deg, var(--lu-green), #16a34a);
+    box-shadow: 0 2px 12px rgba(34, 197, 94, 0.3);
+  }
+
+  .slide-counter {
+    font-size: 12px;
+    color: var(--lu-dim);
+    font-weight: 600;
+    min-width: 60px;
+    text-align: center;
+  }
+
+  /* Welcome slide */
+  .welcome-hero {
+    text-align: center;
+    padding: 20px 0 10px;
+  }
+  .welcome-hero .hero-icon {
+    width: 80px;
+    height: 80px;
+    border-radius: 24px;
+    background: linear-gradient(135deg, var(--lu-primary), #1d4ed8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+    margin: 0 auto 16px;
+    box-shadow: 0 8px 32px var(--lu-primary-glow);
+  }
+  .welcome-hero .hero-title {
+    font-size: 26px;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+  }
+  .welcome-hero .hero-sub {
+    font-size: 15px;
+    color: var(--lu-muted);
+    line-height: 1.5;
+    max-width: 320px;
+    margin: 0 auto;
+  }
+  .feature-pills {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 20px;
+  }
+  .feature-pill {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--lu-text);
+    background: var(--lu-surface);
+    border: 1px solid var(--lu-border);
+    padding: 6px 12px;
+    border-radius: 20px;
+  }
+
+  /* Responsive */
+  @media (max-width: 480px) {
+    .tour-container { border-radius: 20px; max-height: 95vh; }
+    .stat-grid { grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+    .badge-grid { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="tour-overlay" id="tourOverlay">
+<div class="tour-container">
+  <!-- Header -->
+  <div class="tour-header">
+    <div class="tour-logo">
+      <div class="tour-logo-icon">L</div>
+      <span class="tour-logo-text">LevelUp</span>
+      <span class="tour-logo-badge">TOUR</span>
+    </div>
+    <button class="tour-skip" onclick="closeTour()">Skip</button>
+  </div>
+
+  <!-- Progress Dots -->
+  <div class="progress-section" id="progressDots"></div>
+
+  <!-- Slides -->
+  <div class="tour-content">
+
+    <!-- SLIDE 0: Welcome -->
+    <div class="tour-slide" data-slide="0">
+      <div class="welcome-hero">
+        <div class="hero-icon">&#127941;</div>
+        <div class="hero-title">Welcome to LevelUp</div>
+        <div class="hero-sub">Your AI wrestling coach that watches your matches, scores your technique, and builds personalized training plans.</div>
+        <div class="feature-pills">
+          <span class="feature-pill">&#127909; Video Analysis</span>
+          <span class="feature-pill">&#127942; AI Scoring</span>
+          <span class="feature-pill">&#128373;&#65039; Opponent Scouting</span>
+          <span class="feature-pill">&#128170; Custom Drills</span>
+          <span class="feature-pill">&#128200; Progress Tracking</span>
+          <span class="feature-pill">&#129351; Team Leaderboards</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 1: Upload & Analyze -->
+    <div class="tour-slide" data-slide="1">
+      <div class="slide-icon" style="background: rgba(37, 99, 235, 0.12);">&#127909;</div>
+      <div class="slide-title">Upload a Match Video</div>
+      <div class="slide-subtitle">Record or pick a match video and LevelUp's AI analyzes every frame.</div>
+
+      <ol class="step-list">
+        <li><span class="step-text"><strong>Pick or record</strong> your match video from your phone's library or camera.</span></li>
+        <li><span class="step-text"><strong>Choose your match style</strong> — Youth Folk, HS Folk, College, Freestyle, or Greco.</span></li>
+        <li><span class="step-text"><strong>Identify your wrestler</strong> — LevelUp detects both wrestlers and you tap "This Is Me."</span></li>
+        <li><span class="step-text"><strong>Add context</strong> (optional) — weight class, tournament name, round number.</span></li>
+        <li><span class="step-text"><strong>Hit Analyze</strong> — LevelUp extracts key frames, detects action, and scores your technique.</span></li>
+      </ol>
+
+      <div class="highlight-box">
+        <div class="hb-title">Smart Frame Detection</div>
+        <div class="hb-text">LevelUp scans your entire video at 1fps, detects action windows using motion analysis, and selects the most important frames — so nothing gets missed.</div>
+      </div>
+    </div>
+
+    <!-- SLIDE 2: Wrestler Identification -->
+    <div class="tour-slide" data-slide="2">
+      <div class="slide-icon" style="background: rgba(249, 115, 22, 0.12);">&#128065;&#65039;</div>
+      <div class="slide-title">Wrestler Identification</div>
+      <div class="slide-subtitle">GPT-4o vision identifies both wrestlers by uniform, headgear, and body type — no color picker needed.</div>
+
+      <div class="wrestler-id-frame">
+        <div class="wrestler-silhouette left">
+          <div class="wrestler-label">A</div>
+          &#129340;
+        </div>
+        <div class="wrestler-silhouette right">
+          <div class="wrestler-label">B</div>
+          &#129340;
+        </div>
+      </div>
+
+      <div class="wrestler-card selected">
+        <div class="dot" style="background: var(--lu-primary);"></div>
+        <div class="wc-info">
+          <div class="wc-name">Wrestler A</div>
+          <div class="wc-desc">Red singlet with white stripe, black headgear</div>
+        </div>
+        <div class="wc-btn" style="background: rgba(34,197,94,0.15); color: var(--lu-green);">&#10003; Yours</div>
+      </div>
+      <div class="wrestler-card" style="opacity: 0.5;">
+        <div class="dot" style="background: var(--lu-orange);"></div>
+        <div class="wc-info">
+          <div class="wc-name">Wrestler B</div>
+          <div class="wc-desc">Blue singlet, red headgear, taller build</div>
+        </div>
+        <div class="wc-btn" style="background: var(--lu-surface); color: var(--lu-muted);">Opponent</div>
+      </div>
+
+      <div class="highlight-box orange">
+        <div class="hb-text">Can't tell who's who? Tap <strong>"Try Another Frame"</strong> and LevelUp picks a different moment where wrestlers are more separated.</div>
+      </div>
+    </div>
+
+    <!-- SLIDE 3: AI Scoring Rubric -->
+    <div class="tour-slide" data-slide="3">
+      <div class="slide-icon" style="background: rgba(168, 85, 247, 0.12);">&#128202;</div>
+      <div class="slide-title">How LevelUp Scores You</div>
+      <div class="slide-subtitle">Every analysis uses a detailed wrestling rubric across 3 positions — just like a real coach evaluating film.</div>
+
+      <div class="demo-card">
+        <div class="demo-card-header">
+          <div class="demo-card-icon" style="background: rgba(37,99,235,0.12); color: var(--lu-primary);">&#129354;</div>
+          <div>
+            <div class="demo-card-title">Standing (40% of score)</div>
+            <div class="demo-card-desc">Stance, shot selection, finishing, sprawls, re-attacks</div>
+          </div>
+        </div>
+      </div>
+      <div class="demo-card">
+        <div class="demo-card-header">
+          <div class="demo-card-icon" style="background: rgba(34,197,94,0.12); color: var(--lu-green);">&#128170;</div>
+          <div>
+            <div class="demo-card-title">Top / Riding (30% of score)</div>
+            <div class="demo-card-desc">Ride tightness, breakdowns, turns & near falls, mat returns</div>
+          </div>
+        </div>
+      </div>
+      <div class="demo-card">
+        <div class="demo-card-header">
+          <div class="demo-card-icon" style="background: rgba(249,115,22,0.12); color: var(--lu-orange);">&#128260;</div>
+          <div>
+            <div class="demo-card-title">Bottom / Escape (30% of score)</div>
+            <div class="demo-card-desc">Base & posture, stand-ups, sit-outs & switches, reversals</div>
+          </div>
+        </div>
+      </div>
+
+      <table class="rubric-table">
+        <thead>
+          <tr><th>Score</th><th>Level</th><th>Range</th></tr>
+        </thead>
+        <tbody>
+          <tr><td style="color: var(--lu-green);">Elite</td><td>State/national caliber</td><td>90-100</td></tr>
+          <tr><td style="color: var(--lu-primary);">Advanced</td><td>Clean execution</td><td>80-89</td></tr>
+          <tr><td style="color: var(--lu-yellow);">Solid</td><td>Good fundamentals</td><td>70-79</td></tr>
+          <tr><td style="color: var(--lu-orange);">Developing</td><td>Inconsistent technique</td><td>60-69</td></tr>
+          <tr><td style="color: var(--lu-red);">Beginner</td><td>Focus on basics</td><td>&lt;60</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- SLIDE 4: Analysis Results -->
+    <div class="tour-slide" data-slide="4">
+      <div class="slide-icon" style="background: rgba(34, 197, 94, 0.12);">&#127942;</div>
+      <div class="slide-title">Your Analysis Results</div>
+      <div class="slide-subtitle">After analysis, you get position scores, detailed reasoning, strengths, weaknesses, and custom drill assignments.</div>
+
+      <div class="phone-mock">
+        <div class="phone-mock-notch"></div>
+        <div class="phone-mock-content">
+          <div style="text-align:center; margin-bottom:12px;">
+            <div style="font-size:36px; font-weight:800; color:#fff;">78</div>
+            <div style="font-size:11px; color:var(--lu-muted); font-weight:600; letter-spacing:1px;">OVERALL SCORE</div>
+          </div>
+          <div class="score-row">
+            <span class="score-label">Standing</span>
+            <div class="score-bar-track"><div class="score-bar-fill" style="width:82%; background: var(--lu-primary);"></div></div>
+            <span class="score-value" style="color: var(--lu-primary);">82</span>
+          </div>
+          <div class="score-row">
+            <span class="score-label">Top</span>
+            <div class="score-bar-track"><div class="score-bar-fill" style="width:75%; background: var(--lu-green); animation-delay:0.15s;"></div></div>
+            <span class="score-value" style="color: var(--lu-green);">75</span>
+          </div>
+          <div class="score-row">
+            <span class="score-label">Bottom</span>
+            <div class="score-bar-track"><div class="score-bar-fill" style="width:68%; background: var(--lu-orange); animation-delay:0.3s;"></div></div>
+            <span class="score-value" style="color: var(--lu-orange);">68</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="highlight-box green">
+        <div class="hb-title">Position Reasoning</div>
+        <div class="hb-text">LevelUp explains <strong>exactly why</strong> you earned each score — what techniques were observed, what earned points, and what lost points. It's like getting film review from a coach.</div>
+      </div>
+
+      <div class="demo-card">
+        <div class="demo-card-title" style="margin-bottom:6px;">&#9989; Strengths</div>
+        <div class="demo-card-desc">
+          <div style="margin-bottom:3px;">&#8226; Quick level changes on shot entries</div>
+          <div style="margin-bottom:3px;">&#8226; Solid base and hip pressure on top</div>
+          <div>&#8226; Effective hand fighting in neutral</div>
+        </div>
+      </div>
+      <div class="demo-card">
+        <div class="demo-card-title" style="margin-bottom:6px; color:var(--lu-red);">&#10060; Areas to Improve</div>
+        <div class="demo-card-desc">
+          <div style="margin-bottom:3px;">&#8226; Slow stand-up timing from bottom</div>
+          <div style="margin-bottom:3px;">&#8226; Head position drops after sprawl</div>
+          <div>&#8226; Limited chain wrestling after missed shots</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 5: Drills & Training -->
+    <div class="tour-slide" data-slide="5">
+      <div class="slide-icon" style="background: rgba(234, 179, 8, 0.12);">&#128170;</div>
+      <div class="slide-title">Custom Drill Assignments</div>
+      <div class="slide-subtitle">Based on your weaknesses, LevelUp assigns specific drills with reps, sets, and priority levels. Complete them to improve your scores.</div>
+
+      <div class="demo-card">
+        <div class="drill-item">
+          <div class="drill-check done">&#10003;</div>
+          <div class="drill-info">
+            <div class="drill-name">Stand-up Timing Drill</div>
+            <div class="drill-meta">3 sets &#215; 10 reps &middot; Addresses: Bottom escapes</div>
+          </div>
+          <span class="drill-priority high">HIGH</span>
+        </div>
+        <div class="drill-item">
+          <div class="drill-check"></div>
+          <div class="drill-info">
+            <div class="drill-name">Sprawl-to-Snap Combo</div>
+            <div class="drill-meta">3 sets &#215; 8 reps &middot; Addresses: Defense recovery</div>
+          </div>
+          <span class="drill-priority high">HIGH</span>
+        </div>
+        <div class="drill-item">
+          <div class="drill-check"></div>
+          <div class="drill-info">
+            <div class="drill-name">Chain Wrestling Series</div>
+            <div class="drill-meta">3 sets &#215; 5 reps &middot; Addresses: Re-attacks</div>
+          </div>
+          <span class="drill-priority med">MED</span>
+        </div>
+      </div>
+
+      <div class="highlight-box">
+        <div class="hb-title">Training Plan</div>
+        <div class="hb-text">The <strong>Plan tab</strong> builds your daily schedule — practices, drill circuits, film review — with weekly goals tracking your sessions, uploads, and XP earned.</div>
+      </div>
+    </div>
+
+    <!-- SLIDE 6: Opponent Scouting -->
+    <div class="tour-slide" data-slide="6">
+      <div class="slide-icon" style="background: rgba(239, 68, 68, 0.12);">&#128373;&#65039;</div>
+      <div class="slide-title">Scout Your Opponents</div>
+      <div class="slide-subtitle">Upload your opponent's match footage and LevelUp builds a full scouting report with attack patterns, vulnerabilities, and a gameplan.</div>
+
+      <div class="demo-card">
+        <div class="demo-card-header">
+          <div class="demo-card-icon" style="background: rgba(239,68,68,0.12);">&#127919;</div>
+          <div>
+            <div class="demo-card-title">Attack Patterns</div>
+            <div class="demo-card-desc">Single leg from collar tie — 60% success rate. Counter: underhook snap-down.</div>
+          </div>
+        </div>
+      </div>
+      <div class="demo-card">
+        <div class="demo-card-header">
+          <div class="demo-card-icon" style="background: rgba(234,179,8,0.12);">&#128161;</div>
+          <div>
+            <div class="demo-card-title">Vulnerabilities</div>
+            <div class="demo-card-desc">Weak on bottom — gives up reversals. Slow hip heist. Susceptible to tilts from top.</div>
+          </div>
+        </div>
+      </div>
+      <div class="demo-card">
+        <div class="demo-card-header">
+          <div class="demo-card-icon" style="background: rgba(37,99,235,0.12);">&#128203;</div>
+          <div>
+            <div class="demo-card-title">Gameplan</div>
+            <div class="demo-card-desc"><strong>Period 1:</strong> Pressure with heavy ties, attack with doubles. <strong>If ahead:</strong> Ride legs, run clock. <strong>If behind:</strong> Push pace, re-attacks off cage.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 7: Progress & Stats -->
+    <div class="tour-slide" data-slide="7">
+      <div class="slide-icon" style="background: rgba(37, 99, 235, 0.12);">&#128200;</div>
+      <div class="slide-title">Track Your Progress</div>
+      <div class="slide-subtitle">Your profile tracks every analysis, shows score trends, and highlights where you're improving — or where you need to focus.</div>
+
+      <div class="stat-grid">
+        <div class="stat-box">
+          <div class="stat-val">72%</div>
+          <div class="stat-lbl">Win Rate</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val">84</div>
+          <div class="stat-lbl">Avg Score</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-val">11</div>
+          <div class="stat-lbl">Videos</div>
+        </div>
+      </div>
+
+      <div class="demo-card">
+        <div class="demo-card-title" style="margin-bottom:10px;">Position Progress</div>
+        <div class="score-row">
+          <span class="score-label">Standing</span>
+          <div class="score-bar-track"><div class="score-bar-fill" style="width:84%; background: var(--lu-primary);"></div></div>
+          <span class="score-value" style="color: var(--lu-green);">+6</span>
+        </div>
+        <div class="score-row">
+          <span class="score-label">Top</span>
+          <div class="score-bar-track"><div class="score-bar-fill" style="width:78%; background: var(--lu-primary); animation-delay:0.15s;"></div></div>
+          <span class="score-value" style="color: var(--lu-green);">+3</span>
+        </div>
+        <div class="score-row">
+          <span class="score-label">Bottom</span>
+          <div class="score-bar-track"><div class="score-bar-fill" style="width:65%; background: var(--lu-orange); animation-delay:0.3s;"></div></div>
+          <span class="score-value" style="color: var(--lu-red);">-2</span>
+        </div>
+      </div>
+
+      <div class="highlight-box">
+        <div class="hb-title">Compare Any Two Matches</div>
+        <div class="hb-text">Select two analyses from your history to see a side-by-side comparison — track exactly how your scores changed over time.</div>
+      </div>
+    </div>
+
+    <!-- SLIDE 8: Gamification -->
+    <div class="tour-slide" data-slide="8">
+      <div class="slide-icon" style="background: rgba(168, 85, 247, 0.12);">&#127941;</div>
+      <div class="slide-title">Level Up & Earn Badges</div>
+      <div class="slide-subtitle">Every upload earns XP. Build streaks, unlock badges, climb levels, and compete on your team's leaderboard.</div>
+
+      <div class="xp-bar-wrap">
+        <div class="xp-bar-header">
+          <span>Level 4</span>
+          <span>420 / 500 XP</span>
+        </div>
+        <div class="xp-bar-track">
+          <div class="xp-bar-fill" style="width: 84%;"></div>
+        </div>
+      </div>
+
+      <div class="badge-grid">
+        <div class="badge-item"><div class="badge-icon">&#127941;</div><div class="badge-name">First Upload</div></div>
+        <div class="badge-item"><div class="badge-icon">&#128293;</div><div class="badge-name">7-Day Streak</div></div>
+        <div class="badge-item"><div class="badge-icon">&#11088;</div><div class="badge-name">Score 80+</div></div>
+        <div class="badge-item"><div class="badge-icon">&#128640;</div><div class="badge-name">10 Videos</div></div>
+      </div>
+
+      <div class="demo-card">
+        <div class="demo-card-header">
+          <div class="demo-card-icon" style="background: rgba(168,85,247,0.12);">&#128293;</div>
+          <div>
+            <div class="demo-card-title">Daily Streaks</div>
+            <div class="demo-card-desc">Upload a video or complete drills every day to keep your streak alive. Longer streaks = bonus XP.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-card">
+        <div class="demo-card-header">
+          <div class="demo-card-icon" style="background: rgba(234,179,8,0.12);">&#129351;</div>
+          <div>
+            <div class="demo-card-title">Team Leaderboard</div>
+            <div class="demo-card-desc">See how you stack up against your teammates. Top 3 wrestlers earn gold, silver, and bronze medals.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 9: Profile & Settings -->
+    <div class="tour-slide" data-slide="9">
+      <div class="slide-icon" style="background: rgba(113, 113, 122, 0.2);">&#9881;&#65039;</div>
+      <div class="slide-title">Set Up Your Profile</div>
+      <div class="slide-subtitle">Configure your profile so LevelUp can customize your experience — from match style defaults to weight class tracking.</div>
+
+      <div class="demo-card">
+        <div class="demo-card-header">
+          <div class="demo-card-icon" style="background: rgba(37,99,235,0.12);">&#128100;</div>
+          <div>
+            <div class="demo-card-title">Edit Profile</div>
+            <div class="demo-card-desc">Name, birth year, school/club, experience level, and bio. Your birth year auto-selects the right match style.</div>
+          </div>
+        </div>
+      </div>
+      <div class="demo-card">
+        <div class="demo-card-header">
+          <div class="demo-card-icon" style="background: rgba(34,197,94,0.12);">&#9878;&#65039;</div>
+          <div>
+            <div class="demo-card-title">Weight Class</div>
+            <div class="demo-card-desc">Select your style and division. Full USA Wrestling weight charts for Folkstyle and Freestyle/Greco, 8U through College.</div>
+          </div>
+        </div>
+      </div>
+      <div class="demo-card">
+        <div class="demo-card-header">
+          <div class="demo-card-icon" style="background: rgba(234,179,8,0.12);">&#128276;</div>
+          <div>
+            <div class="demo-card-title">Notifications</div>
+            <div class="demo-card-desc">Toggle analysis alerts, drill reminders, weekly summaries, and badge notifications. Set your daily reminder time.</div>
+          </div>
+        </div>
+      </div>
+      <div class="demo-card">
+        <div class="demo-card-header">
+          <div class="demo-card-icon" style="background: rgba(168,85,247,0.12);">&#128101;</div>
+          <div>
+            <div class="demo-card-title">Club Settings</div>
+            <div class="demo-card-desc">Search for and join your wrestling club. See your team roster and compete on the club leaderboard.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 10: Get Started -->
+    <div class="tour-slide" data-slide="10">
+      <div class="welcome-hero">
+        <div class="hero-icon" style="background: linear-gradient(135deg, var(--lu-green), #16a34a); box-shadow: 0 8px 32px rgba(34,197,94,0.3);">&#128640;</div>
+        <div class="hero-title">You're Ready</div>
+        <div class="hero-sub">Upload your first match video and let LevelUp analyze your technique. The more you use it, the better your training gets.</div>
+
+        <div style="margin-top: 24px;">
+          <div class="demo-card" style="text-align: left;">
+            <div class="demo-card-title" style="margin-bottom:10px;">Quick Start Checklist</div>
+            <div class="drill-item">
+              <div class="drill-check" style="border-color: var(--lu-primary); color: var(--lu-primary);">1</div>
+              <div class="drill-info">
+                <div class="drill-name">Set up your profile</div>
+                <div class="drill-meta">Name, birth year, weight class</div>
+              </div>
+            </div>
+            <div class="drill-item">
+              <div class="drill-check" style="border-color: var(--lu-primary); color: var(--lu-primary);">2</div>
+              <div class="drill-info">
+                <div class="drill-name">Upload a match video</div>
+                <div class="drill-meta">Record or pick from your library</div>
+              </div>
+            </div>
+            <div class="drill-item">
+              <div class="drill-check" style="border-color: var(--lu-primary); color: var(--lu-primary);">3</div>
+              <div class="drill-info">
+                <div class="drill-name">Review your scores</div>
+                <div class="drill-meta">Check strengths, weaknesses, and drills</div>
+              </div>
+            </div>
+            <div class="drill-item" style="border-bottom: none;">
+              <div class="drill-check" style="border-color: var(--lu-primary); color: var(--lu-primary);">4</div>
+              <div class="drill-info">
+                <div class="drill-name">Join your club</div>
+                <div class="drill-meta">Find your team and climb the leaderboard</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <div class="tour-footer">
+    <button class="tour-btn tour-btn-prev" id="prevBtn" onclick="prevSlide()">Back</button>
+    <span class="slide-counter" id="slideCounter"></span>
+    <button class="tour-btn tour-btn-next" id="nextBtn" onclick="nextSlide()">Next</button>
+  </div>
+</div>
+</div>
+
+<script>
+  const TOTAL_SLIDES = 11;
+  let currentSlide = 0;
+
+  function init() {
+    const dotsContainer = document.getElementById('progressDots');
+    for (let i = 0; i < TOTAL_SLIDES; i++) {
+      const dot = document.createElement('button');
+      dot.className = 'progress-dot';
+      dot.setAttribute('data-dot', i);
+      dot.onclick = () => goToSlide(i);
+      dotsContainer.appendChild(dot);
+    }
+    updateUI();
+  }
+
+  function updateUI() {
+    // Slides
+    document.querySelectorAll('.tour-slide').forEach((slide, i) => {
+      slide.classList.toggle('active', i === currentSlide);
+    });
+
+    // Dots
+    document.querySelectorAll('.progress-dot').forEach((dot, i) => {
+      dot.classList.remove('active', 'completed');
+      if (i === currentSlide) dot.classList.add('active');
+      else if (i < currentSlide) dot.classList.add('completed');
+    });
+
+    // Buttons
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const counter = document.getElementById('slideCounter');
+
+    prevBtn.style.visibility = currentSlide === 0 ? 'hidden' : 'visible';
+
+    if (currentSlide === TOTAL_SLIDES - 1) {
+      nextBtn.textContent = 'Get Started';
+      nextBtn.className = 'tour-btn tour-btn-next finish';
+    } else {
+      nextBtn.textContent = 'Next';
+      nextBtn.className = 'tour-btn tour-btn-next';
+    }
+
+    counter.textContent = `${currentSlide + 1} / ${TOTAL_SLIDES}`;
+
+    // Scroll content to top
+    document.querySelector('.tour-content').scrollTop = 0;
+  }
+
+  function nextSlide() {
+    if (currentSlide >= TOTAL_SLIDES - 1) {
+      closeTour();
+      return;
+    }
+    currentSlide++;
+    updateUI();
+  }
+
+  function prevSlide() {
+    if (currentSlide > 0) {
+      currentSlide--;
+      updateUI();
+    }
+  }
+
+  function goToSlide(n) {
+    currentSlide = n;
+    updateUI();
+  }
+
+  function closeTour() {
+    document.getElementById('tourOverlay').style.display = 'none';
+    document.body.style.background = 'var(--lu-bg)';
+    document.body.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px;padding:24px;text-align:center;"><div style="font-size:48px;">&#127941;</div><h1 style="font-size:24px;font-weight:800;color:#fff;">Tour Complete</h1><p style="color:#71717A;font-size:15px;max-width:320px;">Open the LevelUp app on your phone and upload your first match to get started.</p><button onclick="location.reload()" style="margin-top:12px;padding:12px 28px;border-radius:12px;background:linear-gradient(135deg,#2563EB,#1d4ed8);color:#fff;font-size:15px;font-weight:600;border:none;cursor:pointer;box-shadow:0 2px 12px rgba(37,99,235,0.25);">Restart Tour</button></div>';
+  }
+
+  init();
+</script>
+</body>
+</html>
