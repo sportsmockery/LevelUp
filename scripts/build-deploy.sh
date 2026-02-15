@@ -18,28 +18,34 @@ log "Checking for in-progress Vercel deployments..."
 MAX_WAIT=300  # 5 minutes max wait
 WAITED=0
 
-while true; do
-  DEPLOYING=$(vercel ls 2>/dev/null | head -20 | grep -c "Building\|Queued\|Initializing" || true)
-  if [ "$DEPLOYING" -eq 0 ]; then
-    break
-  fi
+# Get the most recent deployment URL
+LATEST_URL=$(vercel ls 2>/dev/null | head -1)
 
-  if [ "$WAITED" -ge "$MAX_WAIT" ]; then
-    err "Timed out waiting for in-progress deployment to complete (${MAX_WAIT}s)"
-    exit 1
-  fi
+if [ -n "$LATEST_URL" ]; then
+  while true; do
+    INSPECT=$(vercel inspect "$LATEST_URL" 2>&1 || true)
+    STATUS=$(echo "$INSPECT" | grep -oP 'status\s+●\s+\K\w+' || true)
 
-  warn "Deployment in progress. Waiting... (${WAITED}s / ${MAX_WAIT}s)"
-  sleep 10
-  WAITED=$((WAITED + 10))
-done
+    if [ "$STATUS" = "Ready" ] || [ "$STATUS" = "Canceled" ]; then
+      break
+    fi
 
-# Check if last deployment failed
-LAST_STATUS=$(vercel ls 2>/dev/null | head -5 | grep -o "Error" || true)
-if [ -n "$LAST_STATUS" ]; then
-  err "Last deployment has Error status. Investigate before re-deploying."
-  vercel ls 2>/dev/null | head -5
-  exit 1
+    if [ "$STATUS" = "Error" ] || [ "$STATUS" = "Failed" ]; then
+      err "Last deployment has $STATUS status. Investigate before re-deploying."
+      echo "$INSPECT" | grep -E '(status|url|created)' || true
+      exit 1
+    fi
+
+    # Still building/queued
+    if [ "$WAITED" -ge "$MAX_WAIT" ]; then
+      err "Timed out waiting for in-progress deployment to complete (${MAX_WAIT}s)"
+      exit 1
+    fi
+
+    warn "Deployment in progress (status: ${STATUS:-unknown}). Waiting... (${WAITED}s / ${MAX_WAIT}s)"
+    sleep 10
+    WAITED=$((WAITED + 10))
+  done
 fi
 
 log "No in-progress deployments. Proceeding."
@@ -69,26 +75,36 @@ log "Build passed."
 
 # Step 5: Deploy to production
 log "Deploying to Vercel production..."
-vercel --prod || {
+DEPLOY_OUTPUT=$(vercel --prod 2>&1) || {
   err "Deployment command failed."
+  echo "$DEPLOY_OUTPUT"
   exit 1
 }
+echo "$DEPLOY_OUTPUT"
 
-# Step 6: Confirm deployment reached Ready
-log "Verifying deployment status..."
+# Extract the deployment URL from output
+DEPLOY_URL=$(echo "$DEPLOY_OUTPUT" | grep -oE 'https://levelup-[a-z0-9]+-chris-burhans-projects\.vercel\.app' | head -1)
+if [ -z "$DEPLOY_URL" ]; then
+  warn "Could not extract deployment URL from output. Check Vercel dashboard."
+  exit 1
+fi
+
+# Step 6: Confirm deployment reached Ready via vercel inspect
+log "Verifying deployment status for $DEPLOY_URL ..."
 VERIFY_WAIT=0
 VERIFY_MAX=180  # 3 minutes
 
 while true; do
-  READY=$(vercel ls 2>/dev/null | head -3 | grep -c "Ready" || true)
-  if [ "$READY" -gt 0 ]; then
+  INSPECT=$(vercel inspect "$DEPLOY_URL" 2>&1 || true)
+  STATUS=$(echo "$INSPECT" | grep -oP 'status\s+●\s+\K\w+' || true)
+
+  if [ "$STATUS" = "Ready" ]; then
     break
   fi
 
-  ERRORED=$(vercel ls 2>/dev/null | head -3 | grep -c "Error" || true)
-  if [ "$ERRORED" -gt 0 ]; then
-    err "Deployment failed! Check Vercel dashboard for details."
-    vercel ls 2>/dev/null | head -5
+  if [ "$STATUS" = "Error" ] || [ "$STATUS" = "Failed" ]; then
+    err "Deployment failed! Status: $STATUS"
+    echo "$INSPECT"
     exit 1
   fi
 
@@ -97,11 +113,12 @@ while true; do
     exit 1
   fi
 
+  log "Status: ${STATUS:-checking}... waiting (${VERIFY_WAIT}s / ${VERIFY_MAX}s)"
   sleep 10
   VERIFY_WAIT=$((VERIFY_WAIT + 10))
 done
 
 log "Deployment confirmed Ready!"
-vercel ls 2>/dev/null | head -3
+echo "$INSPECT" | grep -E '(status|url|created|Aliases)' || true
 echo ""
 log "Done."
