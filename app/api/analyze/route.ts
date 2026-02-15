@@ -13,6 +13,9 @@ import { PipelineLogger } from '../../../lib/pipeline-logger';
 import { triageFrames, applyTriage } from '../../../lib/frame-triage';
 import { extractSoftPoseMetrics, computePoseTrends, formatPoseContext } from '../../../lib/pose-estimation';
 import { detectActionWindows, buildTemporalSummary, formatTemporalContext } from '../../../lib/temporal-actions';
+import { deduplicateFrames, applyDedup } from '../../../lib/frame-dedup';
+import { summarizeObservations, formatSummarizedForPass2, formatRawObservations, Pass1Observation } from '../../../lib/observation-summarizer';
+import { buildQuickPass1Prompt, buildQuickPass2Prompt, QUICK_PASS2_SCHEMA, selectQuickFrames, QUICK_MAX_FRAMES, QUICK_PASS1_MAX_TOKENS, QUICK_PASS2_MAX_TOKENS } from '../../../lib/quick-analysis';
 
 type MatchContext = {
   weightClass?: string;
@@ -29,6 +32,7 @@ function getOpenAI() {
 
 type MatchStyle = 'youth_folkstyle' | 'folkstyle' | 'hs_folkstyle' | 'college_folkstyle' | 'freestyle' | 'grecoRoman';
 type AnalysisMode = 'athlete' | 'opponent';
+type AnalysisSpeed = 'full' | 'quick';
 
 type WrestlerIdInfo = {
   position_in_id_frame: 'left' | 'right';
@@ -559,7 +563,7 @@ export async function POST(request: NextRequest) {
   let parsedFrameCount = 10;
   try {
     const body = await request.json();
-    const { frames, matchStyle = 'folkstyle', mode = 'athlete', matchContext, athleteIdentification, opponentIdentification, idFrameBase64, athletePosition } = body;
+    const { frames, matchStyle = 'folkstyle', mode = 'athlete', speed = 'full', matchContext, athleteIdentification, opponentIdentification, idFrameBase64, athletePosition } = body;
     parsedFrameCount = (frames && Array.isArray(frames)) ? frames.length : 10;
 
     if (!frames || !Array.isArray(frames) || frames.length === 0) {
@@ -571,6 +575,7 @@ export async function POST(request: NextRequest) {
 
     const validMatchStyle: MatchStyle = ['youth_folkstyle', 'folkstyle', 'hs_folkstyle', 'college_folkstyle', 'freestyle', 'grecoRoman'].includes(matchStyle) ? matchStyle : 'hs_folkstyle';
     const validMode: AnalysisMode = mode === 'opponent' ? 'opponent' : 'athlete';
+    const validSpeed: AnalysisSpeed = speed === 'quick' ? 'quick' : 'full';
     const validMatchContext: MatchContext | undefined = matchContext && typeof matchContext === 'object' ? matchContext : undefined;
     const validAthleteId: WrestlerIdInfo | undefined = athleteIdentification && typeof athleteIdentification === 'object' ? athleteIdentification : undefined;
     const validOpponentId: WrestlerIdInfo | undefined = opponentIdentification && typeof opponentIdentification === 'object' ? opponentIdentification : undefined;
@@ -598,7 +603,7 @@ export async function POST(request: NextRequest) {
         try {
           const result = await runAnalysisPipeline({
             frames,
-            matchStyle: validMatchStyle, mode: validMode,
+            matchStyle: validMatchStyle, mode: validMode, speed: validSpeed,
             matchContext: validMatchContext,
             athleteIdentification: validAthleteId, opponentIdentification: validOpponentId,
             idFrameBase64, athletePosition: validAthletePosition,
@@ -629,7 +634,7 @@ export async function POST(request: NextRequest) {
     // Synchronous mode (default): run analysis and return result
     const result = await runAnalysisPipeline({
       frames,
-      matchStyle: validMatchStyle, mode: validMode,
+      matchStyle: validMatchStyle, mode: validMode, speed: validSpeed,
       matchContext: validMatchContext,
       athleteIdentification: validAthleteId, opponentIdentification: validOpponentId,
       idFrameBase64, athletePosition: validAthletePosition,
@@ -666,6 +671,7 @@ type AnalysisConfig = {
   frames: string[];
   matchStyle: MatchStyle;
   mode: AnalysisMode;
+  speed: AnalysisSpeed;
   matchContext?: MatchContext;
   athleteIdentification?: WrestlerIdInfo;
   opponentIdentification?: WrestlerIdInfo;
@@ -700,36 +706,70 @@ function buildFallbackResponse(frameCount: number) {
 
 // Core analysis pipeline — extracted so it can be called synchronously or in after()
 async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<string, unknown>> {
-  const { frames, matchStyle: validMatchStyle, mode: validMode, matchContext: validMatchContext, athleteIdentification: validAthleteId, opponentIdentification: validOpponentId, idFrameBase64, athletePosition: validAthletePosition } = config;
+  const { frames, matchStyle: validMatchStyle, mode: validMode, speed: validSpeed, matchContext: validMatchContext, athleteIdentification: validAthleteId, opponentIdentification: validOpponentId, idFrameBase64, athletePosition: validAthletePosition } = config;
+  const isQuick = validSpeed === 'quick';
 
     const logger = new PipelineLogger();
     const openai = getOpenAI();
 
-    // ===== FRAME TRIAGE (Gap 1): Pre-filter non-action frames =====
-    let analysisFrames = frames;
-    let originalFrameIndices: number[] | null = null;
+    // ===== FRAME DEDUPLICATION: Remove near-duplicate consecutive frames =====
+    let pipelineFrames = frames;
+    let dedupOriginalIndices: number[] | null = null;
+
+    if (!isQuick && frames.length > 10) {
+      logger.log('triage_start', { step: 'dedup', total_frames: frames.length });
+      const dedupResult = deduplicateFrames(frames, {
+        lengthThresholdPct: 2,
+        headerCompareLength: 200,
+        minFrames: 8,
+        maxConsecutiveRemoval: 3,
+      });
+      if (dedupResult.removedCount > 0) {
+        const dedupApplied = applyDedup(frames, dedupResult);
+        pipelineFrames = dedupApplied.frames;
+        dedupOriginalIndices = dedupApplied.originalIndices;
+        logger.log('triage_start', {
+          step: 'dedup_complete',
+          kept: pipelineFrames.length,
+          removed: dedupResult.removedCount,
+          duration_ms: dedupResult.durationMs,
+        });
+      }
+    }
+
+    // ===== QUICK MODE: Select limited frames, skip triage =====
+    let analysisFrames = pipelineFrames;
+    let originalFrameIndices: number[] | null = dedupOriginalIndices;
     let triageSummaryData: Record<string, unknown> | undefined;
 
-    // Only triage if we have enough frames to make it worthwhile (>10)
-    if (frames.length > 10) {
-      logger.log('triage_start', { total_frames: frames.length });
+    if (isQuick) {
+      const quickSelection = selectQuickFrames(frames, QUICK_MAX_FRAMES);
+      analysisFrames = quickSelection.frames;
+      originalFrameIndices = quickSelection.originalIndices;
+      logger.log('triage_start', {
+        mode: 'quick',
+        selected_frames: analysisFrames.length,
+        total_frames: frames.length,
+      });
+    } else if (pipelineFrames.length > 10) {
+      // ===== FRAME TRIAGE (Gap 1): Pre-filter non-action frames =====
+      logger.log('triage_start', { total_frames: pipelineFrames.length });
       try {
-        const { results: triageResults, summary: tSummary } = await triageFrames(openai, frames, {
+        const { results: triageResults, summary: tSummary } = await triageFrames(openai, pipelineFrames, {
           minIntensity: 'low',
           alwaysIncludeEdgeFrames: 2,
         });
 
-        const { filteredFrames, originalIndices } = applyTriage(frames, triageResults);
+        const { filteredFrames, originalIndices } = applyTriage(pipelineFrames, triageResults);
 
         // Only use triage results if we kept at least 60% of frames
-        // (if triage is too aggressive, skip it and use all frames)
-        if (filteredFrames.length >= frames.length * 0.6) {
+        if (filteredFrames.length >= pipelineFrames.length * 0.6) {
           analysisFrames = filteredFrames;
           originalFrameIndices = originalIndices;
           triageSummaryData = tSummary as unknown as Record<string, unknown>;
           logger.log('triage_complete', {
             kept: filteredFrames.length,
-            filtered: frames.length - filteredFrames.length,
+            filtered: pipelineFrames.length - filteredFrames.length,
             duration_ms: tSummary.triage_duration_ms,
           });
         } else {
@@ -737,26 +777,24 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
             skipped: true,
             reason: 'Triage too aggressive',
             would_keep: filteredFrames.length,
-            total: frames.length,
+            total: pipelineFrames.length,
           });
         }
       } catch (err: any) {
-        // Triage failure is non-fatal — continue with all frames
         logger.warn('triage_complete', { error: err?.message || 'Triage failed', using_all_frames: true });
       }
     }
 
     // ===== PASS 1: Parallel perception calls =====
-    const BATCH_SIZE = 5;
+    const BATCH_SIZE = isQuick ? QUICK_MAX_FRAMES : 5; // Quick mode: single batch
     let batches: string[][] = [];
     for (let i = 0; i < analysisFrames.length; i += BATCH_SIZE) {
       batches.push(analysisFrames.slice(i, i + BATCH_SIZE));
     }
 
     // Cap batches to prevent excessive API calls on very long videos
-    if (batches.length > MAX_BATCHES) {
+    if (!isQuick && batches.length > MAX_BATCHES) {
       console.log(`[LevelUp] Capping batches from ${batches.length} to ${MAX_BATCHES}`);
-      // Keep first and last batch, evenly sample the rest
       const kept = [batches[0]];
       const step = (batches.length - 2) / (MAX_BATCHES - 2);
       for (let i = 1; i < MAX_BATCHES - 1; i++) {
@@ -766,12 +804,25 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
       batches = kept;
     }
 
-    logger.log('pass1_start', { batches: batches.length, batch_size: BATCH_SIZE, total_frames: frames.length });
+    const pass1MaxTokens = isQuick ? QUICK_PASS1_MAX_TOKENS : 1500; // Reduced from 2000
+    const pass1Prompt = isQuick
+      ? buildQuickPass1Prompt(validAthleteId, validAthletePosition)
+      : buildPass1Prompt(validAthleteId, validOpponentId, validAthletePosition);
+
+    logger.log('pass1_start', {
+      mode: isQuick ? 'quick' : 'full',
+      batches: batches.length,
+      batch_size: BATCH_SIZE,
+      total_frames: frames.length,
+      analysis_frames: analysisFrames.length,
+      max_tokens: pass1MaxTokens,
+    });
 
     // Master timeout wrapper
     const analysisStart = Date.now();
+    const timeoutLimit = isQuick ? 60_000 : ANALYSIS_TIMEOUT; // Quick mode: 60s timeout
     const checkTimeout = () => {
-      if (Date.now() - analysisStart > ANALYSIS_TIMEOUT) {
+      if (Date.now() - analysisStart > timeoutLimit) {
         throw new Error('ANALYSIS_TIMEOUT');
       }
     };
@@ -781,11 +832,11 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
         const batchStartIdx = batchIndex * BATCH_SIZE;
         const frameContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [];
 
-        // Include ID frame in first batch only (used for wrestler identification context)
+        // Include ID frame in first batch only
         if (batchIndex === 0 && idFrameBase64) {
           frameContent.push({
             type: 'text' as const,
-            text: '[Identification Frame — this is the frame used to identify the two wrestlers. Use it as a visual reference.]',
+            text: '[Identification Frame — use as visual reference for wrestler ID.]',
           });
           frameContent.push({
             type: 'image_url' as const,
@@ -806,7 +857,7 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
             type: 'image_url' as const,
             image_url: {
               url: frame.startsWith('data:') ? frame : `data:image/jpeg;base64,${frame}`,
-              detail: 'high' as const,
+              detail: isQuick ? 'low' as const : 'high' as const,
             },
           });
         });
@@ -814,7 +865,7 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
         const response = await openai.chat.completions.create({
           model: 'gpt-4o',
           messages: [
-            { role: 'system', content: buildPass1Prompt(validAthleteId, validOpponentId, validAthletePosition) },
+            { role: 'system', content: pass1Prompt },
             {
               role: 'user',
               content: [
@@ -827,7 +878,7 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
             },
           ],
           response_format: { type: 'json_object' },
-          max_tokens: 2000,
+          max_tokens: pass1MaxTokens,
           temperature: 0,
           seed: 42,
         });
@@ -880,13 +931,13 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
       position_confidence: positionConfidence,
     });
 
-    // Validate Pass 1 coverage — warn if many frames were skipped
-    if (allObservations.length < frames.length * 0.7) {
+    // Validate Pass 1 coverage
+    if (allObservations.length < analysisFrames.length * 0.7) {
       logger.warn('pass1_complete', {
         message: 'Under-reported',
         observations: allObservations.length,
-        frames: frames.length,
-        coverage: Math.round(allObservations.length / frames.length * 100),
+        frames: analysisFrames.length,
+        coverage: Math.round(allObservations.length / analysisFrames.length * 100),
       });
     }
 
@@ -900,11 +951,8 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
 
     checkTimeout();
 
-    // ===== DISPLAY FRAME SELECTION (Tier 2 → Tier 3) =====
-    const SIGNIFICANCE_PRIORITY: Record<string, number> = { CRITICAL: 0, IMPORTANT: 1, CONTEXT: 2, SKIP: 3 };
-    const MAX_DISPLAY_FRAMES = 20;
-
-    // Classify observations by significance
+    // ===== DISPLAY FRAME SELECTION =====
+    const MAX_DISPLAY_FRAMES = isQuick ? 8 : 20;
     const classified = allObservations.map((obs: any) => ({
       ...obs,
       significance: (obs.significance || 'CONTEXT').toUpperCase(),
@@ -914,8 +962,7 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
     const important = classified.filter((o: any) => o.significance === 'IMPORTANT');
     const context = classified.filter((o: any) => o.significance === 'CONTEXT');
 
-    // Select display frames: all CRITICAL, fill with IMPORTANT, then CONTEXT
-    let displayFrameIndices = new Set<number>(critical.map((o: any) => o.frame_index));
+    const displayFrameIndices = new Set<number>(critical.map((o: any) => o.frame_index));
     for (const o of important) {
       if (displayFrameIndices.size >= MAX_DISPLAY_FRAMES) break;
       displayFrameIndices.add(o.frame_index);
@@ -924,7 +971,6 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
       if (displayFrameIndices.size >= Math.min(MAX_DISPLAY_FRAMES, 8 + critical.length + important.length)) break;
       displayFrameIndices.add(o.frame_index);
     }
-    // Ensure minimum of 8 display frames if we have enough observations
     if (displayFrameIndices.size < 8 && allObservations.length >= 8) {
       for (const o of allObservations) {
         if (displayFrameIndices.size >= 8) break;
@@ -934,43 +980,78 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
 
     logger.log('pass1_complete', { display_frames: displayFrameIndices.size, critical: critical.length, important: important.length, context: context.length });
 
-    // ===== TEMPORAL ACTION DETECTION (Gap 3): Group observations into action windows =====
-    const actionWindows = detectActionWindows(allObservations);
-    const temporalSummary = buildTemporalSummary(actionWindows, frames.length);
-    const temporalContext = formatTemporalContext(actionWindows, temporalSummary);
-    logger.log('temporal_analysis', {
-      windows: actionWindows.length,
-      scoring_windows: temporalSummary.scoring_windows,
-      tempo: temporalSummary.tempo,
-    });
+    // ===== TEMPORAL ACTION DETECTION & POSE ESTIMATION (skip in quick mode) =====
+    let temporalContext = '';
+    let poseContext = '';
+    let temporalSummary: any = { total_windows: 0, scoring_windows: 0, tempo: 'unknown', match_phases: [] };
+    let actionWindows: any[] = [];
+    let poseTrends: any = { fatigue_indicators: [] };
 
-    // ===== POSE ESTIMATION (Gap 2): Extract soft pose metrics from Pass 1 =====
-    const softPoseMetrics = extractSoftPoseMetrics(allObservations);
-    const poseTrends = computePoseTrends(softPoseMetrics);
-    const poseContext = formatPoseContext(softPoseMetrics);
-    logger.log('pose_estimation', {
-      metrics_count: softPoseMetrics.length,
-      hip_trend: poseTrends.hip_height_trend,
-      stance_trend: poseTrends.stance_width_trend,
-      fatigue_indicators: poseTrends.fatigue_indicators.length,
-    });
+    if (!isQuick) {
+      actionWindows = detectActionWindows(allObservations);
+      temporalSummary = buildTemporalSummary(actionWindows, frames.length);
+      temporalContext = formatTemporalContext(actionWindows, temporalSummary);
+      logger.log('temporal_analysis', {
+        windows: actionWindows.length,
+        scoring_windows: temporalSummary.scoring_windows,
+        tempo: temporalSummary.tempo,
+      });
 
-    // ALL observations still go to Pass 2 for scoring (no data loss)
+      const softPoseMetrics = extractSoftPoseMetrics(allObservations);
+      poseTrends = computePoseTrends(softPoseMetrics);
+      poseContext = formatPoseContext(softPoseMetrics);
+      logger.log('pose_estimation', {
+        metrics_count: softPoseMetrics.length,
+        hip_trend: poseTrends.hip_height_trend,
+        stance_trend: poseTrends.stance_width_trend,
+        fatigue_indicators: poseTrends.fatigue_indicators.length,
+      });
+    }
+
     // ===== PASS 2: Reasoning call (text-only) =====
-    const observationsText = allObservations
-      .map((obs: any) => `Frame ${obs.frame_index}: position=${obs.athlete_position}, body=${obs.athlete_body}, opponent=${obs.opponent_body}, contact=${obs.contact_points}, action=${obs.action}, visible=${obs.wrestler_visible}, significance=${obs.significance || 'CONTEXT'}`)
-      .join('\n');
+    // Use summarized observations for full mode to reduce tokens
+    const typedObservations: Pass1Observation[] = allObservations.map((obs: any) => ({
+      frame_index: obs.frame_index ?? 0,
+      athlete_position: obs.athlete_position ?? 'unknown',
+      athlete_body: obs.athlete_body ?? '',
+      opponent_body: obs.opponent_body ?? '',
+      contact_points: obs.contact_points ?? '',
+      action: obs.action ?? '',
+      wrestler_visible: obs.wrestler_visible ?? false,
+      athlete_identity_consistent: obs.athlete_identity_consistent,
+      identity_notes: obs.identity_notes,
+      estimated_stance_height: obs.estimated_stance_height,
+      estimated_knee_angle: obs.estimated_knee_angle,
+      relative_position: obs.relative_position,
+      weight_distribution: obs.weight_distribution,
+      significance: (obs.significance || 'CONTEXT').toUpperCase(),
+    }));
+
+    let observationsText: string;
+    if (isQuick) {
+      // Quick mode: use raw but brief format
+      observationsText = formatRawObservations(typedObservations);
+    } else {
+      // Full mode: use summarized format to reduce Pass 2 tokens
+      const summarized = summarizeObservations(typedObservations);
+      observationsText = formatSummarizedForPass2(summarized);
+      logger.log('pass2_start', {
+        mode: 'athlete',
+        observation_compression: `${summarized.segments.length} segments from ${summarized.totalFrames} frames`,
+        compression_ratio: Math.round(summarized.compressionRatio * 100) + '%',
+      });
+    }
 
     if (validMode === 'opponent') {
-      // Scouting analysis
       logger.log('pass2_start', { mode: 'opponent' });
+      const rawObsText = formatRawObservations(typedObservations);
       const pass2Response = await openai.chat.completions.create({
         model: 'gpt-4o',
         messages: [
           { role: 'system', content: buildPass2ScoutingPrompt(validMatchStyle, validOpponentId, validAthletePosition) },
           {
             role: 'user',
-            content: `Here are the frame-by-frame observations of the opponent:\n\n${observationsText}\n\nProduce a tactical scouting report with a gameplan to beat this opponent.`,
+            content: `Here are the frame-by-frame observations of the opponent:\n\n${rawObsText}\n\nProduce a tactical scouting report with a gameplan to beat this opponent.`,
           },
         ],
         response_format: {
@@ -992,27 +1073,38 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
       return normalized;
     }
 
-    // Athlete analysis — split observations into halves for fatigue detection
-    const halfIdx = Math.floor(allObservations.length / 2);
-    const firstHalfObs = allObservations.slice(0, halfIdx);
-    const secondHalfObs = allObservations.slice(halfIdx);
-    const periodLabel = `\n\n--- FIRST HALF (frames 0-${halfIdx - 1}, early match) ---\n${firstHalfObs.map((obs: any) => `Frame ${obs.frame_index}: position=${obs.athlete_position}, body=${obs.athlete_body}, action=${obs.action}`).join('\n')}\n\n--- SECOND HALF (frames ${halfIdx}-${allObservations.length - 1}, late match) ---\n${secondHalfObs.map((obs: any) => `Frame ${obs.frame_index}: position=${obs.athlete_position}, body=${obs.athlete_body}, action=${obs.action}`).join('\n')}`;
+    // Athlete analysis
+    const pass2MaxTokens = isQuick ? QUICK_PASS2_MAX_TOKENS : 4096;
+    const pass2SystemPrompt = isQuick
+      ? buildQuickPass2Prompt(validMatchStyle, frames.length, validAthleteId, validAthletePosition)
+      : buildPass2AthletePrompt(validMatchStyle, frames.length, validMatchContext, validAthleteId, validAthletePosition);
 
-    logger.log('pass2_start', { mode: 'athlete', frame_count: frames.length });
+    // Build Pass 2 user content
+    let pass2UserContent: string;
+    if (isQuick) {
+      pass2UserContent = `Frame observations (${analysisFrames.length} frames):\n\n${observationsText}\n\nScore this wrestler using the rubric. Be concise.`;
+    } else {
+      // Fatigue split for full analysis
+      const halfIdx = Math.floor(allObservations.length / 2);
+      const firstHalfObs = allObservations.slice(0, halfIdx);
+      const secondHalfObs = allObservations.slice(halfIdx);
+      const periodLabel = `\n\n--- FIRST HALF (early match) ---\n${firstHalfObs.map((obs: any) => `Frame ${obs.frame_index}: ${obs.athlete_position}, ${obs.action}`).join('\n')}\n\n--- SECOND HALF (late match) ---\n${secondHalfObs.map((obs: any) => `Frame ${obs.frame_index}: ${obs.athlete_position}, ${obs.action}`).join('\n')}`;
+
+      pass2UserContent = `Match observations (${frames.length} frames total):\n\n${observationsText}${temporalContext}${poseContext}\n\nFatigue analysis split:${periodLabel}\n\nScore this wrestler's technique. Cite frame indices.${poseTrends.fatigue_indicators.length > 0 ? `\n\nPOSE FATIGUE INDICATORS:\n${poseTrends.fatigue_indicators.join('\n')}` : ''}`;
+    }
+
+    logger.log('pass2_start', { mode: 'athlete', frame_count: frames.length, speed: validSpeed, max_tokens: pass2MaxTokens });
     const pass2Response = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
-        { role: 'system', content: buildPass2AthletePrompt(validMatchStyle, frames.length, validMatchContext, validAthleteId, validAthletePosition) },
-        {
-          role: 'user',
-          content: `Here are the frame-by-frame observations from the match (${frames.length} frames total):\n\n${observationsText}${temporalContext}${poseContext}\n\nFor fatigue analysis, here are the observations split by match half:${periodLabel}\n\nScore this wrestler's technique using the rubric. Cite specific frame indices as evidence. Also complete the fatigue analysis comparing first half vs second half.${poseTrends.fatigue_indicators.length > 0 ? `\n\nPOSE-BASED FATIGUE INDICATORS:\n${poseTrends.fatigue_indicators.join('\n')}` : ''}`,
-        },
+        { role: 'system', content: pass2SystemPrompt },
+        { role: 'user', content: pass2UserContent },
       ],
       response_format: {
         type: 'json_schema',
-        json_schema: PASS2_RESPONSE_SCHEMA,
+        json_schema: isQuick ? QUICK_PASS2_SCHEMA : PASS2_RESPONSE_SCHEMA,
       },
-      max_tokens: 4096,
+      max_tokens: pass2MaxTokens,
       temperature: 0,
       seed: 42,
     });
@@ -1031,49 +1123,64 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
       logger.warn('validation', { hallucination_warnings: warnings });
     }
 
-    // Pipeline invariant checks
+    // Pipeline invariant checks (skip some in quick mode for speed)
     const invariantWarnings = validatePipelineInvariants(pass2Result, frames.length, allObservations.length);
     if (invariantWarnings.length > 0) {
       logger.warn('validation', { invariant_warnings: invariantWarnings });
     }
 
     // Cross-validate Pass 1 and Pass 2
-    const qualityFlags = crossValidatePasses(allObservations, pass2Result, frames.length);
+    const qualityFlags = isQuick ? [] : crossValidatePasses(allObservations, pass2Result, frames.length);
     if (qualityFlags.length > 0) {
       logger.warn('validation', { quality_flags: qualityFlags });
     }
 
     const allQualityFlags = [
-      ...invariantWarnings.map(w => ({ check: w.check, severity: w.severity, detail: w.detail })),
-      ...qualityFlags.map(f => ({ check: f.check, severity: f.severity, detail: f.detail })),
+      ...invariantWarnings.map((w: any) => ({ check: w.check, severity: w.severity, detail: w.detail })),
+      ...qualityFlags.map((f: any) => ({ check: f.check, severity: f.severity, detail: f.detail })),
     ];
 
     const normalized = normalizeResponse(pass2Result, frames.length, 'athlete');
 
-    // Enrich with hardening metadata + Tier 1 data
+    // Pipeline performance metrics
+    const pipelineMs = Date.now() - analysisStart;
+
+    // Enrich with hardening metadata + performance data
     (normalized as any).enriched = {
       ...(normalized as any).enriched,
       identity_confidence: identityConfidence,
       position_confidence: positionConfidence,
       analysis_quality_flags: allQualityFlags,
+      analysis_speed: validSpeed,
+      pipeline_performance: {
+        total_ms: pipelineMs,
+        total_seconds: Math.round(pipelineMs / 100) / 10,
+        frames_input: frames.length,
+        frames_after_dedup: pipelineFrames.length,
+        frames_after_triage: analysisFrames.length,
+        pass1_batches: batches.length,
+        pass2_tokens: usage?.total_tokens,
+        pass2_prompt_tokens: usage?.prompt_tokens,
+        mode: validSpeed,
+      },
       triage_summary: triageSummaryData ? {
         total_frames: frames.length,
         included_frames: analysisFrames.length,
         filtered_frames: frames.length - analysisFrames.length,
       } : undefined,
-      temporal_summary: {
+      temporal_summary: !isQuick ? {
         total_windows: temporalSummary.total_windows,
         scoring_windows: temporalSummary.scoring_windows,
         tempo: temporalSummary.tempo,
         match_phases: temporalSummary.match_phases,
-      },
-      action_windows: actionWindows.filter(w => w.significance !== 'context').slice(0, 20),
-      pose_trends: poseTrends.fatigue_indicators.length > 0 ? poseTrends : undefined,
+      } : undefined,
+      action_windows: !isQuick ? actionWindows.filter((w: any) => w.significance !== 'context').slice(0, 20) : undefined,
+      pose_trends: !isQuick && poseTrends.fatigue_indicators.length > 0 ? poseTrends : undefined,
     };
 
-    logger.log('save', { overall: pass2Result.overall_score, confidence: pass2Result.confidence, evidence: pass2Result.frame_evidence.length, identity_confidence: identityConfidence });
+    logger.log('save', { overall: pass2Result.overall_score, confidence: pass2Result.confidence, evidence: pass2Result.frame_evidence.length, identity_confidence: identityConfidence, pipeline_ms: pipelineMs, speed: validSpeed });
 
-    // Fire-and-forget Supabase save — client gets response immediately
+    // Fire-and-forget Supabase save
     saveToSupabase(pass2Result, normalized, validMatchStyle, validMatchContext, {
       athleteSide: validAthletePosition,
       athleteBoundingBox: validAthleteId?.bounding_box_pct,
@@ -1083,8 +1190,8 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
       hallucinationWarnings: warnings,
       pipelineLog: logger.summary(),
       triageSummary: triageSummaryData,
-      temporalSummary: temporalSummary as unknown as Record<string, unknown>,
-      poseMetrics: poseTrends as unknown as Record<string, unknown>,
+      temporalSummary: !isQuick ? temporalSummary as unknown as Record<string, unknown> : undefined,
+      poseMetrics: !isQuick ? poseTrends as unknown as Record<string, unknown> : undefined,
       framesTriaged: frames.length,
       framesAfterTriage: analysisFrames.length,
     }).catch((err) =>
