@@ -55,6 +55,8 @@ export async function POST(request: NextRequest) {
       model: 'gpt-4o',
       temperature: 0,
       seed: 42,
+      top_p: 1,
+      frequency_penalty: 0,
       max_tokens: 500,
       messages: [
         {

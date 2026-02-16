@@ -107,6 +107,8 @@ export async function POST(request: NextRequest) {
       max_tokens: QUICK_PASS1_MAX_TOKENS,
       temperature: 0,
       seed: 42,
+      top_p: 1,
+      frequency_penalty: 0,
     });
 
     const pass1Content = pass1Response.choices[0]?.message?.content;
@@ -150,6 +152,8 @@ export async function POST(request: NextRequest) {
       max_tokens: QUICK_PASS2_MAX_TOKENS,
       temperature: 0,
       seed: 42,
+      top_p: 1,
+      frequency_penalty: 0,
     });
 
     const pass2Content = pass2Response.choices[0]?.message?.content;

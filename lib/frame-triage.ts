@@ -139,6 +139,8 @@ export async function triageFrames(
           max_tokens: 500,
           temperature: 0,
           seed: 42,
+          top_p: 1,
+          frequency_penalty: 0,
         });
 
         const content = response.choices[0]?.message?.content;

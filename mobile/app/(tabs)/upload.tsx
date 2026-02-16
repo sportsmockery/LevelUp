@@ -651,7 +651,14 @@ export default function UploadScreen() {
       setFrameUris([...allFrameUris]);
       setFrameTimestamps([...extractedTimestamps]);
 
+      // === DETERMINISM DIAGNOSTICS ===
+      const frameSizes = apiFrames.map((f) => f.length);
+      const frameHash = frameSizes.reduce((h, s, i) => h + s * (i + 1), 0); // Simple checksum
+      const tsStr = extractedTimestamps.map((t) => (t / 1000).toFixed(1) + 's').join(', ');
       console.log(`[LevelUp] API payload: ${apiFrames.length} frames, ${Math.round(totalSize / 1024)}KB total`);
+      console.log(`[LevelUp] Frame timestamps: [${tsStr}]`);
+      console.log(`[LevelUp] Frame sizes (bytes): [${frameSizes.join(', ')}]`);
+      console.log(`[LevelUp] Frame checksum: ${frameHash}`);
 
       setProgress(72);
       setStatusText(`Sending ${apiFrames.length} frames to LevelUp...`);

@@ -753,6 +753,11 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
 
         const { filteredFrames, originalIndices } = applyTriage(pipelineFrames, triageResults);
 
+        // === DETERMINISM DIAGNOSTICS: Triage results ===
+        const keptIndices = triageResults.filter((r) => r.include_in_analysis).map((r) => r.frame_index);
+        const filteredIndices = triageResults.filter((r) => !r.include_in_analysis).map((r) => r.frame_index);
+        console.log(`[LevelUp][determinism] Triage: kept=[${keptIndices.join(',')}] filtered=[${filteredIndices.join(',')}]`);
+
         // Only use triage results if we kept at least 60% of frames
         if (filteredFrames.length >= pipelineFrames.length * 0.6) {
           analysisFrames = filteredFrames;
@@ -794,6 +799,11 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
       kept.push(batches[batches.length - 1]);
       batches = kept;
     }
+
+    // === DETERMINISM DIAGNOSTICS: Input fingerprint ===
+    const inputSizes = analysisFrames.map((f) => f.length);
+    const inputChecksum = inputSizes.reduce((h, s, i) => h + s * (i + 1), 0);
+    console.log(`[LevelUp][determinism] Input: ${analysisFrames.length} frames, checksum=${inputChecksum}, sizes=[${inputSizes.slice(0, 5).join(',')}${inputSizes.length > 5 ? ',...' : ''}]`);
 
     const pass1MaxTokens = isQuick ? QUICK_PASS1_MAX_TOKENS : 1500; // Reduced from 2000
     const pass1Prompt = isQuick
@@ -872,7 +882,12 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
           max_tokens: pass1MaxTokens,
           temperature: 0,
           seed: 42,
+          top_p: 1,
+          frequency_penalty: 0,
         });
+
+        // === DETERMINISM DIAGNOSTICS: Pass 1 response fingerprint ===
+        console.log(`[LevelUp][determinism] Pass1 batch ${batchIndex}: system_fingerprint=${response.system_fingerprint}, model=${response.model}`);
 
         const content = response.choices[0]?.message?.content;
         if (!content) return { observations: [] };
@@ -1054,6 +1069,8 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
         max_tokens: 4096,
         temperature: 0,
         seed: 42,
+        top_p: 1,
+        frequency_penalty: 0,
       });
 
       const scoutContent = pass2Response.choices[0]?.message?.content;
@@ -1086,6 +1103,13 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
       pass2UserContent = `Match observations (${frames.length} frames total):\n\n${observationsText}${temporalContext}${poseContext}\n\nFatigue analysis split:${periodLabel}\n\nScore this wrestler's technique. Cite frame indices.${poseTrends.fatigue_indicators.length > 0 ? `\n\nPOSE FATIGUE INDICATORS:\n${poseTrends.fatigue_indicators.join('\n')}` : ''}`;
     }
 
+    // === DETERMINISM DIAGNOSTICS: Pass 2 prompt fingerprint ===
+    const pass2UserHash = pass2UserContent.length;
+    console.log(`[LevelUp][determinism] Pass2 user prompt length=${pass2UserHash}, first 500 chars:\n${pass2UserContent.slice(0, 500)}`);
+    console.log(`[LevelUp][determinism] Pass2 system prompt length=${pass2SystemPrompt.length}`);
+    const pass2Params = { model: 'gpt-4o', temperature: 0, seed: 42, max_tokens: pass2MaxTokens, top_p: 1, frequency_penalty: 0 };
+    console.log(`[LevelUp][determinism] Pass2 OpenAI params: ${JSON.stringify(pass2Params)}`);
+
     logger.log('pass2_start', { mode: 'athlete', frame_count: frames.length, speed: validSpeed, max_tokens: pass2MaxTokens });
     const pass2Response = await openai.chat.completions.create({
       model: 'gpt-4o',
@@ -1100,7 +1124,12 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
       max_tokens: pass2MaxTokens,
       temperature: 0,
       seed: 42,
+      top_p: 1,
+      frequency_penalty: 0,
     });
+
+    // === DETERMINISM DIAGNOSTICS: Pass 2 response fingerprint ===
+    console.log(`[LevelUp][determinism] Pass2 response: system_fingerprint=${pass2Response.system_fingerprint}, model=${pass2Response.model}`);
 
     const pass2Content = pass2Response.choices[0]?.message?.content;
     const usage = pass2Response.usage;
