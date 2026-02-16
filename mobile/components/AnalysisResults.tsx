@@ -10,8 +10,17 @@ import {
   AlertTriangle,
   Share2,
 } from 'lucide-react-native';
+import {
+  TrendingUp,
+  TrendingDown,
+  ArrowRight as ArrowRightIcon,
+} from 'lucide-react-native';
 import { AnalysisResult } from '@/lib/types';
 import { exportAnalysisPDF } from '@/lib/export';
+import {
+  getScoreTrendIndicator,
+  formatPositionVsAvg,
+} from '@/lib/score-comparison';
 
 type Props = {
   result: AnalysisResult;
@@ -20,6 +29,8 @@ type Props = {
   athleteName?: string;
   showUploadAnother?: boolean;
   onUploadAnother?: () => void;
+  previousScore?: number | null;
+  positionAverages?: { standing: number; top: number; bottom: number } | null;
 };
 
 const getScoreColor = (score: number) => {
@@ -29,7 +40,7 @@ const getScoreColor = (score: number) => {
   return '#EF4444';
 };
 
-export default function AnalysisResults({ result, thumbnailUri, videoFileName, athleteName, showUploadAnother, onUploadAnother }: Props) {
+export default function AnalysisResults({ result, thumbnailUri, videoFileName, athleteName, showUploadAnother, onUploadAnother, previousScore, positionAverages }: Props) {
   const [coachNotes, setCoachNotes] = useState('');
   const [sharing, setSharing] = useState(false);
 
@@ -74,16 +85,37 @@ export default function AnalysisResults({ result, thumbnailUri, videoFileName, a
           </View>
         </LinearGradient>
         <Text style={styles.scoreLabel}>OVERALL SCORE</Text>
+        {/* Score comparison badge */}
+        {previousScore !== undefined && (() => {
+          const delta = previousScore !== null ? result.overall_score - previousScore : null;
+          const indicator = getScoreTrendIndicator(delta);
+          return (
+            <View style={[styles.comparisonBadge, { backgroundColor: indicator.bgColor }]}>
+              {indicator.icon === 'up' || indicator.icon === 'up-double'
+                ? <TrendingUp size={14} color={indicator.color} />
+                : indicator.icon === 'down' || indicator.icon === 'down-double'
+                ? <TrendingDown size={14} color={indicator.color} />
+                : <ArrowRightIcon size={14} color={indicator.color} />}
+              <Text style={[styles.comparisonText, { color: indicator.color }]}>
+                {indicator.icon === 'up' || indicator.icon === 'up-double' ? '\u2191 ' : indicator.icon === 'down' || indicator.icon === 'down-double' ? '\u2193 ' : '\u2192 '}
+                {indicator.label}
+              </Text>
+            </View>
+          );
+        })()}
       </View>
 
       {/* Position Scores */}
       <View style={styles.positionGrid}>
         {[
-          { label: 'STANDING', score: result.position_scores.standing },
-          { label: 'TOP', score: result.position_scores.top },
-          { label: 'BOTTOM', score: result.position_scores.bottom },
+          { label: 'STANDING', key: 'standing' as const, score: result.position_scores.standing },
+          { label: 'TOP', key: 'top' as const, score: result.position_scores.top },
+          { label: 'BOTTOM', key: 'bottom' as const, score: result.position_scores.bottom },
         ].map((pos, i) => {
           const insufficient = pos.score === 0 && result.enriched?.confidence !== undefined && result.enriched.confidence < 0.3;
+          const avgInfo = positionAverages && !insufficient
+            ? formatPositionVsAvg(pos.label, pos.score, positionAverages[pos.key])
+            : null;
           return (
             <View key={i} style={styles.positionCard}>
               {insufficient ? (
@@ -96,6 +128,11 @@ export default function AnalysisResults({ result, thumbnailUri, videoFileName, a
               <Text style={styles.positionLabel}>{pos.label}</Text>
               {insufficient && (
                 <Text style={styles.insufficientLabel}>Insufficient footage</Text>
+              )}
+              {avgInfo && avgInfo.delta !== 0 && (
+                <Text style={[styles.positionAvgDelta, { color: avgInfo.color }]}>
+                  {avgInfo.text}
+                </Text>
               )}
             </View>
           );
@@ -272,6 +309,16 @@ const styles = StyleSheet.create({
   },
   scoreValue: { fontSize: 44, fontWeight: '900', color: '#fff' },
   scoreLabel: { fontSize: 12, color: '#71717A', fontWeight: '700', letterSpacing: 2 },
+  comparisonBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginTop: 8,
+  },
+  comparisonText: { fontSize: 12, fontWeight: '600' },
   positionGrid: {
     flexDirection: 'row',
     gap: 12,
@@ -291,6 +338,7 @@ const styles = StyleSheet.create({
   positionLabel: { fontSize: 10, color: '#71717A', fontWeight: '700', marginTop: 4, letterSpacing: 1 },
   insufficientText: { fontSize: 24, fontWeight: '800', color: '#52525B' },
   insufficientLabel: { fontSize: 8, color: '#52525B', marginTop: 2, textAlign: 'center' as const },
+  positionAvgDelta: { fontSize: 9, fontWeight: '600', marginTop: 3, textAlign: 'center' as const },
   section: { paddingHorizontal: 24, marginTop: 24 },
   sectionTitle: {
     fontSize: 13,
