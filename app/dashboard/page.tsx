@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import XPBar from '@/components/game/XPBar';
 import LevelBadge from '@/components/game/LevelBadge';
 import StreakCounter from '@/components/game/StreakCounter';
@@ -9,14 +10,30 @@ import Confetti from '@/components/game/Confetti';
 import BottomNav from '@/components/BottomNav';
 
 export default function Dashboard() {
-  const [user, setUser] = useState<any>(null);
+  const router = useRouter();
+  const { user, profile, loading } = useAuth();
   const [xp, setXp] = useState(1240);
   const [level, setLevel] = useState(12);
   const [streak, setStreak] = useState(7);
 
   useEffect(() => {
-    supabase?.auth?.getUser().then(({ data }: any) => setUser(data.user));
-  }, []);
+    if (!loading && profile) {
+      // Redirect parents/supporters to parent dashboard
+      if (profile.role === 'parent') {
+        router.replace('/dashboard/parent');
+        return;
+      }
+      // Use profile data if available
+      if (profile.xp) setXp(profile.xp);
+      if (profile.level) setLevel(profile.level);
+      if (profile.streak) setStreak(profile.streak);
+    }
+  }, [loading, profile, router]);
+
+  // Show nothing while checking role to avoid flash
+  if (loading || (profile?.role === 'parent')) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen pb-20">
