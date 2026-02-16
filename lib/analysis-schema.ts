@@ -115,7 +115,7 @@ export const PASS2_RESPONSE_SCHEMA = {
         },
         description: '3-5 specific drill recommendations',
       },
-      summary: { type: 'string' as const, description: '2-3 sentence overall assessment referencing the athlete by LevelUp name' },
+      summary: { type: 'string' as const, description: '2-3 sentence overall assessment. Refer to the athlete by name if provided in the ATHLETE line, otherwise by uniform description.' },
       match_result: {
         type: 'object' as const,
         description: 'Match outcome if determinable from the video evidence',

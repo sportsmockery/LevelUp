@@ -160,7 +160,7 @@ export default function VideoReviewOverlay({ frameUris, frameTimestamps, videoUr
         ? frameTimestamps[sf + 1] - 100
         : frameTimestamps[sf] + 3000;
       if (posMs >= loopEnd) {
-        videoRef.current?.setPositionAsync(frameTimestamps[sf]);
+        videoRef.current?.setPositionAsync(frameTimestamps[sf]).catch(() => {});
       }
       return;
     }
@@ -196,7 +196,7 @@ export default function VideoReviewOverlay({ frameUris, frameTimestamps, videoUr
     setCurrentFrame(0);
     setPausedForAnnotation(false);
     if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current);
-    await videoRef.current?.setPositionAsync(0);
+    await videoRef.current?.setPositionAsync(0).catch(() => {});
     await videoRef.current?.playAsync();
     setPlaying(true);
   };
@@ -212,7 +212,7 @@ export default function VideoReviewOverlay({ frameUris, frameTimestamps, videoUr
     } else if (selectedFrameRef.current !== null) {
       // Resume loop on selected frame
       intentionalPlayRef.current = true;
-      await videoRef.current?.setPositionAsync(frameTimestamps![selectedFrameRef.current]);
+      await videoRef.current?.setPositionAsync(frameTimestamps![selectedFrameRef.current]).catch(() => {});
       await videoRef.current?.playAsync();
       setPlaying(true);
     } else {
@@ -228,7 +228,7 @@ export default function VideoReviewOverlay({ frameUris, frameTimestamps, videoUr
     if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current);
     if (hasVideo && frameTimestamps) {
       intentionalPlayRef.current = true;
-      await videoRef.current?.setPositionAsync(frameTimestamps[idx]);
+      await videoRef.current?.setPositionAsync(frameTimestamps[idx]).catch(() => {});
       await videoRef.current?.playAsync();
       setPlaying(true);
     }
@@ -252,7 +252,7 @@ export default function VideoReviewOverlay({ frameUris, frameTimestamps, videoUr
       setCurrentFrame(startIdx);
       intentionalPlayRef.current = true;
       const startPos = startIdx < frameTimestamps.length ? frameTimestamps[startIdx] : 0;
-      await videoRef.current?.setPositionAsync(startPos);
+      await videoRef.current?.setPositionAsync(startPos).catch(() => {});
       await videoRef.current?.playAsync();
       setPlaying(true);
     } else {

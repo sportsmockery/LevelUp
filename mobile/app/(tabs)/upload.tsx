@@ -191,7 +191,9 @@ export default function UploadScreen() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [durationWarning, setDurationWarning] = useState<string | null>(null);
 
-  // Smart default: set match style based on athlete's birth year from profile
+  const [athleteName, setAthleteName] = useState('');
+
+  // Smart default: set match style based on athlete's birth year from profile, load athlete name
   useEffect(() => {
     AsyncStorage.getItem('@levelup/athlete_profile').then((raw) => {
       if (raw) {
@@ -199,6 +201,9 @@ export default function UploadScreen() {
           const profile = JSON.parse(raw);
           if (profile.birthYear) {
             setMatchStyle(getDefaultMatchStyle(profile.birthYear));
+          }
+          if (profile.displayName) {
+            setAthleteName(profile.displayName.trim());
           }
         } catch {}
       }
@@ -850,6 +855,7 @@ export default function UploadScreen() {
             result={result}
             thumbnailUri={frameUris.length > 0 ? null : thumbnailUri}
             videoFileName={video?.fileName || 'Match Video'}
+            athleteName={athleteName || undefined}
             showUploadAnother
             onUploadAnother={resetUpload}
           />

@@ -113,6 +113,7 @@ function buildPass2AthletePrompt(
   matchContext?: MatchContext,
   athleteId?: WrestlerIdInfo,
   athletePosition?: 'left' | 'right',
+  athleteName?: string,
 ): string {
   const knowledgeBase = buildKnowledgeBasePrompt(matchStyle);
   const descriptors: string[] = [];
@@ -139,7 +140,7 @@ function buildPass2AthletePrompt(
 
   return `You are LevelUp, an expert youth wrestling AI coach and video analyst. You are given raw frame-by-frame observations from a wrestling match and must produce a detailed, rubric-based technical analysis.
 
-ATHLETE: The wrestler${colorNote}.
+ATHLETE: ${athleteName || 'The wrestler'}${colorNote}.
 ${contextSection}
 ${knowledgeBase}
 
@@ -652,7 +653,7 @@ export async function POST(request: NextRequest) {
   let parsedFrameCount = 10;
   try {
     const body = await request.json();
-    const { frames, matchStyle = 'folkstyle', mode = 'athlete', speed = 'full', matchContext, athleteIdentification, opponentIdentification, idFrameBase64, athletePosition } = body;
+    const { frames, matchStyle = 'folkstyle', mode = 'athlete', speed = 'full', matchContext, athleteIdentification, opponentIdentification, idFrameBase64, athletePosition, athleteName: rawAthleteName } = body;
     parsedFrameCount = (frames && Array.isArray(frames)) ? frames.length : 10;
 
     if (!frames || !Array.isArray(frames) || frames.length === 0) {
@@ -669,6 +670,9 @@ export async function POST(request: NextRequest) {
     const validAthleteId: WrestlerIdInfo | undefined = athleteIdentification && typeof athleteIdentification === 'object' ? athleteIdentification : undefined;
     const validOpponentId: WrestlerIdInfo | undefined = opponentIdentification && typeof opponentIdentification === 'object' ? opponentIdentification : undefined;
     const validAthletePosition: 'left' | 'right' | undefined = (athletePosition === 'left' || athletePosition === 'right') ? athletePosition : undefined;
+    const validAthleteName: string | undefined = (typeof rawAthleteName === 'string' && rawAthleteName.trim().length > 0)
+      ? rawAthleteName.trim().slice(0, 50)
+      : undefined;
 
     // ===== CACHE CHECK: Same input → same score =====
     const cacheKey = computeAnalysisCacheKey(frames, validMatchStyle, validMode, validAthletePosition, validAthleteId, validMatchContext);
@@ -705,6 +709,7 @@ export async function POST(request: NextRequest) {
             matchContext: validMatchContext,
             athleteIdentification: validAthleteId, opponentIdentification: validOpponentId,
             idFrameBase64, athletePosition: validAthletePosition,
+            athleteName: validAthleteName,
           });
           await asyncDb.from('match_analyses').update({
             job_status: 'complete',
@@ -737,6 +742,7 @@ export async function POST(request: NextRequest) {
       matchContext: validMatchContext,
       athleteIdentification: validAthleteId, opponentIdentification: validOpponentId,
       idFrameBase64, athletePosition: validAthletePosition,
+      athleteName: validAthleteName,
     });
     await setCachedAnalysis(cacheKey, result, { frameCount: frames.length, matchStyle: validMatchStyle, athletePosition: validAthletePosition });
     return NextResponse.json(result);
@@ -777,6 +783,7 @@ type AnalysisConfig = {
   opponentIdentification?: WrestlerIdInfo;
   idFrameBase64?: string;
   athletePosition?: 'left' | 'right';
+  athleteName?: string;
 };
 
 /** @deprecated Use buildAnalysisError() for all error responses. Retained for reference only. */
@@ -806,7 +813,7 @@ function buildFallbackResponse(frameCount: number) {
 
 // Core analysis pipeline — extracted so it can be called synchronously or in after()
 async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<string, unknown>> {
-  const { frames, matchStyle: validMatchStyle, mode: validMode, speed: validSpeed, matchContext: validMatchContext, athleteIdentification: validAthleteId, opponentIdentification: validOpponentId, idFrameBase64, athletePosition: validAthletePosition } = config;
+  const { frames, matchStyle: validMatchStyle, mode: validMode, speed: validSpeed, matchContext: validMatchContext, athleteIdentification: validAthleteId, opponentIdentification: validOpponentId, idFrameBase64, athletePosition: validAthletePosition, athleteName: validAthleteName } = config;
   const isQuick = validSpeed === 'quick';
 
     const logger = new PipelineLogger();
@@ -1196,7 +1203,7 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
     const pass2MaxTokens = isQuick ? QUICK_PASS2_MAX_TOKENS : 4096;
     const pass2SystemPrompt = isQuick
       ? buildQuickPass2Prompt(validMatchStyle, frames.length, validAthleteId, validAthletePosition)
-      : buildPass2AthletePrompt(validMatchStyle, frames.length, validMatchContext, validAthleteId, validAthletePosition);
+      : buildPass2AthletePrompt(validMatchStyle, frames.length, validMatchContext, validAthleteId, validAthletePosition, validAthleteName);
 
     // Build Pass 2 user content
     let pass2UserContent: string;

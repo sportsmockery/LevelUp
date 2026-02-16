@@ -17,6 +17,7 @@ type Props = {
   result: AnalysisResult;
   thumbnailUri?: string | null;
   videoFileName?: string;
+  athleteName?: string;
   showUploadAnother?: boolean;
   onUploadAnother?: () => void;
 };
@@ -28,7 +29,7 @@ const getScoreColor = (score: number) => {
   return '#EF4444';
 };
 
-export default function AnalysisResults({ result, thumbnailUri, videoFileName, showUploadAnother, onUploadAnother }: Props) {
+export default function AnalysisResults({ result, thumbnailUri, videoFileName, athleteName, showUploadAnother, onUploadAnother }: Props) {
   const [coachNotes, setCoachNotes] = useState('');
   const [sharing, setSharing] = useState(false);
 
@@ -39,6 +40,7 @@ export default function AnalysisResults({ result, thumbnailUri, videoFileName, s
         result,
         videoFileName,
         coachNotes: coachNotes.trim() || undefined,
+        athleteName,
       });
     } catch (e: any) {
       if (!e?.message?.includes('dismissed')) {

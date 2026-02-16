@@ -1,5 +1,6 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { copyAsync, cacheDirectory } from 'expo-file-system/legacy';
 import { AnalysisResult } from './types';
 
 type ExportOptions = {
@@ -7,6 +8,7 @@ type ExportOptions = {
   videoFileName?: string;
   matchDate?: string;
   coachNotes?: string;
+  athleteName?: string;
 };
 
 function getScoreColor(score: number): string {
@@ -24,8 +26,12 @@ function getScoreLabel(score: number): string {
   return 'Beginner';
 }
 
+function sanitizeFileName(name: string): string {
+  return name.replace(/[\/\\:*?"<>|]/g, '').trim().slice(0, 50);
+}
+
 function buildReportHTML(options: ExportOptions): string {
-  const { result, videoFileName, matchDate, coachNotes } = options;
+  const { result, videoFileName, matchDate, coachNotes, athleteName } = options;
   const date = matchDate || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   const overallColor = getScoreColor(result.overall_score);
 
@@ -147,7 +153,7 @@ function buildReportHTML(options: ExportOptions): string {
   <div class="header">
     <h1>LEVELUP</h1>
     <div class="subtitle">Wrestling Analysis Report</div>
-    <div class="meta">${date}${videoFileName ? ` &mdash; ${videoFileName}` : ''}${result.framesAnalyzed > 0 ? ` &mdash; ${result.framesAnalyzed} frames analyzed` : ''}</div>
+    <div class="meta">${athleteName ? `${athleteName} &mdash; ` : ''}${date}${videoFileName ? ` &mdash; ${videoFileName}` : ''}${result.framesAnalyzed > 0 ? ` &mdash; ${result.framesAnalyzed} frames analyzed` : ''}</div>
   </div>
 
   <div class="overall-score">
@@ -223,8 +229,27 @@ function buildReportHTML(options: ExportOptions): string {
 
 export async function exportAnalysisPDF(options: ExportOptions): Promise<void> {
   const html = buildReportHTML(options);
-  const { uri } = await Print.printToFileAsync({ html, base64: false });
-  await Sharing.shareAsync(uri, {
+  const { uri: tempUri } = await Print.printToFileAsync({ html, base64: false });
+
+  // Build descriptive filename: {Name} {MM-DD-YY} {Score}.pdf
+  const now = new Date();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const yy = String(now.getFullYear()).slice(-2);
+  const dateStr = `${mm}-${dd}-${yy}`;
+  const nameStr = options.athleteName
+    ? sanitizeFileName(options.athleteName)
+    : options.videoFileName
+      ? sanitizeFileName(options.videoFileName.replace(/\.[^.]+$/, ''))
+      : 'LevelUp';
+  const score = options.result.overall_score;
+  const fileName = `${nameStr} ${dateStr} ${score}.pdf`;
+
+  // Copy temp file to a path with the desired filename
+  const destUri = `${cacheDirectory}${fileName}`;
+  await copyAsync({ from: tempUri, to: destUri });
+
+  await Sharing.shareAsync(destUri, {
     mimeType: 'application/pdf',
     dialogTitle: 'Share LevelUp Analysis Report',
     UTI: 'com.adobe.pdf',
