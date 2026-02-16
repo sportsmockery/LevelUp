@@ -1,12 +1,13 @@
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { StatusBar } from 'react-native';
 import 'react-native-reanimated';
 import { configureNotifications } from '@/lib/analysis-poller';
 import { registerPushToken } from '@/lib/notifications';
+import { AuthProvider, useAuth } from '@/lib/auth';
 
 SplashScreen.preventAutoHideAsync();
 configureNotifications();
@@ -22,6 +23,32 @@ const LevelUpDark = {
     primary: '#2563EB',
   },
 };
+
+function RootNavigator() {
+  const { session, loading } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (loading) return;
+
+    const inAuth = segments[0] === '(auth)';
+
+    if (!session && !inAuth) {
+      router.replace('/(auth)/welcome');
+    } else if (session && inAuth) {
+      router.replace('/(tabs)');
+    }
+  }, [session, loading, segments]);
+
+  return (
+    <Stack>
+      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+    </Stack>
+  );
+}
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
@@ -42,12 +69,11 @@ export default function RootLayout() {
   if (!loaded) return null;
 
   return (
-    <ThemeProvider value={LevelUpDark}>
-      <StatusBar barStyle="light-content" backgroundColor="#0A0A0A" />
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-      </Stack>
-    </ThemeProvider>
+    <AuthProvider>
+      <ThemeProvider value={LevelUpDark}>
+        <StatusBar barStyle="light-content" backgroundColor="#0A0A0A" />
+        <RootNavigator />
+      </ThemeProvider>
+    </AuthProvider>
   );
 }
