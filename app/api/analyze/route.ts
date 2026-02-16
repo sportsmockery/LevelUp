@@ -922,24 +922,16 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
       position_confidence: positionConfidence,
     });
 
-    // Validate Pass 1 coverage — fatal error if less than 50% of frames were observed
+    // Validate Pass 1 coverage — fatal error if less than 95% of frames were observed
     const pass1Coverage = analysisFrames.length > 0
       ? allObservations.length / analysisFrames.length
       : 0;
 
-    if (pass1Coverage < 0.5) {
+    if (pass1Coverage < 0.95) {
       const coveragePct = Math.round(pass1Coverage * 100);
       throw new Error(
-        `Analysis failed: Pass 1 only returned observations for ${allObservations.length}/${analysisFrames.length} frames (${coveragePct}% coverage). Minimum required: 50%.`
+        `Analysis failed: Pass 1 only returned observations for ${allObservations.length}/${analysisFrames.length} frames (${coveragePct}% coverage). Minimum required: 95%.`
       );
-    }
-
-    if (pass1Coverage < 0.7) {
-      logger.warn('pass1_complete', {
-        observations: allObservations.length,
-        frames: analysisFrames.length,
-        coverage: Math.round(pass1Coverage * 100),
-      });
     }
 
     if (identityConfidence < 0.5) {
