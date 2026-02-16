@@ -134,12 +134,58 @@ export default function UploadScreen() {
   const [selectedWrestler, setSelectedWrestler] = useState<'a' | 'b' | null>(null);
   const [identifyingWrestler, setIdentifyingWrestler] = useState(false);
   const [extractingIdFrames, setExtractingIdFrames] = useState(false);
-  // Split-frame wrestler side selection
-  const [wrestlerSide, setWrestlerSide] = useState<'left' | 'right' | null>(null);
-  const [leftHalfUri, setLeftHalfUri] = useState<string | null>(null);
-  const [rightHalfUri, setRightHalfUri] = useState<string | null>(null);
-  const [extractingPreview, setExtractingPreview] = useState(false);
+  const [idFrameLayout, setIdFrameLayout] = useState<{
+    containerW: number; containerH: number;
+    imageW: number; imageH: number;
+  } | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+
+  // Compute bounding box style accounting for resizeMode 'contain' letterboxing/pillarboxing
+  const computeBoxStyle = (box: { x: number; y: number; w: number; h: number }) => {
+    if (!idFrameLayout) {
+      // Fallback: raw percentages (may be slightly off before layout is measured)
+      return {
+        left: `${box.x * 100}%` as any,
+        top: `${box.y * 100}%` as any,
+        width: `${box.w * 100}%` as any,
+        height: `${box.h * 100}%` as any,
+      };
+    }
+    const { containerW, containerH, imageW, imageH } = idFrameLayout;
+    const containerAspect = containerW / containerH;
+    const imageAspect = imageW / imageH;
+
+    let renderedW: number, renderedH: number, offsetX: number, offsetY: number;
+    if (imageAspect > containerAspect) {
+      // Image wider than container — pillarboxing (letterbox top/bottom won't happen, image fits width)
+      renderedW = containerW;
+      renderedH = containerW / imageAspect;
+      offsetX = 0;
+      offsetY = (containerH - renderedH) / 2;
+    } else {
+      // Image taller than container — letterboxing (pillarbox left/right)
+      renderedH = containerH;
+      renderedW = containerH * imageAspect;
+      offsetX = (containerW - renderedW) / 2;
+      offsetY = 0;
+    }
+
+    return {
+      left: offsetX + box.x * renderedW,
+      top: offsetY + box.y * renderedH,
+      width: box.w * renderedW,
+      height: box.h * renderedH,
+    };
+  };
+
+  const handleIdFrameLayout = (e: any) => {
+    const { width: cW, height: cH } = e.nativeEvent.layout;
+    if (idFrameUri) {
+      Image.getSize(idFrameUri, (imgW, imgH) => {
+        setIdFrameLayout({ containerW: cW, containerH: cH, imageW: imgW, imageH: imgH });
+      });
+    }
+  };
   const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState('');
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -160,7 +206,7 @@ export default function UploadScreen() {
   }, []);
 
   const checkVideoDuration = (asset: ImagePicker.ImagePickerAsset): boolean => {
-    const duration = asset.duration ?? 0; // seconds
+    const duration = (asset.duration ?? 0) / 1000; // ms → seconds
     if (duration > 600) {
       Alert.alert(
         'Video Too Long',
@@ -177,43 +223,6 @@ export default function UploadScreen() {
     return true;
   };
 
-  // Extract a frame at 1.5s, split left/right for wrestler side picker
-  const extractWrestlerPreview = async (videoUri: string) => {
-    setExtractingPreview(true);
-    setWrestlerSide(null);
-    setLeftHalfUri(null);
-    setRightHalfUri(null);
-    try {
-      const { uri: thumbUri } = await VideoThumbnails.getThumbnailAsync(videoUri, {
-        time: 1500,
-        quality: 0.85,
-      });
-      // Get dimensions via no-op manipulate
-      const full = await ImageManipulator.manipulateAsync(thumbUri, []);
-      const w = full.width;
-      const h = full.height;
-      const halfW = Math.floor(w / 2);
-
-      const left = await ImageManipulator.manipulateAsync(
-        thumbUri,
-        [{ crop: { originX: 0, originY: 0, width: halfW, height: h } }],
-        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG },
-      );
-      const right = await ImageManipulator.manipulateAsync(
-        thumbUri,
-        [{ crop: { originX: halfW, originY: 0, width: w - halfW, height: h } }],
-        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG },
-      );
-
-      setLeftHalfUri(left.uri);
-      setRightHalfUri(right.uri);
-    } catch (err) {
-      console.warn('[LevelUp] Failed to extract wrestler preview:', err);
-    } finally {
-      setExtractingPreview(false);
-    }
-  };
-
   const pickVideo = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const res = await ImagePicker.launchImageLibraryAsync({
@@ -225,8 +234,7 @@ export default function UploadScreen() {
       if (!checkVideoDuration(res.assets[0])) return;
       setVideo(res.assets[0]);
       setResult(null);
-      extractWrestlerPreview(res.assets[0].uri);
-      extractIdFrames(res.assets[0].uri, res.assets[0].duration ?? 60);
+      extractIdFrames(res.assets[0].uri, (res.assets[0].duration ?? 60000) / 1000);
     }
   };
 
@@ -244,8 +252,7 @@ export default function UploadScreen() {
       if (!checkVideoDuration(res.assets[0])) return;
       setVideo(res.assets[0]);
       setResult(null);
-      extractWrestlerPreview(res.assets[0].uri);
-      extractIdFrames(res.assets[0].uri, res.assets[0].duration ?? 60);
+      extractIdFrames(res.assets[0].uri, (res.assets[0].duration ?? 60000) / 1000);
     }
   };
 
@@ -286,29 +293,17 @@ export default function UploadScreen() {
         return;
       }
 
-      // Find lowest-motion frame (smallest delta from neighbors = most static)
-      let bestIdx = 0;
-      if (extracted.length >= 3) {
-        let minDelta = Infinity;
-        for (let i = 1; i < extracted.length - 1; i++) {
-          const delta = Math.abs(extracted[i].base64Len - extracted[i - 1].base64Len) +
-                        Math.abs(extracted[i].base64Len - extracted[i + 1].base64Len);
-          if (delta < minDelta) {
-            minDelta = delta;
-            bestIdx = i;
-          }
-        }
-      }
-
+      // Always use frame 0 (time=0ms) for initial detection
       const frameData = extracted.map((e) => ({ uri: e.uri, base64: e.base64 }));
+      console.log(`[LevelUp] extractIdFrames: ${frameData.length} frames extracted, using frame 0 for detection`);
       setIdFrames(frameData);
-      setIdFrameUri(frameData[bestIdx].uri);
-      setIdFrameBase64(frameData[bestIdx].base64);
-      setIdFrameIndex(bestIdx);
+      setIdFrameUri(frameData[0].uri);
+      setIdFrameBase64(frameData[0].base64);
+      setIdFrameIndex(0);
       setExtractingIdFrames(false);
 
       // Run GPT-4o wrestler detection
-      await runWrestlerDetection(frameData[bestIdx].base64);
+      await runWrestlerDetection(frameData[0].base64);
     } catch (err) {
       console.warn('[LevelUp] Failed to extract ID frames:', err);
       setExtractingIdFrames(false);
@@ -319,6 +314,13 @@ export default function UploadScreen() {
     setIdentifyingWrestler(true);
     try {
       const result = await identifyWrestler(frameBase64);
+      console.log('[LevelUp] runWrestlerDetection result:', JSON.stringify({
+        a_box: result.wrestler_a.bounding_box_pct,
+        a_pos: result.wrestler_a.position,
+        b_box: result.wrestler_b.bounding_box_pct,
+        b_pos: result.wrestler_b.position,
+        confidence: result.confidence,
+      }));
       setWrestlerDetection(result);
     } catch (err) {
       console.warn('[LevelUp] Wrestler detection failed:', err);
@@ -330,6 +332,7 @@ export default function UploadScreen() {
   const tryAnotherFrame = async () => {
     if (idFrames.length === 0) return;
     const nextIdx = (idFrameIndex + 1) % idFrames.length;
+    console.log(`[LevelUp] tryAnotherFrame: switching from frame ${idFrameIndex} to frame ${nextIdx}`);
     setIdFrameIndex(nextIdx);
     setIdFrameUri(idFrames[nextIdx].uri);
     setIdFrameBase64(idFrames[nextIdx].base64);
@@ -601,7 +604,7 @@ export default function UploadScreen() {
     setStatusText('Preparing video...');
 
     try {
-      const durationMs = (video.duration || 60) * 1000;
+      const durationMs = video.duration || 60000;
 
       // Second Wi-Fi check right before upload
       const stillWiFi = await checkWiFi();
@@ -682,8 +685,17 @@ export default function UploadScreen() {
         };
       }
 
-      const videoDuration = video.duration || 60;
-      const useAsync = videoDuration > 420; // 7+ minute videos use background mode
+      // Derive athletePosition from detection result
+      const athletePosition: 'left' | 'right' | undefined =
+        selectedWrestler && wrestlerDetection
+          ? (selectedWrestler === 'a'
+              ? wrestlerDetection.wrestler_a.position
+              : wrestlerDetection.wrestler_b.position)
+          : undefined;
+      console.log(`[LevelUp] Derived athletePosition: ${athletePosition ?? 'none'} (selectedWrestler=${selectedWrestler})`);
+
+      const videoDurationSec = (video.duration || 60000) / 1000;
+      const useAsync = videoDurationSec > 420; // 7+ minute videos use background mode
       let data: AnalysisResult;
 
       if (useAsync) {
@@ -700,7 +712,7 @@ export default function UploadScreen() {
           athleteId,
           opponentId,
           idFrameBase64 ?? undefined,
-          wrestlerSide ?? undefined,
+          athletePosition,
         );
         await savePendingJob(jobId);
 
@@ -728,7 +740,7 @@ export default function UploadScreen() {
           athleteId,
           opponentId,
           idFrameBase64 ?? undefined,
-          wrestlerSide ?? undefined,
+          athletePosition,
         );
       }
 
@@ -753,7 +765,7 @@ export default function UploadScreen() {
         frameTimestamps: extractedTimestamps,
         videoUri: video.uri,
         videoFileName: video.fileName || 'Match Video',
-        videoDurationSeconds: video.duration || 0,
+        videoDurationSeconds: (video.duration || 0) / 1000,
         singletColors: [],
         result: data,
       });
@@ -783,10 +795,7 @@ export default function UploadScreen() {
     setSelectedWrestler(null);
     setIdentifyingWrestler(false);
     setExtractingIdFrames(false);
-    setWrestlerSide(null);
-    setLeftHalfUri(null);
-    setRightHalfUri(null);
-    setExtractingPreview(false);
+    setIdFrameLayout(null);
     setThumbnailUri(null);
     setFrameUris([]);
     setFrameTimestamps([]);
@@ -801,10 +810,11 @@ export default function UploadScreen() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const formatDuration = (seconds?: number) => {
-    if (!seconds) return '--:--';
-    const m = Math.floor(seconds / 60);
-    const s = Math.floor(seconds % 60);
+  const formatDuration = (ms?: number) => {
+    if (!ms) return '--:--';
+    const totalSec = Math.floor(ms / 1000);
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
@@ -891,63 +901,6 @@ export default function UploadScreen() {
           )}
         </View>
 
-        {/* Split-Frame Wrestler Side Picker */}
-        {video && !analyzing && !result && (extractingPreview || leftHalfUri) && (
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>WHICH SIDE IS YOUR WRESTLER?</Text>
-            <Text style={styles.sectionHint}>Tap the side of the frame where your wrestler starts</Text>
-            {extractingPreview ? (
-              <View style={styles.wrestlerLoadingContainer}>
-                <ActivityIndicator size="small" color="#2563EB" />
-                <Text style={styles.wrestlerLoadingText}>Loading preview...</Text>
-              </View>
-            ) : (
-              <View style={styles.sideSplitRow}>
-                <TouchableOpacity
-                  style={[styles.sideSplitCard, wrestlerSide === 'left' && styles.sideSplitCardSelected]}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    setWrestlerSide(wrestlerSide === 'left' ? null : 'left');
-                  }}
-                  activeOpacity={0.8}
-                >
-                  {leftHalfUri && (
-                    <Image source={{ uri: leftHalfUri }} style={styles.sideSplitImage} />
-                  )}
-                  <View style={styles.sideSplitLabelWrap}>
-                    <Text style={[styles.sideSplitLabel, wrestlerSide === 'left' && styles.sideSplitLabelSelected]}>LEFT</Text>
-                  </View>
-                  {wrestlerSide === 'left' && (
-                    <View style={styles.sideSplitBadge}>
-                      <Text style={styles.sideSplitBadgeText}>YOUR WRESTLER</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.sideSplitCard, wrestlerSide === 'right' && styles.sideSplitCardSelected]}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    setWrestlerSide(wrestlerSide === 'right' ? null : 'right');
-                  }}
-                  activeOpacity={0.8}
-                >
-                  {rightHalfUri && (
-                    <Image source={{ uri: rightHalfUri }} style={styles.sideSplitImage} />
-                  )}
-                  <View style={styles.sideSplitLabelWrap}>
-                    <Text style={[styles.sideSplitLabel, wrestlerSide === 'right' && styles.sideSplitLabelSelected]}>RIGHT</Text>
-                  </View>
-                  {wrestlerSide === 'right' && (
-                    <View style={styles.sideSplitBadge}>
-                      <Text style={styles.sideSplitBadgeText}>YOUR WRESTLER</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        )}
-
         {/* Wrestler Identification — GPT-4o Detection */}
         {video && !analyzing && !result && (extractingIdFrames || identifyingWrestler || wrestlerDetection) && (
           <View style={styles.section}>
@@ -967,30 +920,20 @@ export default function UploadScreen() {
             {!extractingIdFrames && !identifyingWrestler && wrestlerDetection && idFrameUri && (
               <>
                 {/* Annotated ID frame */}
-                <View style={styles.idFrameContainer}>
+                <View style={styles.idFrameContainer} onLayout={handleIdFrameLayout}>
                   <Image source={{ uri: idFrameUri }} style={styles.idFrameImage} />
                   {/* Bounding box overlays */}
                   <View style={[
                     styles.boundingBox,
                     styles.boundingBoxA,
-                    {
-                      left: `${wrestlerDetection.wrestler_a.bounding_box_pct.x * 100}%` as any,
-                      top: `${wrestlerDetection.wrestler_a.bounding_box_pct.y * 100}%` as any,
-                      width: `${wrestlerDetection.wrestler_a.bounding_box_pct.w * 100}%` as any,
-                      height: `${wrestlerDetection.wrestler_a.bounding_box_pct.h * 100}%` as any,
-                    },
+                    computeBoxStyle(wrestlerDetection.wrestler_a.bounding_box_pct),
                   ]}>
                     <Text style={styles.boundingBoxLabel}>A</Text>
                   </View>
                   <View style={[
                     styles.boundingBox,
                     styles.boundingBoxB,
-                    {
-                      left: `${wrestlerDetection.wrestler_b.bounding_box_pct.x * 100}%` as any,
-                      top: `${wrestlerDetection.wrestler_b.bounding_box_pct.y * 100}%` as any,
-                      width: `${wrestlerDetection.wrestler_b.bounding_box_pct.w * 100}%` as any,
-                      height: `${wrestlerDetection.wrestler_b.bounding_box_pct.h * 100}%` as any,
-                    },
+                    computeBoxStyle(wrestlerDetection.wrestler_b.bounding_box_pct),
                   ]}>
                     <Text style={styles.boundingBoxLabel}>B</Text>
                   </View>
@@ -1006,7 +949,9 @@ export default function UploadScreen() {
                     ]}
                     onPress={() => {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                      setSelectedWrestler(selectedWrestler === 'a' ? null : 'a');
+                      const next = selectedWrestler === 'a' ? null : 'a';
+                      console.log(`[LevelUp] Wrestler selection: ${next ?? 'deselected'}, box:`, wrestlerDetection?.wrestler_a.bounding_box_pct);
+                      setSelectedWrestler(next);
                     }}
                     activeOpacity={0.8}
                   >
@@ -1040,7 +985,9 @@ export default function UploadScreen() {
                     ]}
                     onPress={() => {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                      setSelectedWrestler(selectedWrestler === 'b' ? null : 'b');
+                      const next = selectedWrestler === 'b' ? null : 'b';
+                      console.log(`[LevelUp] Wrestler selection: ${next ?? 'deselected'}, box:`, wrestlerDetection?.wrestler_b.bounding_box_pct);
+                      setSelectedWrestler(next);
                     }}
                     activeOpacity={0.8}
                   >
@@ -1318,7 +1265,8 @@ const styles = StyleSheet.create({
   idFrameImage: {
     width: '100%',
     aspectRatio: 16 / 9,
-    resizeMode: 'cover',
+    resizeMode: 'contain',
+    backgroundColor: '#000',
   },
   boundingBox: {
     position: 'absolute',
@@ -1586,53 +1534,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#fff',
-  },
-  sideSplitRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  sideSplitCard: {
-    flex: 1,
-    borderRadius: 14,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: '#27272A',
-    backgroundColor: '#18181B',
-  },
-  sideSplitCardSelected: {
-    borderColor: '#2563EB',
-  },
-  sideSplitImage: {
-    width: '100%',
-    aspectRatio: 9 / 16,
-    resizeMode: 'cover',
-  },
-  sideSplitLabelWrap: {
-    paddingVertical: 8,
-    alignItems: 'center',
-  },
-  sideSplitLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#71717A',
-    letterSpacing: 1,
-  },
-  sideSplitLabelSelected: {
-    color: '#2563EB',
-  },
-  sideSplitBadge: {
-    position: 'absolute',
-    top: 8,
-    alignSelf: 'center',
-    backgroundColor: '#2563EB',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  sideSplitBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#fff',
-    letterSpacing: 0.5,
   },
 });
