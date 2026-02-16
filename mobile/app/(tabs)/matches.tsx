@@ -143,8 +143,10 @@ export default function MatchesScreen() {
   // Compute stats from real data
   const wins = matches.filter((m) => getResultLetter(m) === 'W').length;
   const losses = matches.filter((m) => getResultLetter(m) === 'L').length;
-  const avgScore = matches.length > 0
-    ? Math.round(matches.reduce((s, m) => s + m.overallScore, 0) / matches.length)
+  // Average score only counts video-analyzed matches (not manual entries)
+  const videoMatches = matches.filter((m) => !m.isManualEntry);
+  const avgScore = videoMatches.length > 0
+    ? Math.round(videoMatches.reduce((s, m) => s + m.overallScore, 0) / videoMatches.length)
     : 0;
 
   const filteredMatches = matches.filter(
@@ -589,14 +591,29 @@ export default function MatchesScreen() {
           </View>
           <View style={styles.matchInfo}>
             <Text style={styles.matchOpponent}>{match.opponentName || 'Unknown Opponent'}</Text>
-            <Text style={styles.matchMethod}>{formatResultMethod(match)}</Text>
+            <View style={styles.matchMethodRow}>
+              <Text style={styles.matchMethod}>
+                {formatResultMethod(match)}
+                {match.matchScoreDetail ? ` (${match.matchScoreDetail})` : ''}
+              </Text>
+              {match.isManualEntry && !match.hasVideo && (
+                <View style={styles.manualBadge}>
+                  <Text style={styles.manualBadgeText}>Manual</Text>
+                </View>
+              )}
+              {match.isManualEntry && match.hasVideo && (
+                <View style={styles.analyzedBadge}>
+                  <Text style={styles.analyzedBadgeText}>Analyzed</Text>
+                </View>
+              )}
+            </View>
             <Text style={styles.matchTournament}>
               {match.competitionName || match.matchStyle || ''}{match.competitionName ? ' | ' : ''}{formatMatchDate(match.createdAt)}
             </Text>
           </View>
         </View>
         <View style={styles.matchRight}>
-          <Text style={styles.matchScore}>{match.overallScore}</Text>
+          {!match.isManualEntry && <Text style={styles.matchScore}>{match.overallScore}</Text>}
           {match.hasVideo && <Video size={14} color="#2563EB" />}
         </View>
       </View>
@@ -964,7 +981,7 @@ const styles = StyleSheet.create({
   resultText: { fontSize: 16, fontWeight: '800' },
   matchInfo: { flex: 1 },
   matchOpponent: { fontSize: 15, fontWeight: '700', color: '#fff' },
-  matchMethod: { fontSize: 12, color: '#A1A1AA', marginTop: 2 },
+  matchMethod: { fontSize: 12, color: '#A1A1AA' },
   matchTournament: { fontSize: 11, color: '#52525B', marginTop: 2 },
   matchRight: { alignItems: 'flex-end', gap: 6 },
   matchScore: { fontSize: 20, fontWeight: '800', color: '#2563EB' },
@@ -1185,4 +1202,32 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   scoutProgressText: { fontSize: 13, color: '#A1A1AA' },
+  matchMethodRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+  },
+  manualBadge: {
+    backgroundColor: '#3F3F4620',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  manualBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#71717A',
+  },
+  analyzedBadge: {
+    backgroundColor: '#2563EB20',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  analyzedBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#2563EB',
+  },
 });

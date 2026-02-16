@@ -36,9 +36,13 @@ import {
   UserPlus,
   X as XIcon,
   ChevronRight,
+  ClipboardList,
+  ChevronDown,
+  Check,
+  Calendar,
 } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { submitAnalysis, identifyWrestler } from '@/lib/api';
+import { submitAnalysis, identifyWrestler, saveManualMatch } from '@/lib/api';
 import { pollForCompletion, savePendingJob, requestNotificationPermissions } from '@/lib/analysis-poller';
 import { getStoredPushToken } from '@/lib/notifications';
 import { AnalysisResult, MatchStyle, MatchContext, AthleteIdentification, WrestlerIdentificationResult, OpponentSummary } from '@/lib/types';
@@ -137,7 +141,28 @@ async function checkWiFi(): Promise<boolean> {
   }
 }
 
+const WIN_LOSS_TYPES = ['Fall', 'TF', 'MD', 'Dec', 'Forfeit'] as const;
+
 export default function UploadScreen() {
+  // Mode selector: 'video' or 'manual'
+  const [uploadMode, setUploadMode] = useState<'video' | 'manual'>('video');
+
+  // Manual entry state
+  const [manualDate, setManualDate] = useState(new Date().toISOString().split('T')[0]);
+  const [manualOpponentName, setManualOpponentName] = useState('');
+  const [manualOpponentSchool, setManualOpponentSchool] = useState('');
+  const [manualWeightClass, setManualWeightClass] = useState('');
+  const [manualResult, setManualResult] = useState<'win' | 'loss' | null>(null);
+  const [manualWinLossType, setManualWinLossType] = useState('');
+  const [manualScore, setManualScore] = useState('');
+  const [manualCompetition, setManualCompetition] = useState('');
+  const [manualRound, setManualRound] = useState('');
+  const [manualNotes, setManualNotes] = useState('');
+  const [manualSaving, setManualSaving] = useState(false);
+  const [manualSaved, setManualSaved] = useState(false);
+  const [manualOpponentSearch, setManualOpponentSearch] = useState('');
+  const [showWinLossDropdown, setShowWinLossDropdown] = useState(false);
+
   const [video, setVideo] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [matchStyle, setMatchStyle] = useState<MatchStyle>('youth_folkstyle');
   const [styleModalVisible, setStyleModalVisible] = useState(false);
@@ -918,6 +943,64 @@ export default function UploadScreen() {
     setOpponentModalVisible(false);
   };
 
+  const handleSaveManualMatch = async () => {
+    if (!manualOpponentName.trim()) {
+      Alert.alert('Missing field', 'Opponent name is required.');
+      return;
+    }
+    if (!manualResult) {
+      Alert.alert('Missing field', 'Select W or L.');
+      return;
+    }
+    if (!manualWinLossType) {
+      Alert.alert('Missing field', 'Select the win/loss type.');
+      return;
+    }
+    if (!manualWeightClass.trim()) {
+      Alert.alert('Missing field', 'Weight class is required.');
+      return;
+    }
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    setManualSaving(true);
+    try {
+      await saveManualMatch({
+        matchDate: manualDate,
+        opponentName: manualOpponentName.trim(),
+        opponentSchool: manualOpponentSchool.trim() || undefined,
+        weightClass: manualWeightClass.trim(),
+        matchResult: manualResult,
+        winLossType: manualWinLossType,
+        matchScoreDetail: manualScore.trim() || undefined,
+        competitionName: manualCompetition.trim() || undefined,
+        roundNumber: manualRound.trim() || undefined,
+        matchNotes: manualNotes.trim() || undefined,
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setManualSaved(true);
+    } catch (err: any) {
+      Alert.alert('Save failed', err?.message || 'Could not save match.');
+    } finally {
+      setManualSaving(false);
+    }
+  };
+
+  const resetManualEntry = () => {
+    setManualDate(new Date().toISOString().split('T')[0]);
+    setManualOpponentName('');
+    setManualOpponentSchool('');
+    setManualWeightClass('');
+    setManualResult(null);
+    setManualWinLossType('');
+    setManualScore('');
+    setManualCompetition('');
+    setManualRound('');
+    setManualNotes('');
+    setManualSaved(false);
+    setManualOpponentSearch('');
+    setShowWinLossDropdown(false);
+  };
+
   const formatFileSize = (bytes?: number) => {
     if (!bytes) return 'Unknown size';
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -968,14 +1051,330 @@ export default function UploadScreen() {
     );
   }
 
+  // Manual entry success view
+  if (manualSaved) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.manualSuccessContainer}>
+          <View style={styles.manualSuccessIcon}>
+            <Check size={48} color="#22C55E" />
+          </View>
+          <Text style={styles.manualSuccessTitle}>Match Saved!</Text>
+          <Text style={styles.manualSuccessText}>
+            {manualResult === 'win' ? 'W' : 'L'} vs {manualOpponentName} — {manualWinLossType}
+            {manualScore ? ` (${manualScore})` : ''}
+          </Text>
+          <View style={styles.manualSuccessBtns}>
+            <TouchableOpacity
+              style={styles.manualSuccessBtn}
+              onPress={() => {
+                resetManualEntry();
+              }}
+            >
+              <Text style={styles.manualSuccessBtnText}>Add Another</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.manualSuccessBtn, styles.manualSuccessBtnSecondary]}
+              onPress={() => {
+                resetManualEntry();
+                setUploadMode('video');
+              }}
+            >
+              <Text style={styles.manualSuccessBtnTextSecondary}>Upload Video</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>UPLOAD VIDEO</Text>
-          <Text style={styles.headerSub}>Get LevelUp analysis of your match</Text>
+          <Text style={styles.headerTitle}>{uploadMode === 'video' ? 'UPLOAD VIDEO' : 'ADD MATCH'}</Text>
+          <Text style={styles.headerSub}>
+            {uploadMode === 'video' ? 'Get LevelUp analysis of your match' : 'Log a match result manually'}
+          </Text>
         </View>
 
+        {/* Mode Selector */}
+        {!video && !analyzing && (
+          <View style={styles.modeSelector}>
+            <TouchableOpacity
+              style={[styles.modeBtn, uploadMode === 'video' && styles.modeBtnActive]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setUploadMode('video');
+              }}
+            >
+              <Video size={18} color={uploadMode === 'video' ? '#fff' : '#71717A'} />
+              <Text style={[styles.modeBtnText, uploadMode === 'video' && styles.modeBtnTextActive]}>
+                Upload Video
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modeBtn, uploadMode === 'manual' && styles.modeBtnActive]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setUploadMode('manual');
+              }}
+            >
+              <ClipboardList size={18} color={uploadMode === 'manual' ? '#fff' : '#71717A'} />
+              <Text style={[styles.modeBtnText, uploadMode === 'manual' && styles.modeBtnTextActive]}>
+                Add Match Result
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* ===== MANUAL ENTRY FORM ===== */}
+        {uploadMode === 'manual' && (
+          <>
+            {/* Match Date */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>MATCH DATE *</Text>
+              <View style={styles.manualDateRow}>
+                <Calendar size={18} color="#71717A" />
+                <TextInput
+                  style={[styles.contextInput, { flex: 1 }]}
+                  value={manualDate}
+                  onChangeText={setManualDate}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor="#52525B"
+                />
+              </View>
+            </View>
+
+            {/* Opponent */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>OPPONENT *</Text>
+              {pastOpponents.length > 0 && !manualOpponentName && (
+                <>
+                  <TextInput
+                    style={styles.opponentSearchInput}
+                    placeholder="Search past opponents..."
+                    placeholderTextColor="#52525B"
+                    value={manualOpponentSearch}
+                    onChangeText={setManualOpponentSearch}
+                  />
+                  {pastOpponents
+                    .filter((o) =>
+                      manualOpponentSearch.length === 0 ||
+                      o.name.toLowerCase().includes(manualOpponentSearch.toLowerCase())
+                    )
+                    .slice(0, 4)
+                    .map((opp, i) => (
+                      <TouchableOpacity
+                        key={i}
+                        style={styles.pastOpponentRow}
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                          setManualOpponentName(opp.name);
+                          setManualOpponentSchool(opp.school || '');
+                          setManualWeightClass(opp.weightClass || '');
+                          setManualOpponentSearch('');
+                        }}
+                      >
+                        <View style={styles.pastOpponentInfo}>
+                          <Text style={styles.pastOpponentName}>{opp.name}</Text>
+                          <Text style={styles.pastOpponentMeta}>{opp.school || 'Unknown'}</Text>
+                        </View>
+                        <ChevronRight size={16} color="#52525B" />
+                      </TouchableOpacity>
+                    ))
+                  }
+                </>
+              )}
+              <TextInput
+                style={styles.contextInput}
+                placeholder="Opponent name"
+                placeholderTextColor="#52525B"
+                value={manualOpponentName}
+                onChangeText={setManualOpponentName}
+              />
+            </View>
+
+            {/* Opponent School (optional) */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>OPPONENT SCHOOL <Text style={styles.optionalTag}>OPTIONAL</Text></Text>
+              <TextInput
+                style={styles.contextInput}
+                placeholder="e.g. Eastview High"
+                placeholderTextColor="#52525B"
+                value={manualOpponentSchool}
+                onChangeText={setManualOpponentSchool}
+              />
+            </View>
+
+            {/* Weight Class */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>WEIGHT CLASS *</Text>
+              <TextInput
+                style={styles.contextInput}
+                placeholder="e.g. 126 lbs"
+                placeholderTextColor="#52525B"
+                value={manualWeightClass}
+                onChangeText={setManualWeightClass}
+              />
+            </View>
+
+            {/* Match Result: W or L */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>MATCH RESULT *</Text>
+              <View style={styles.resultToggleRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.resultToggleBtn,
+                    manualResult === 'win' && styles.resultToggleBtnWin,
+                  ]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    setManualResult('win');
+                  }}
+                >
+                  <Text style={[
+                    styles.resultToggleText,
+                    manualResult === 'win' && styles.resultToggleTextWin,
+                  ]}>W</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.resultToggleBtn,
+                    manualResult === 'loss' && styles.resultToggleBtnLoss,
+                  ]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    setManualResult('loss');
+                  }}
+                >
+                  <Text style={[
+                    styles.resultToggleText,
+                    manualResult === 'loss' && styles.resultToggleTextLoss,
+                  ]}>L</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Win/Loss Type */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>WIN/LOSS TYPE *</Text>
+              <TouchableOpacity
+                style={styles.dropdownBtn}
+                onPress={() => setShowWinLossDropdown(!showWinLossDropdown)}
+              >
+                <Text style={[styles.dropdownBtnText, !manualWinLossType && { color: '#52525B' }]}>
+                  {manualWinLossType || 'Select type...'}
+                </Text>
+                <ChevronDown size={18} color="#71717A" />
+              </TouchableOpacity>
+              {showWinLossDropdown && (
+                <View style={styles.dropdownList}>
+                  {WIN_LOSS_TYPES.map((type) => (
+                    <TouchableOpacity
+                      key={type}
+                      style={[styles.dropdownItem, manualWinLossType === type && styles.dropdownItemActive]}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setManualWinLossType(type);
+                        setShowWinLossDropdown(false);
+                      }}
+                    >
+                      <Text style={[styles.dropdownItemText, manualWinLossType === type && styles.dropdownItemTextActive]}>
+                        {type}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+
+            {/* Match Score */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>MATCH SCORE <Text style={styles.optionalTag}>OPTIONAL</Text></Text>
+              <TextInput
+                style={styles.contextInput}
+                placeholder="e.g. 12-4"
+                placeholderTextColor="#52525B"
+                value={manualScore}
+                onChangeText={setManualScore}
+              />
+            </View>
+
+            {/* Competition & Round */}
+            <View style={styles.section}>
+              <View style={styles.contextRow}>
+                <View style={styles.contextField}>
+                  <Text style={styles.contextFieldLabel}>Competition <Text style={styles.optionalTag}>OPT</Text></Text>
+                  <TextInput
+                    style={styles.contextInput}
+                    placeholder="e.g. District Duals"
+                    placeholderTextColor="#52525B"
+                    value={manualCompetition}
+                    onChangeText={setManualCompetition}
+                  />
+                </View>
+                <View style={styles.contextField}>
+                  <Text style={styles.contextFieldLabel}>Round # <Text style={styles.optionalTag}>OPT</Text></Text>
+                  <TextInput
+                    style={styles.contextInput}
+                    placeholder="1"
+                    placeholderTextColor="#52525B"
+                    value={manualRound}
+                    onChangeText={setManualRound}
+                    keyboardType="number-pad"
+                  />
+                </View>
+              </View>
+            </View>
+
+            {/* Match Notes */}
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>MATCH NOTES <Text style={styles.optionalTag}>OPTIONAL</Text></Text>
+              <TextInput
+                style={[styles.contextInput, styles.manualNotesInput]}
+                placeholder="What went well? What to work on?"
+                placeholderTextColor="#52525B"
+                value={manualNotes}
+                onChangeText={setManualNotes}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
+            </View>
+
+            {/* Save Button */}
+            <View style={styles.section}>
+              <TouchableOpacity
+                onPress={handleSaveManualMatch}
+                disabled={manualSaving}
+                activeOpacity={0.85}
+              >
+                <LinearGradient
+                  colors={['#2563EB', '#E91E8C']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={[styles.analyzeBtn, manualSaving && { opacity: 0.6 }]}
+                >
+                  {manualSaving ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <>
+                      <Check size={20} color="#fff" />
+                      <Text style={styles.analyzeBtnText}>SAVE MATCH</Text>
+                    </>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ height: 40 }} />
+          </>
+        )}
+
+        {/* ===== VIDEO UPLOAD FLOW (existing) ===== */}
+        {uploadMode === 'video' && (
+        <>
         {/* Video Picker */}
         <View style={styles.section}>
           {!video ? (
@@ -1368,7 +1767,6 @@ export default function UploadScreen() {
         )}
 
         <View style={{ height: 40 }} />
-      </ScrollView>
 
       {/* Match Style Info Modal */}
       <Modal
@@ -1459,6 +1857,8 @@ export default function UploadScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+      </>
+      )}
     </SafeAreaView>
   );
 }
@@ -1842,4 +2242,162 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   addNewOpponentText: { fontSize: 13, fontWeight: '700', color: '#71717A', letterSpacing: 1 },
+  // Mode selector
+  modeSelector: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 24,
+    marginTop: 16,
+  },
+  modeBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: '#18181B',
+    borderWidth: 1.5,
+    borderColor: '#27272A',
+  },
+  modeBtnActive: {
+    backgroundColor: '#2563EB20',
+    borderColor: '#2563EB',
+  },
+  modeBtnText: { fontSize: 13, fontWeight: '700', color: '#71717A' },
+  modeBtnTextActive: { color: '#fff' },
+  // Manual entry
+  manualDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  resultToggleRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  resultToggleBtn: {
+    flex: 1,
+    paddingVertical: 18,
+    borderRadius: 16,
+    backgroundColor: '#18181B',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#27272A',
+  },
+  resultToggleBtnWin: {
+    borderColor: '#22C55E',
+    backgroundColor: '#22C55E15',
+  },
+  resultToggleBtnLoss: {
+    borderColor: '#EF4444',
+    backgroundColor: '#EF444415',
+  },
+  resultToggleText: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#71717A',
+  },
+  resultToggleTextWin: { color: '#22C55E' },
+  resultToggleTextLoss: { color: '#EF4444' },
+  dropdownBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#18181B',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: '#27272A',
+  },
+  dropdownBtnText: {
+    fontSize: 14,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  dropdownList: {
+    backgroundColor: '#18181B',
+    borderRadius: 12,
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: '#27272A',
+    overflow: 'hidden',
+  },
+  dropdownItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#27272A',
+  },
+  dropdownItemActive: {
+    backgroundColor: '#2563EB20',
+  },
+  dropdownItemText: {
+    fontSize: 14,
+    color: '#E4E4E7',
+    fontWeight: '600',
+  },
+  dropdownItemTextActive: {
+    color: '#2563EB',
+  },
+  manualNotesInput: {
+    minHeight: 100,
+    paddingTop: 12,
+  },
+  manualSuccessContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    gap: 12,
+  },
+  manualSuccessIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#22C55E15',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  manualSuccessTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  manualSuccessText: {
+    fontSize: 16,
+    color: '#A1A1AA',
+    textAlign: 'center',
+  },
+  manualSuccessBtns: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 20,
+    width: '100%',
+  },
+  manualSuccessBtn: {
+    flex: 1,
+    backgroundColor: '#2563EB',
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  manualSuccessBtnSecondary: {
+    backgroundColor: '#18181B',
+    borderWidth: 1,
+    borderColor: '#27272A',
+  },
+  manualSuccessBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  manualSuccessBtnTextSecondary: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#A1A1AA',
+  },
 });

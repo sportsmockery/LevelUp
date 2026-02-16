@@ -5,7 +5,7 @@ import BottomNav from '@/components/BottomNav';
 import {
   Users, UserPlus, Trophy, TrendingUp, Video, Mail,
   ChevronRight, Shield, BarChart3, Settings, Search,
-  Copy, CheckCircle, Star,
+  Copy, CheckCircle, Star, Link2, Loader2, Calendar,
 } from 'lucide-react';
 
 type Wrestler = {
@@ -39,6 +39,11 @@ export default function ClubPage() {
   const [tab, setTab] = useState<'roster' | 'stats' | 'manage'>('roster');
   const [searchQuery, setSearchQuery] = useState('');
   const [copied, setCopied] = useState(false);
+  const [inviteUrl, setInviteUrl] = useState('');
+  const [inviteExpires, setInviteExpires] = useState('');
+  const [inviteCopied, setInviteCopied] = useState(false);
+  const [generatingInvite, setGeneratingInvite] = useState(false);
+  const [inviteError, setInviteError] = useState('');
   const clubCode = 'TITAN-2026';
 
   const filteredRoster = roster.filter(w =>
@@ -50,6 +55,31 @@ export default function ClubPage() {
     navigator.clipboard.writeText(clubCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleGenerateInvite = async () => {
+    setGeneratingInvite(true);
+    setInviteError('');
+    try {
+      const res = await fetch('/api/club/invite/generate', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        setInviteError(data.error || 'Failed to generate invite');
+        return;
+      }
+      setInviteUrl(data.url);
+      setInviteExpires(data.expiresAt);
+    } catch {
+      setInviteError('Network error. Please try again.');
+    } finally {
+      setGeneratingInvite(false);
+    }
+  };
+
+  const handleCopyInvite = () => {
+    navigator.clipboard.writeText(inviteUrl);
+    setInviteCopied(true);
+    setTimeout(() => setInviteCopied(false), 2000);
   };
 
   const teamAvgScore = Math.round(roster.reduce((s, w) => s + w.avgScore, 0) / roster.length);
@@ -251,6 +281,72 @@ export default function ClubPage() {
         {/* Manage Tab */}
         {tab === 'manage' && (
           <div className="space-y-5">
+            {/* Invite Parents & Supporters */}
+            <div>
+              <p className="text-sm font-medium text-zinc-400 mb-3">INVITE PARENTS & SUPPORTERS</p>
+              <div className="bg-zinc-900 rounded-2xl p-4 space-y-3">
+                <p className="text-sm text-zinc-300">
+                  Generate a link to invite parents and supporters to join your club.
+                </p>
+
+                {inviteError && (
+                  <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+                    {inviteError}
+                  </div>
+                )}
+
+                {inviteUrl ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 bg-zinc-800 rounded-xl p-3">
+                      <Link2 className="w-4 h-4 text-[#2563EB] shrink-0" />
+                      <span className="text-xs text-zinc-300 truncate flex-1">{inviteUrl}</span>
+                      <button
+                        onClick={handleCopyInvite}
+                        className="shrink-0 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                      >
+                        {inviteCopied ? (
+                          <CheckCircle className="w-4 h-4 text-green-400" />
+                        ) : (
+                          <Copy className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs text-zinc-500">
+                      <Calendar className="w-3 h-3" />
+                      <span>
+                        Expires {new Date(inviteExpires).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </span>
+                    </div>
+                    <button
+                      onClick={handleGenerateInvite}
+                      disabled={generatingInvite}
+                      className="text-xs text-[#2563EB] hover:text-[#2563EB]/80 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      Generate new link
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleGenerateInvite}
+                    disabled={generatingInvite}
+                    className="w-full bg-[#2563EB] text-white rounded-xl px-4 py-3 text-sm font-medium flex items-center justify-center gap-2 hover:bg-[#2563EB]/90 transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {generatingInvite ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Link2 className="w-4 h-4" />
+                        Generate Invite Link
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+
             {/* Announcements */}
             <div>
               <p className="text-sm font-medium text-zinc-400 mb-3">ANNOUNCEMENTS</p>

@@ -149,6 +149,9 @@ export type MatchHistoryEntry = {
   weightClass: string | null;
   matchStyle: string | null;
   hasVideo: boolean;
+  isManualEntry: boolean;
+  matchScoreDetail: string | null;
+  winLossType: string | null;
 };
 
 export type OpponentSummary = {

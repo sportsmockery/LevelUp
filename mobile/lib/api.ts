@@ -225,6 +225,36 @@ export async function shareAnalysis(
   return response.json();
 }
 
+// Save a manually entered match result (no video)
+export type ManualMatchData = {
+  matchDate: string;
+  opponentName: string;
+  opponentSchool?: string;
+  weightClass?: string;
+  matchResult: 'win' | 'loss';
+  winLossType: string;
+  matchScoreDetail?: string;
+  competitionName?: string;
+  roundNumber?: string;
+  matchNotes?: string;
+  matchStyle?: string;
+};
+
+export async function saveManualMatch(data: ManualMatchData): Promise<{ id: string }> {
+  const response = await fetch(`${API_BASE}/api/matches/manual`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => 'Unknown error');
+    throw new Error(`Save failed (${response.status}): ${errorText}`);
+  }
+
+  return response.json();
+}
+
 // Club leaderboard
 export type LeaderboardEntry = {
   athleteId: string;

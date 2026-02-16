@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     const { data: rows, error } = await db
       .from('match_analyses')
       .select(
-        'id, created_at, opponent_name, opponent_school, opponent_weight_class, match_result, result_type, match_duration_sec, overall_score, standing, top, bottom, competition_name, weight_class, match_style, analysis_json, job_status',
+        'id, created_at, opponent_name, opponent_school, opponent_weight_class, match_result, result_type, match_duration_sec, overall_score, standing, top, bottom, competition_name, weight_class, match_style, analysis_json, job_status, is_manual_entry, match_score_detail, win_loss_type',
       )
       .eq('athlete_id', athleteId)
       .not('job_status', 'in', '("processing","failed")')
@@ -54,6 +54,9 @@ export async function GET(request: NextRequest) {
       weightClass: row.weight_class || null,
       matchStyle: row.match_style || null,
       hasVideo: !!row.analysis_json,
+      isManualEntry: row.is_manual_entry || false,
+      matchScoreDetail: row.match_score_detail || null,
+      winLossType: row.win_loss_type || null,
     }));
 
     // Compute opponent summaries by grouping on opponent_name (case-insensitive)
