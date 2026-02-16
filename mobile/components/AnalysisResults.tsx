@@ -194,10 +194,10 @@ export default function AnalysisResults({ result, thumbnailUri, videoFileName, a
 
       {/* Coach Notes & Share */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>COACH NOTES</Text>
+        <Text style={styles.sectionTitle}>MATCH NOTES</Text>
         <TextInput
           style={styles.coachNotesInput}
-          placeholder="Add notes for the coaching staff..."
+          placeholder="Add notes about this match..."
           placeholderTextColor="#52525B"
           value={coachNotes}
           onChangeText={setCoachNotes}

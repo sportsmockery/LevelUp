@@ -93,7 +93,7 @@ function buildReportHTML(options: ExportOptions): string {
 
   const coachNotesHTML = coachNotes ? `
     <div class="coach-notes">
-      <h3>Coach Notes</h3>
+      <h3>Match Notes</h3>
       <p>${coachNotes.replace(/\n/g, '<br/>')}</p>
     </div>
   ` : '';
