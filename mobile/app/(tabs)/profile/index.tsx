@@ -43,9 +43,11 @@ import {
 import { getAnalysisHistory } from '@/lib/storage';
 import { AnalysisHistoryEntry } from '@/lib/types';
 import { getProfileStats, ProfileStats } from '@/lib/profile-stats';
+import { API_BASE } from '@/lib/api';
 import AnalysisResults from '@/components/AnalysisResults';
 import VideoReviewOverlay from '@/components/VideoReviewOverlay';
 import ComparisonView from '@/components/ComparisonView';
+import { useAuth } from '@/lib/auth';
 
 type ProfileTab = 'stats' | 'history' | 'badges' | 'settings';
 
@@ -106,6 +108,7 @@ function Sparkline({ data, color, width = 280, height = 60 }: { data: number[]; 
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { signOut } = useAuth();
   const [tab, setTab] = useState<ProfileTab>('stats');
   const [history, setHistory] = useState<AnalysisHistoryEntry[]>([]);
   const [stats, setStats] = useState<ProfileStats | null>(null);
@@ -113,6 +116,7 @@ export default function ProfileScreen() {
   const [selectedEntry, setSelectedEntry] = useState<AnalysisHistoryEntry | null>(null);
   const [compareMode, setCompareMode] = useState(false);
   const [compareSelections, setCompareSelections] = useState<AnalysisHistoryEntry[]>([]);
+  const [pendingConnectionCount, setPendingConnectionCount] = useState(0);
 
   const loadData = useCallback(async () => {
     setLoadingStats(true);
@@ -123,6 +127,12 @@ export default function ProfileScreen() {
     setHistory(h);
     setStats(s);
     setLoadingStats(false);
+
+    // Fetch pending connection request count
+    fetch(`${API_BASE}/api/family/requests/count`)
+      .then((res) => res.json())
+      .then((data) => setPendingConnectionCount(data.count || 0))
+      .catch(() => {});
   }, []);
 
   useFocusEffect(
@@ -480,6 +490,24 @@ export default function ProfileScreen() {
         ];
         return (
           <View style={styles.section}>
+            {/* Connection Requests */}
+            <TouchableOpacity
+              style={styles.settingsItem}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push('/profile/connection-requests');
+              }}
+            >
+              <Users size={20} color="#A1A1AA" />
+              <Text style={styles.settingsLabel}>Connection Requests</Text>
+              {pendingConnectionCount > 0 && (
+                <View style={styles.connectionBadge}>
+                  <Text style={styles.connectionBadgeText}>{pendingConnectionCount}</Text>
+                </View>
+              )}
+              <ChevronRight size={18} color="#52525B" />
+            </TouchableOpacity>
+
             {settingsItems.map((item, i) => (
               <TouchableOpacity
                 key={i}
@@ -495,7 +523,13 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             ))}
 
-            <TouchableOpacity style={styles.signOutBtn}>
+            <TouchableOpacity
+              style={styles.signOutBtn}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                signOut();
+              }}
+            >
               <LogOut size={20} color="#EF4444" />
               <Text style={styles.signOutText}>Sign Out</Text>
             </TouchableOpacity>
@@ -958,6 +992,20 @@ const styles = StyleSheet.create({
   },
   compareCheckMark: {
     fontSize: 13,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  connectionBadge: {
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  connectionBadgeText: {
+    fontSize: 11,
     fontWeight: '800',
     color: '#fff',
   },

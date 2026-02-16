@@ -16,8 +16,31 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = request.nextUrl;
-  const athleteId = searchParams.get('athlete_id') || auth.user.id;
+  const requestedUserId = searchParams.get('userId');
   const limit = Math.min(parseInt(searchParams.get('limit') || '100', 10), 200);
+
+  // Determine which athlete's data to fetch
+  let athleteId = searchParams.get('athlete_id') || auth.user.id;
+
+  // If userId is provided, verify parent has approved connection
+  if (requestedUserId && requestedUserId !== auth.user.id) {
+    const { data: connection } = await db
+      .from('family_connections')
+      .select('id')
+      .eq('parent_user_id', auth.user.id)
+      .eq('athlete_user_id', requestedUserId)
+      .eq('status', 'approved')
+      .limit(1)
+      .maybeSingle();
+
+    if (!connection) {
+      return NextResponse.json(
+        { error: 'Not authorized to view this athlete\'s data' },
+        { status: 403 },
+      );
+    }
+    athleteId = requestedUserId;
+  }
 
   try {
     const { data: rows, error } = await db
