@@ -18,6 +18,7 @@ import { detectActionWindows, buildTemporalSummary, formatTemporalContext } from
 import { deduplicateFrames, applyDedup } from '../../../lib/frame-dedup';
 import { summarizeObservations, formatSummarizedForPass2, formatRawObservations, Pass1Observation } from '../../../lib/observation-summarizer';
 import { buildQuickPass1Prompt, buildQuickPass2Prompt, QUICK_PASS2_SCHEMA, selectQuickFrames, QUICK_MAX_FRAMES, QUICK_PASS1_MAX_TOKENS, QUICK_PASS2_MAX_TOKENS } from '../../../lib/quick-analysis';
+import { requireAuth } from '../../../lib/auth-check';
 
 type MatchContext = {
   weightClass?: string;
@@ -656,6 +657,9 @@ const ANALYSIS_TIMEOUT = 240_000; // 240s — leave 60s buffer before Vercel kil
 const MAX_BATCHES = 15; // Cap Pass 1 at 15 batches (75 frames)
 
 export async function POST(request: NextRequest) {
+  const auth = await requireAuth(request);
+  if (auth.response) return auth.response;
+
   let parsedFrameCount = 10;
   try {
     const body = await request.json();

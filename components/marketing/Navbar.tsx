@@ -59,6 +59,12 @@ export default function Navbar() {
                 {link.label}
               </a>
             ))}
+            <a
+              href="/login"
+              className="text-sm font-medium text-white transition-colors hover:text-[#2563EB] font-[family-name:var(--font-plus-jakarta)]"
+            >
+              Sign In
+            </a>
             <motion.button
               onClick={scrollToWaitlist}
               whileHover={{ scale: 1.05 }}
@@ -105,6 +111,13 @@ export default function Navbar() {
                   {link.label}
                 </a>
               ))}
+              <a
+                href="/login"
+                onClick={() => setMobileOpen(false)}
+                className="rounded-xl px-4 py-3 text-base font-medium text-white transition-colors hover:bg-[#18181B] active:bg-[#18181B] font-[family-name:var(--font-plus-jakarta)]"
+              >
+                Sign In
+              </a>
               <motion.button
                 onClick={scrollToWaitlist}
                 whileTap={{ scale: 0.97 }}

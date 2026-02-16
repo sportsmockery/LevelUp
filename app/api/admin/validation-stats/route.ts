@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../../../../lib/supabase';
+import { requireAuth } from '../../../../lib/auth-check';
 
 function pearsonCorrelation(x: number[], y: number[]): number {
   if (x.length !== y.length || x.length < 3) return 0;
@@ -24,7 +25,10 @@ function pearsonCorrelation(x: number[], y: number[]): number {
   return numerator / denominator;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await requireAuth(request);
+  if (auth.response) return auth.response;
+
   if (!supabase) {
     return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
   }

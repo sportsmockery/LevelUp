@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { exportTrainingData, recordExport } from '../../../../lib/training-data';
 import { evaluateModel, generateCalibrationAdjustments } from '../../../../lib/model-evaluation';
 import { supabase } from '../../../../lib/supabase';
+import { requireAuth } from '../../../../lib/auth-check';
 
 export async function GET(request: NextRequest) {
+  const auth = await requireAuth(request);
+  if (auth.response) return auth.response;
+
   if (!supabase) {
     return NextResponse.json({ error: 'Database not configured' }, { status: 503 });
   }

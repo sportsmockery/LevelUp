@@ -1,6 +1,6 @@
 import './globals.css';
 import { Space_Grotesk, Plus_Jakarta_Sans } from 'next/font/google';
-import { ThemeProvider } from 'next-themes';
+import Providers from '@/components/Providers';
 
 const heading = Space_Grotesk({
   subsets: ['latin'],
@@ -31,9 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${heading.variable} ${body.variable} bg-[#0A0A0A] text-white min-h-screen font-body`}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-          {children}
-        </ThemeProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../../../lib/supabase';
 import { supabaseServer } from '../../../lib/supabase-server';
+import { requireAuth } from '../../../lib/auth-check';
 
 export async function GET(request: NextRequest) {
+  const auth = await requireAuth(request);
+  if (auth.response) return auth.response;
+
   const db = supabaseServer || supabase;
   if (!db) {
     return NextResponse.json(
@@ -12,7 +16,7 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = request.nextUrl;
-  const athleteId = searchParams.get('athlete_id') || '00000000-0000-0000-0000-000000000000';
+  const athleteId = searchParams.get('athlete_id') || auth.user.id;
   const limit = Math.min(parseInt(searchParams.get('limit') || '100', 10), 200);
 
   try {

@@ -7,9 +7,13 @@ import {
   type AIScore,
   type CalibrationMetric,
 } from '../../../../lib/confidence-calibration';
+import { requireAuth } from '../../../../lib/auth-check';
 
 // GET /api/admin/calibration — Get calibration summary and individual metrics
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await requireAuth(request);
+  if (auth.response) return auth.response;
+
   if (!supabase) {
     return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 });
   }
