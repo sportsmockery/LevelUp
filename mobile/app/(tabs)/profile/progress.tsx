@@ -16,9 +16,7 @@ import {
   TrendingUp,
   TrendingDown,
   AlertTriangle,
-  Trophy,
   BarChart3,
-  ChevronRight,
   Minus,
 } from 'lucide-react-native';
 import { API_BASE } from '@/lib/api';

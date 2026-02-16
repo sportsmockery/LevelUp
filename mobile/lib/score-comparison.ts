@@ -5,14 +5,6 @@ export type ScoreTrendIndicator = {
   label: string;
 };
 
-export function computeScoreDelta(
-  currentScore: number,
-  previousScore: number | null,
-): number | null {
-  if (previousScore === null) return null;
-  return currentScore - previousScore;
-}
-
 export function getScoreTrendIndicator(delta: number | null): ScoreTrendIndicator {
   if (delta === null) {
     return { icon: 'first', color: '#71717A', bgColor: '#71717A20', label: 'First match' };
@@ -30,17 +22,6 @@ export function getScoreTrendIndicator(delta: number | null): ScoreTrendIndicato
     return { icon: 'down', color: '#EF4444', bgColor: '#EF444420', label: `${delta} from last match` };
   }
   return { icon: 'neutral', color: '#71717A', bgColor: '#71717A20', label: 'Similar to last match' };
-}
-
-export function formatScoreComparison(
-  current: number,
-  previous: number | null,
-): string {
-  if (previous === null) return 'First match';
-  const delta = current - previous;
-  if (delta > 0) return `+${delta} from last`;
-  if (delta < 0) return `${delta} from last`;
-  return 'Same as last';
 }
 
 export function getPositionDeltaColor(delta: number): string {

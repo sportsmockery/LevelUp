@@ -34,10 +34,18 @@ function RootNavigator() {
 
   // Check tutorial flag once on mount
   useEffect(() => {
-    AsyncStorage.getItem('hasSeenTutorial').then((val) => {
-      setNeedsTutorial(val !== 'true');
-      setTutorialChecked(true);
-    });
+    AsyncStorage.getItem('hasSeenTutorial')
+      .then((val) => {
+        setNeedsTutorial(val !== 'true');
+      })
+      .catch((err) => {
+        console.error('[LevelUp] Error checking tutorial flag:', err);
+        // On error, skip tutorial to avoid blocking user
+        setNeedsTutorial(false);
+      })
+      .finally(() => {
+        setTutorialChecked(true);
+      });
   }, []);
 
   useEffect(() => {

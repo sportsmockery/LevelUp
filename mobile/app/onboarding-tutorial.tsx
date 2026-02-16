@@ -82,7 +82,12 @@ export default function OnboardingTutorialScreen() {
   const [currentIndex, setCurrentIndex] = useState(0);
 
   const completeTutorial = useCallback(async () => {
-    await AsyncStorage.setItem('hasSeenTutorial', 'true');
+    try {
+      await AsyncStorage.setItem('hasSeenTutorial', 'true');
+    } catch (err) {
+      console.error('[LevelUp] Error saving tutorial flag:', err);
+      // Still navigate — don't block user if storage fails
+    }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     if (router.canGoBack()) {
       router.back();
