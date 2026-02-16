@@ -497,7 +497,7 @@ export default function VideoReviewOverlay({ frameUris, frameTimestamps, videoUr
           activeOpacity={0.7}
         >
           <Text style={styles.framesHeaderText}>
-            ALL FRAMES ({totalFrames})
+            KEY MOMENTS ({result.frame_annotations?.length ?? 0})
           </Text>
           {framesExpanded
             ? <ChevronUp size={16} color="#A1A1AA" />
