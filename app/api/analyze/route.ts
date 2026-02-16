@@ -5,6 +5,7 @@ import OpenAI from 'openai';
 import { buildKnowledgeBasePrompt, TECHNIQUE_TAXONOMY, DRILL_DATABASE } from '../../../lib/wrestling-knowledge';
 import { PASS2_RESPONSE_SCHEMA, OPPONENT_SCOUTING_SCHEMA, Pass2Response, OpponentScoutingResponse, FatigueAnalysis } from '../../../lib/analysis-schema';
 import { supabase } from '../../../lib/supabase';
+import { supabaseServer } from '../../../lib/supabase-server';
 import { extractMatchStats } from '../../../lib/stats-extractor';
 import { checkBadges } from '../../../lib/badge-checker';
 import { buildAnalysisError } from '../../../lib/analysis-errors';
@@ -579,19 +580,28 @@ function computeAnalysisCacheKey(
 }
 
 async function getCachedAnalysis(cacheKey: string): Promise<Record<string, unknown> | null> {
-  if (!supabase) return null;
+  const db = supabaseServer || supabase;
+  if (!db) {
+    console.warn('[LevelUp][cache] No Supabase client available — cache disabled');
+    return null;
+  }
   try {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('analysis_cache')
       .select('result_json')
       .eq('cache_key', cacheKey)
       .gte('created_at', sevenDaysAgo)
       .maybeSingle();
-    if (error || !data) return null;
+    if (error) {
+      console.warn(`[LevelUp][cache] Query error:`, error.message);
+      return null;
+    }
+    if (!data) return null;
     console.log(`[LevelUp][cache] HIT — returning cached result for key ${cacheKey.slice(0, 12)}...`);
     return data.result_json as Record<string, unknown>;
-  } catch {
+  } catch (err) {
+    console.warn('[LevelUp][cache] getCachedAnalysis exception:', err);
     return null;
   }
 }
@@ -601,9 +611,13 @@ async function setCachedAnalysis(
   result: Record<string, unknown>,
   meta: { frameCount: number; matchStyle: string; athletePosition?: string },
 ): Promise<void> {
-  if (!supabase) return;
+  const db = supabaseServer || supabase;
+  if (!db) {
+    console.warn('[LevelUp][cache] No Supabase client available — cannot store result');
+    return;
+  }
   try {
-    await supabase
+    const { error } = await db
       .from('analysis_cache')
       .upsert({
         cache_key: cacheKey,
@@ -614,9 +628,13 @@ async function setCachedAnalysis(
         overall_score: (result as any).overall_score || 0,
         created_at: new Date().toISOString(),
       });
-    console.log(`[LevelUp][cache] STORED result for key ${cacheKey.slice(0, 12)}... (score=${(result as any).overall_score})`);
+    if (error) {
+      console.warn(`[LevelUp][cache] Store error:`, error.message);
+    } else {
+      console.log(`[LevelUp][cache] STORED result for key ${cacheKey.slice(0, 12)}... (score=${(result as any).overall_score})`);
+    }
   } catch (err) {
-    console.warn('[LevelUp][cache] Failed to store:', err);
+    console.warn('[LevelUp][cache] setCachedAnalysis exception:', err);
   }
 }
 
