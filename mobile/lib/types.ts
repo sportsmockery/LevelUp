@@ -160,3 +160,16 @@ export type AnalysisHistoryEntry = {
   singletColors: string[];
   result: AnalysisResult;
 };
+
+export type DrillAssignment = {
+  id: string;
+  analysis_id: string;
+  drill_name: string;
+  drill_desc: string;
+  reps: string;
+  priority: 'critical' | 'high' | 'medium' | 'maintenance';
+  addresses: string;
+  completed: boolean;
+  completed_at: string | null;
+  created_at: string;
+};

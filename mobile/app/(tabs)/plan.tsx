@@ -1,71 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  ActivityIndicator,
+  RefreshControl,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
   CheckCircle,
   Circle,
-  Clock,
   Target,
   Calendar,
   Dumbbell,
-  Play,
-  Film,
-  Flame,
+  AlertTriangle,
+  Zap,
 } from 'lucide-react-native';
+import { DrillAssignment } from '@/lib/types';
+import { API_BASE } from '@/lib/api';
 
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-type ScheduleItem = {
-  id: number;
-  title: string;
-  time: string;
-  duration: string;
-  drills: string[];
-  icon: 'stretch' | 'practice' | 'ai' | 'film';
+const XP_BY_PRIORITY: Record<string, number> = {
+  critical: 50,
+  high: 35,
+  medium: 25,
+  maintenance: 15,
 };
 
-const SCHEDULE: ScheduleItem[] = [
-  {
-    id: 1,
-    title: 'Pre-Practice Mobility',
-    time: '3:00 PM',
-    duration: '20 min',
-    drills: ['Hip circles x20', 'Inchworm walkouts x10', 'Band pull-aparts x15'],
-    icon: 'stretch',
-  },
-  {
-    id: 2,
-    title: 'Team Practice',
-    time: '3:30 PM',
-    duration: '90 min',
-    drills: ['Live wrestling 6x3min', 'Takedown sparring', 'Situation drilling'],
-    icon: 'practice',
-  },
-  {
-    id: 3,
-    title: 'AI Drill Circuit',
-    time: '5:15 PM',
-    duration: '30 min',
-    drills: ['10x Chain wrestling shots', '5x30s Sprawl reaction drill', '3x8 Tight-waist tilts'],
-    icon: 'ai',
-  },
-  {
-    id: 4,
-    title: 'Film Review',
-    time: '6:00 PM',
-    duration: '15 min',
-    drills: ['Watch last match highlights', 'Note 3 improvement areas', 'Log in journal'],
-    icon: 'film',
-  },
-];
+const PRIORITY_COLORS: Record<string, string> = {
+  critical: '#EF4444',
+  high: '#F97316',
+  medium: '#EAB308',
+  maintenance: '#22C55E',
+};
+
+const ATHLETE_ID = '00000000-0000-0000-0000-000000000000';
 
 type WeeklyGoal = {
   id: number;
@@ -74,13 +48,6 @@ type WeeklyGoal = {
   target: number;
   unit: string;
 };
-
-const GOALS: WeeklyGoal[] = [
-  { id: 1, title: 'Practice Sessions', current: 3, target: 5, unit: 'sessions' },
-  { id: 2, title: 'Video Uploads', current: 1, target: 2, unit: 'videos' },
-  { id: 3, title: 'Drill Completions', current: 8, target: 15, unit: 'drills' },
-  { id: 4, title: 'XP Earned', current: 420, target: 750, unit: 'XP' },
-];
 
 type UpcomingEvent = {
   id: number;
@@ -96,135 +63,223 @@ const EVENTS: UpcomingEvent[] = [
   { id: 3, title: 'State Qualifier', date: 'Feb 22', daysAway: 11, type: 'Tournament' },
 ];
 
-const getIcon = (type: string, color: string) => {
-  switch (type) {
-    case 'stretch':
-      return <Flame size={20} color={color} />;
-    case 'practice':
-      return <Dumbbell size={20} color={color} />;
-    case 'ai':
-      return <Target size={20} color={color} />;
-    case 'film':
-      return <Film size={20} color={color} />;
-    default:
-      return <Play size={20} color={color} />;
-  }
-};
+function getWeekStart(): Date {
+  const now = new Date();
+  const day = now.getDay();
+  const diff = day === 0 ? 6 : day - 1; // Monday = 0
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - diff);
+  monday.setHours(0, 0, 0, 0);
+  return monday;
+}
 
 export default function PlanScreen() {
-  const [selectedDay, setSelectedDay] = useState(2); // Wednesday (0-indexed)
-  const [completed, setCompleted] = useState<Set<number>>(new Set());
+  const [drills, setDrills] = useState<DrillAssignment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [completingId, setCompletingId] = useState<string | null>(null);
+  const [xpToast, setXpToast] = useState<{ xp: number; name: string } | null>(null);
+  const toastOpacity = useRef(new Animated.Value(0)).current;
 
-  const toggleComplete = (id: number) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setCompleted((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
+  const fetchDrills = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/drills?athlete_id=${ATHLETE_ID}`);
+      if (res.ok) {
+        const data = await res.json();
+        setDrills(data.drills || []);
       }
-      return next;
-    });
+    } catch {
+      // Silently fail — empty state will show
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      setLoading(true);
+      fetchDrills();
+    }, [fetchDrills])
+  );
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchDrills();
+  }, [fetchDrills]);
+
+  const showXpToast = (xp: number, name: string) => {
+    setXpToast({ xp, name });
+    Animated.sequence([
+      Animated.timing(toastOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.delay(2000),
+      Animated.timing(toastOpacity, { toValue: 0, duration: 400, useNativeDriver: true }),
+    ]).start(() => setXpToast(null));
   };
+
+  const completeDrill = async (drill: DrillAssignment) => {
+    if (drill.completed || completingId) return;
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setCompletingId(drill.id);
+
+    // Optimistic update
+    setDrills((prev) =>
+      prev.map((d) =>
+        d.id === drill.id ? { ...d, completed: true, completed_at: new Date().toISOString() } : d
+      )
+    );
+
+    try {
+      const res = await fetch(`${API_BASE}/api/drills`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ drillId: drill.id, athleteId: ATHLETE_ID }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        showXpToast(data.xp_earned, drill.drill_name);
+      } else {
+        // Revert on failure
+        setDrills((prev) =>
+          prev.map((d) =>
+            d.id === drill.id ? { ...d, completed: false, completed_at: null } : d
+          )
+        );
+      }
+    } catch {
+      // Revert on error
+      setDrills((prev) =>
+        prev.map((d) =>
+          d.id === drill.id ? { ...d, completed: false, completed_at: null } : d
+        )
+      );
+    } finally {
+      setCompletingId(null);
+    }
+  };
+
+  // Compute weekly goals from real data
+  const weekStart = getWeekStart();
+  const thisWeekDrills = drills.filter(
+    (d) => d.completed && d.completed_at && new Date(d.completed_at) >= weekStart
+  );
+  const weeklyXP = thisWeekDrills.reduce(
+    (sum, d) => sum + (XP_BY_PRIORITY[d.priority] || 15),
+    0
+  );
+
+  const goals: WeeklyGoal[] = [
+    {
+      id: 1,
+      title: 'Drill Completions',
+      current: thisWeekDrills.length,
+      target: Math.max(drills.filter((d) => !d.completed).length, 5),
+      unit: 'drills',
+    },
+    { id: 2, title: 'XP Earned', current: weeklyXP, target: 200, unit: 'XP' },
+  ];
+
+  // Group drills by date
+  const drillsByDate = new Map<string, DrillAssignment[]>();
+  for (const drill of drills) {
+    const dateKey = new Date(drill.created_at).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    });
+    if (!drillsByDate.has(dateKey)) drillsByDate.set(dateKey, []);
+    drillsByDate.get(dateKey)!.push(drill);
+  }
+
+  const pendingDrills = drills.filter((d) => !d.completed);
+  const completedDrills = drills.filter((d) => d.completed);
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      {/* XP Toast */}
+      {xpToast && (
+        <Animated.View style={[styles.xpToast, { opacity: toastOpacity }]}>
+          <Zap size={18} color="#EAB308" />
+          <Text style={styles.xpToastText}>
+            +{xpToast.xp} XP — {xpToast.name}
+          </Text>
+        </Animated.View>
+      )}
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#2563EB"
+          />
+        }
+      >
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>TRAINING PLAN</Text>
-          <Text style={styles.headerSub}>Your weekly roadmap</Text>
+          <Text style={styles.headerSub}>Your personalized drills from LevelUp</Text>
         </View>
 
-        {/* Day Selector */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.dayScroll}
-        >
-          {DAYS.map((day, i) => (
-            <TouchableOpacity
-              key={day}
-              style={[styles.dayBtn, selectedDay === i && styles.dayBtnActive]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setSelectedDay(i);
-              }}
-            >
-              <Text
-                style={[
-                  styles.dayText,
-                  selectedDay === i && styles.dayTextActive,
-                ]}
-              >
-                {day}
-              </Text>
-              {selectedDay === i && (
-                <View style={styles.dayDot} />
-              )}
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        {loading ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="large" color="#2563EB" />
+            <Text style={styles.loadingText}>Loading drills...</Text>
+          </View>
+        ) : drills.length === 0 ? (
+          <View style={styles.emptyWrap}>
+            <Target size={48} color="#52525B" />
+            <Text style={styles.emptyTitle}>No drills yet</Text>
+            <Text style={styles.emptyText}>
+              Complete a video analysis to get personalized training drills from LevelUp.
+            </Text>
+          </View>
+        ) : (
+          <>
+            {/* Pending Drills */}
+            {pendingDrills.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>
+                  TO DO ({pendingDrills.length})
+                </Text>
+                {pendingDrills.map((drill) => (
+                  <DrillCard
+                    key={drill.id}
+                    drill={drill}
+                    completing={completingId === drill.id}
+                    onComplete={() => completeDrill(drill)}
+                  />
+                ))}
+              </View>
+            )}
 
-        {/* Today's Schedule */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>TODAY&apos;S SCHEDULE</Text>
-          {SCHEDULE.map((item) => {
-            const isComplete = completed.has(item.id);
-            return (
-              <TouchableOpacity
-                key={item.id}
-                style={[
-                  styles.scheduleCard,
-                  isComplete && styles.scheduleCardDone,
-                ]}
-                onPress={() => toggleComplete(item.id)}
-                activeOpacity={0.75}
-              >
-                <View style={styles.scheduleTop}>
-                  <View style={styles.scheduleIconWrap}>
-                    {getIcon(item.icon, isComplete ? '#22C55E' : '#2563EB')}
-                  </View>
-                  <View style={styles.scheduleInfo}>
-                    <Text
-                      style={[
-                        styles.scheduleTitle,
-                        isComplete && styles.scheduleTitleDone,
-                      ]}
-                    >
-                      {item.title}
-                    </Text>
-                    <View style={styles.scheduleMetaRow}>
-                      <Clock size={12} color="#71717A" />
-                      <Text style={styles.scheduleMeta}>
-                        {item.time} | {item.duration}
-                      </Text>
-                    </View>
-                  </View>
-                  {isComplete ? (
-                    <CheckCircle size={24} color="#22C55E" />
-                  ) : (
-                    <Circle size={24} color="#52525B" />
-                  )}
-                </View>
-                <View style={styles.drillList}>
-                  {item.drills.map((drill, di) => (
-                    <Text key={di} style={styles.drillText}>
-                      {'\u2022'} {drill}
-                    </Text>
-                  ))}
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+            {/* Completed Drills */}
+            {completedDrills.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>
+                  COMPLETED ({completedDrills.length})
+                </Text>
+                {completedDrills.map((drill) => (
+                  <DrillCard
+                    key={drill.id}
+                    drill={drill}
+                    completing={false}
+                    onComplete={() => {}}
+                  />
+                ))}
+              </View>
+            )}
+          </>
+        )}
 
         {/* Weekly Goals */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>WEEKLY GOALS</Text>
-          {GOALS.map((goal) => {
-            const pct = Math.min((goal.current / goal.target) * 100, 100);
+          {goals.map((goal) => {
+            const pct = goal.target > 0 ? Math.min((goal.current / goal.target) * 100, 100) : 0;
             return (
               <View key={goal.id} style={styles.goalCard}>
                 <View style={styles.goalTop}>
@@ -285,6 +340,65 @@ export default function PlanScreen() {
   );
 }
 
+function DrillCard({
+  drill,
+  completing,
+  onComplete,
+}: {
+  drill: DrillAssignment;
+  completing: boolean;
+  onComplete: () => void;
+}) {
+  const priorityColor = PRIORITY_COLORS[drill.priority] || '#71717A';
+
+  return (
+    <TouchableOpacity
+      style={[styles.drillCard, drill.completed && styles.drillCardDone]}
+      onPress={onComplete}
+      activeOpacity={drill.completed ? 1 : 0.75}
+      disabled={drill.completed || completing}
+    >
+      <View style={styles.drillTop}>
+        <View style={styles.drillIconWrap}>
+          {drill.priority === 'critical' ? (
+            <AlertTriangle size={20} color={drill.completed ? '#22C55E' : priorityColor} />
+          ) : (
+            <Dumbbell size={20} color={drill.completed ? '#22C55E' : '#2563EB'} />
+          )}
+        </View>
+        <View style={styles.drillInfo}>
+          <Text style={[styles.drillName, drill.completed && styles.drillNameDone]}>
+            {drill.drill_name}
+          </Text>
+          <View style={styles.drillMetaRow}>
+            <View style={[styles.priorityBadge, { backgroundColor: priorityColor + '20' }]}>
+              <Text style={[styles.priorityText, { color: priorityColor }]}>
+                {drill.priority.toUpperCase()}
+              </Text>
+            </View>
+            {drill.reps && (
+              <Text style={styles.drillReps}>{drill.reps}</Text>
+            )}
+          </View>
+        </View>
+        {completing ? (
+          <ActivityIndicator size="small" color="#2563EB" />
+        ) : drill.completed ? (
+          <CheckCircle size={24} color="#22C55E" />
+        ) : (
+          <Circle size={24} color="#52525B" />
+        )}
+      </View>
+      {drill.drill_desc ? (
+        <Text style={styles.drillDesc}>{drill.drill_desc}</Text>
+      ) : null}
+      {drill.addresses ? (
+        <Text style={styles.drillAddresses}>Addresses: {drill.addresses}</Text>
+      ) : null}
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0A0A0A' },
   header: {
@@ -296,34 +410,11 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 28, fontWeight: '800', color: '#fff', letterSpacing: -1 },
   headerSub: { fontSize: 14, color: '#71717A', marginTop: 4 },
-  dayScroll: {
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    gap: 10,
-  },
-  dayBtn: {
-    width: 52,
-    height: 60,
-    borderRadius: 16,
-    backgroundColor: '#18181B',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#27272A',
-  },
-  dayBtnActive: {
-    backgroundColor: '#2563EB20',
-    borderColor: '#2563EB',
-  },
-  dayText: { fontSize: 14, fontWeight: '700', color: '#71717A' },
-  dayTextActive: { color: '#2563EB' },
-  dayDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#2563EB',
-    marginTop: 4,
-  },
+  loadingWrap: { alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
+  loadingText: { color: '#71717A', marginTop: 12, fontSize: 14 },
+  emptyWrap: { alignItems: 'center', justifyContent: 'center', paddingTop: 80, paddingHorizontal: 40 },
+  emptyTitle: { color: '#fff', fontSize: 20, fontWeight: '700', marginTop: 16 },
+  emptyText: { color: '#71717A', fontSize: 14, textAlign: 'center', marginTop: 8, lineHeight: 20 },
   section: { paddingHorizontal: 24, marginTop: 24 },
   sectionTitle: {
     fontSize: 13,
@@ -332,7 +423,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     marginBottom: 14,
   },
-  scheduleCard: {
+  drillCard: {
     backgroundColor: '#18181B',
     borderRadius: 20,
     padding: 16,
@@ -340,16 +431,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#27272A',
   },
-  scheduleCardDone: {
+  drillCardDone: {
     borderColor: '#22C55E40',
-    opacity: 0.85,
+    opacity: 0.7,
   },
-  scheduleTop: {
+  drillTop: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  scheduleIconWrap: {
+  drillIconWrap: {
     width: 40,
     height: 40,
     borderRadius: 12,
@@ -357,13 +448,36 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  scheduleInfo: { flex: 1 },
-  scheduleTitle: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  scheduleTitleDone: { color: '#71717A', textDecorationLine: 'line-through' },
-  scheduleMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  scheduleMeta: { fontSize: 12, color: '#71717A' },
-  drillList: { marginTop: 12, paddingLeft: 52, gap: 4 },
-  drillText: { fontSize: 13, color: '#A1A1AA', lineHeight: 20 },
+  drillInfo: { flex: 1 },
+  drillName: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  drillNameDone: { color: '#71717A', textDecorationLine: 'line-through' },
+  drillMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
+  priorityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  priorityText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  drillReps: { fontSize: 12, color: '#A1A1AA' },
+  drillDesc: { fontSize: 13, color: '#A1A1AA', lineHeight: 18, marginTop: 10, paddingLeft: 52 },
+  drillAddresses: { fontSize: 12, color: '#71717A', marginTop: 4, paddingLeft: 52, fontStyle: 'italic' },
+  xpToast: {
+    position: 'absolute',
+    top: 60,
+    left: 24,
+    right: 24,
+    backgroundColor: '#18181B',
+    borderWidth: 1,
+    borderColor: '#EAB30840',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    zIndex: 100,
+  },
+  xpToastText: { color: '#EAB308', fontSize: 15, fontWeight: '700', flex: 1 },
   goalCard: {
     backgroundColor: '#18181B',
     borderRadius: 16,
