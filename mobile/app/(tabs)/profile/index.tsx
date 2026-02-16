@@ -39,6 +39,7 @@ import {
   TrendingUp,
   TrendingDown,
   AlertTriangle,
+  HelpCircle,
 } from 'lucide-react-native';
 import { getAnalysisHistory } from '@/lib/storage';
 import { AnalysisHistoryEntry } from '@/lib/types';
@@ -540,6 +541,18 @@ export default function ProfileScreen() {
                 <ChevronRight size={18} color="#52525B" />
               </TouchableOpacity>
             ))}
+
+            <TouchableOpacity
+              style={styles.settingsItem}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push('/onboarding-tutorial');
+              }}
+            >
+              <HelpCircle size={20} color="#A1A1AA" />
+              <Text style={styles.settingsLabel}>View Tutorial Again</Text>
+              <ChevronRight size={18} color="#52525B" />
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.signOutBtn}
