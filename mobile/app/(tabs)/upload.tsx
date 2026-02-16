@@ -37,6 +37,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { submitAnalysis, identifyWrestler } from '@/lib/api';
 import { pollForCompletion, savePendingJob, requestNotificationPermissions } from '@/lib/analysis-poller';
+import { getStoredPushToken } from '@/lib/notifications';
 import { AnalysisResult, MatchStyle, MatchContext, AthleteIdentification, WrestlerIdentificationResult } from '@/lib/types';
 import { addAnalysisEntry } from '@/lib/storage';
 import { trackAnalysis } from '@/lib/athlete-tracking';
@@ -804,6 +805,7 @@ export default function UploadScreen() {
 
       // Always use async mode: submit frames, poll for result
       await requestNotificationPermissions();
+      const pushToken = await getStoredPushToken();
       setProgress(78);
       setStatusText('Submitting for analysis...');
 
@@ -817,6 +819,7 @@ export default function UploadScreen() {
         idFrameBase64 ?? undefined,
         athletePosition,
         athleteName || undefined,
+        pushToken || undefined,
       );
       await savePendingJob(jobId);
 

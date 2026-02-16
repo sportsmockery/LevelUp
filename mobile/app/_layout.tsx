@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import { StatusBar } from 'react-native';
 import 'react-native-reanimated';
 import { configureNotifications } from '@/lib/analysis-poller';
+import { registerPushToken } from '@/lib/notifications';
 
 SplashScreen.preventAutoHideAsync();
 configureNotifications();
@@ -32,7 +33,10 @@ export default function RootLayout() {
   }, [error]);
 
   useEffect(() => {
-    if (loaded) SplashScreen.hideAsync();
+    if (loaded) {
+      SplashScreen.hideAsync();
+      registerPushToken();
+    }
   }, [loaded]);
 
   if (!loaded) return null;

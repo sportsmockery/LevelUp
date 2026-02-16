@@ -35,6 +35,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "d37172b8-0cb9-4a42-ba13-5e5cb134ea02"
+      }
+    },
+    "owner": "sportsmockery"
   }
 }

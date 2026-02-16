@@ -69,13 +69,14 @@ export async function submitAnalysis(
   idFrameBase64?: string,
   athletePosition?: 'left' | 'right',
   athleteName?: string,
+  expoPushToken?: string,
 ): Promise<{ jobId: string }> {
-  console.log(`[LevelUp] Submitting async analysis: ${frames.length} frames (position: ${athletePosition || 'none'}, name: ${athleteName || 'none'})`);
+  console.log(`[LevelUp] Submitting async analysis: ${frames.length} frames (position: ${athletePosition || 'none'}, name: ${athleteName || 'none'}, push: ${expoPushToken ? 'yes' : 'none'})`);
 
   const response = await fetch(`${API_BASE}/api/analyze?async=true`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ frames, matchStyle, mode, matchContext, athleteIdentification, opponentIdentification, idFrameBase64, athletePosition, athleteName }),
+    body: JSON.stringify({ frames, matchStyle, mode, matchContext, athleteIdentification, opponentIdentification, idFrameBase64, athletePosition, athleteName, expoPushToken }),
   });
 
   if (!response.ok) {

@@ -653,7 +653,7 @@ export async function POST(request: NextRequest) {
   let parsedFrameCount = 10;
   try {
     const body = await request.json();
-    const { frames, matchStyle = 'folkstyle', mode = 'athlete', speed = 'full', matchContext, athleteIdentification, opponentIdentification, idFrameBase64, athletePosition, athleteName: rawAthleteName } = body;
+    const { frames, matchStyle = 'folkstyle', mode = 'athlete', speed = 'full', matchContext, athleteIdentification, opponentIdentification, idFrameBase64, athletePosition, athleteName: rawAthleteName, expoPushToken: rawExpoPushToken } = body;
     parsedFrameCount = (frames && Array.isArray(frames)) ? frames.length : 10;
 
     if (!frames || !Array.isArray(frames) || frames.length === 0) {
@@ -672,6 +672,9 @@ export async function POST(request: NextRequest) {
     const validAthletePosition: 'left' | 'right' | undefined = (athletePosition === 'left' || athletePosition === 'right') ? athletePosition : undefined;
     const validAthleteName: string | undefined = (typeof rawAthleteName === 'string' && rawAthleteName.trim().length > 0)
       ? rawAthleteName.trim().slice(0, 50)
+      : undefined;
+    const validExpoPushToken: string | undefined = (typeof rawExpoPushToken === 'string' && /^Expo(nent)?PushToken\[.+\]$/.test(rawExpoPushToken.trim()))
+      ? rawExpoPushToken.trim()
       : undefined;
 
     // ===== CACHE CHECK: Same input → same score =====
@@ -721,6 +724,22 @@ export async function POST(request: NextRequest) {
           }).eq('id', jobId);
           await setCachedAnalysis(cacheKey, result, { frameCount: frames.length, matchStyle: validMatchStyle, athletePosition: validAthletePosition });
           console.log(`[LevelUp] Background job ${jobId} complete`);
+
+          // Send push notification on success
+          if (validExpoPushToken) {
+            const score = (result as any).overall_score || 0;
+            fetch('https://exp.host/--/api/v2/push/send', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                to: validExpoPushToken,
+                title: 'Analysis Complete!',
+                body: `Overall score: ${score}. Tap to view your full breakdown.`,
+                data: { type: 'analysis_complete', jobId, score },
+                sound: 'default',
+              }),
+            }).catch((pushErr) => console.warn('[LevelUp] Push notification failed:', pushErr));
+          }
         } catch (err: any) {
           console.error(`[LevelUp] Background job ${jobId} failed:`, err);
           const errorCode = err?.message === 'ANALYSIS_TIMEOUT' ? 'ANALYSIS_TIMEOUT' : 'ANALYSIS_ERROR';
@@ -729,6 +748,21 @@ export async function POST(request: NextRequest) {
             job_status: 'failed',
             error_message: structuredError.userMessage,
           }).eq('id', jobId);
+
+          // Send push notification on failure
+          if (validExpoPushToken) {
+            fetch('https://exp.host/--/api/v2/push/send', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                to: validExpoPushToken,
+                title: 'Analysis Failed',
+                body: 'Something went wrong. Please try again.',
+                data: { type: 'analysis_failed', jobId },
+                sound: 'default',
+              }),
+            }).catch((pushErr) => console.warn('[LevelUp] Push notification failed:', pushErr));
+          }
         }
       });
 
