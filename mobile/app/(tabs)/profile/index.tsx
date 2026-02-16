@@ -187,6 +187,24 @@ export default function ProfileScreen() {
 
         return (
           <>
+            {/* Progress Dashboard Link */}
+            <TouchableOpacity
+              style={styles.progressCard}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push('/profile/progress');
+              }}
+            >
+              <View style={styles.progressCardIcon}>
+                <BarChart3 size={20} color="#2563EB" />
+              </View>
+              <View style={styles.progressCardInfo}>
+                <Text style={styles.progressCardTitle}>Progress Dashboard</Text>
+                <Text style={styles.progressCardSubtitle}>Score trends, position breakdown & more</Text>
+              </View>
+              <ChevronRight size={18} color="#52525B" />
+            </TouchableOpacity>
+
             {/* Season Performance Grid */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>SEASON PERFORMANCE</Text>
@@ -720,6 +738,29 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 13, fontWeight: '700', color: '#71717A' },
   tabTextActive: { color: '#2563EB' },
   section: { paddingHorizontal: 24, marginTop: 24 },
+  progressCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#18181B',
+    borderRadius: 16,
+    padding: 16,
+    marginHorizontal: 24,
+    marginTop: 24,
+    borderWidth: 1,
+    borderColor: '#2563EB40',
+  },
+  progressCardIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#2563EB20',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  progressCardInfo: { flex: 1 },
+  progressCardTitle: { fontSize: 15, fontWeight: '700', color: '#E4E4E7' },
+  progressCardSubtitle: { fontSize: 12, color: '#71717A', marginTop: 2 },
   sectionTitle: {
     fontSize: 13,
     fontWeight: '700',

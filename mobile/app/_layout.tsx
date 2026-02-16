@@ -25,7 +25,7 @@ const LevelUpDark = {
 };
 
 function RootNavigator() {
-  const { session, loading } = useAuth();
+  const { session, profile, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -33,18 +33,32 @@ function RootNavigator() {
     if (loading) return;
 
     const inAuth = segments[0] === '(auth)';
+    const inParentTabs = segments[0] === '(parent-tabs)';
+    const inTabs = segments[0] === '(tabs)';
+    const isParent = profile?.role === 'parent';
 
     if (!session && !inAuth) {
       router.replace('/(auth)/welcome');
     } else if (session && inAuth) {
+      if (isParent) {
+        router.replace('/(parent-tabs)');
+      } else {
+        router.replace('/(tabs)');
+      }
+    } else if (session && isParent && inTabs) {
+      // Parent landed on athlete tabs — redirect
+      router.replace('/(parent-tabs)');
+    } else if (session && !isParent && inParentTabs) {
+      // Non-parent landed on parent tabs — redirect
       router.replace('/(tabs)');
     }
-  }, [session, loading, segments]);
+  }, [session, profile, loading, segments]);
 
   return (
     <Stack>
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="(parent-tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
     </Stack>
   );

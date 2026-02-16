@@ -196,6 +196,67 @@ export type AnalysisHistoryEntry = {
   result: AnalysisResult;
 };
 
+export type ProgressScorePoint = {
+  date: string;
+  score: number;
+  matchSequence: number;
+};
+
+export type PositionTrend = {
+  delta: number;
+  trend: 'improving' | 'declining' | 'stable';
+};
+
+export type PositionStrengthWeakness = {
+  text: string;
+  position: 'standing' | 'top' | 'bottom';
+};
+
+export type RecurringIssue = {
+  weakness: string;
+  occurrences: number;
+  totalMatches: number;
+};
+
+export type RecentMatchEntry = {
+  id: string;
+  date: string;
+  opponentName: string | null;
+  matchResult: string | null;
+  overallScore: number;
+  scoreDelta: number | null;
+};
+
+export type ProgressDashboardData = {
+  stats: {
+    totalMatches: number;
+    avgScore: number;
+    wins: number;
+    losses: number;
+    draws: number;
+  };
+  overallScores: ProgressScorePoint[];
+  positionScores: {
+    standing: ProgressScorePoint[];
+    top: ProgressScorePoint[];
+    bottom: ProgressScorePoint[];
+  };
+  positionAverages: {
+    standing: number;
+    top: number;
+    bottom: number;
+  };
+  positionTrends: {
+    standing: PositionTrend;
+    top: PositionTrend;
+    bottom: PositionTrend;
+  };
+  topStrengths: PositionStrengthWeakness[];
+  topWeaknesses: PositionStrengthWeakness[];
+  recurringIssues: RecurringIssue[];
+  recentMatches: RecentMatchEntry[];
+};
+
 export type DrillAssignment = {
   id: string;
   analysis_id: string;
