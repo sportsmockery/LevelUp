@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { after } from 'next/server';
+import { createHash } from 'crypto';
 import OpenAI from 'openai';
 import { buildKnowledgeBasePrompt, TECHNIQUE_TAXONOMY, DRILL_DATABASE } from '../../../lib/wrestling-knowledge';
 import { PASS2_RESPONSE_SCHEMA, OPPONENT_SCOUTING_SCHEMA, Pass2Response, OpponentScoutingResponse, FatigueAnalysis } from '../../../lib/analysis-schema';
@@ -544,6 +545,81 @@ function normalizeResponse(
   };
 }
 
+// ===== ANALYSIS CACHE: Same input → same score (±0) =====
+// OpenAI's seed parameter is "best effort" and does NOT guarantee deterministic output.
+// To ensure identical inputs always produce identical scores, we hash the inputs and
+// cache the result in Supabase. Cache key = SHA-256(frames + config params).
+
+function computeAnalysisCacheKey(
+  frames: string[],
+  matchStyle: string,
+  mode: string,
+  athletePosition?: string,
+  athleteId?: WrestlerIdInfo,
+  matchContext?: MatchContext,
+): string {
+  const hasher = createHash('sha256');
+  // Hash frame content (use first 200 + last 200 chars of each frame for speed)
+  for (const frame of frames) {
+    hasher.update(frame.slice(0, 200));
+    hasher.update(frame.slice(-200));
+    hasher.update(String(frame.length));
+  }
+  hasher.update(matchStyle);
+  hasher.update(mode);
+  hasher.update(athletePosition || '');
+  if (athleteId) {
+    hasher.update(athleteId.position_in_id_frame || '');
+    hasher.update(athleteId.uniform_description || '');
+  }
+  if (matchContext) {
+    hasher.update(JSON.stringify(matchContext));
+  }
+  return hasher.digest('hex');
+}
+
+async function getCachedAnalysis(cacheKey: string): Promise<Record<string, unknown> | null> {
+  if (!supabase) return null;
+  try {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+      .from('analysis_cache')
+      .select('result_json')
+      .eq('cache_key', cacheKey)
+      .gte('created_at', sevenDaysAgo)
+      .maybeSingle();
+    if (error || !data) return null;
+    console.log(`[LevelUp][cache] HIT — returning cached result for key ${cacheKey.slice(0, 12)}...`);
+    return data.result_json as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+async function setCachedAnalysis(
+  cacheKey: string,
+  result: Record<string, unknown>,
+  meta: { frameCount: number; matchStyle: string; athletePosition?: string },
+): Promise<void> {
+  if (!supabase) return;
+  try {
+    await supabase
+      .from('analysis_cache')
+      .upsert({
+        cache_key: cacheKey,
+        result_json: result,
+        frame_count: meta.frameCount,
+        match_style: meta.matchStyle,
+        athlete_position: meta.athletePosition || null,
+        overall_score: (result as any).overall_score || 0,
+        created_at: new Date().toISOString(),
+      });
+    console.log(`[LevelUp][cache] STORED result for key ${cacheKey.slice(0, 12)}... (score=${(result as any).overall_score})`);
+  } catch (err) {
+    console.warn('[LevelUp][cache] Failed to store:', err);
+  }
+}
+
 // Allow up to 300s for two-pass analysis (Fluid Compute recommended)
 export const maxDuration = 300;
 
@@ -571,6 +647,14 @@ export async function POST(request: NextRequest) {
     const validAthleteId: WrestlerIdInfo | undefined = athleteIdentification && typeof athleteIdentification === 'object' ? athleteIdentification : undefined;
     const validOpponentId: WrestlerIdInfo | undefined = opponentIdentification && typeof opponentIdentification === 'object' ? opponentIdentification : undefined;
     const validAthletePosition: 'left' | 'right' | undefined = (athletePosition === 'left' || athletePosition === 'right') ? athletePosition : undefined;
+
+    // ===== CACHE CHECK: Same input → same score =====
+    const cacheKey = computeAnalysisCacheKey(frames, validMatchStyle, validMode, validAthletePosition, validAthleteId, validMatchContext);
+    console.log(`[LevelUp][cache] Cache key: ${cacheKey.slice(0, 16)}... (${frames.length} frames, ${validMatchStyle}, ${validMode})`);
+    const cachedResult = await getCachedAnalysis(cacheKey);
+    if (cachedResult) {
+      return NextResponse.json(cachedResult);
+    }
 
     // Async mode: return jobId immediately, run analysis in background
     const asyncMode = request.nextUrl.searchParams.get('async') === 'true';
@@ -607,6 +691,7 @@ export async function POST(request: NextRequest) {
             top: (result as any).position_scores?.top || 0,
             bottom: (result as any).position_scores?.bottom || 0,
           }).eq('id', jobId);
+          await setCachedAnalysis(cacheKey, result, { frameCount: frames.length, matchStyle: validMatchStyle, athletePosition: validAthletePosition });
           console.log(`[LevelUp] Background job ${jobId} complete`);
         } catch (err: any) {
           console.error(`[LevelUp] Background job ${jobId} failed:`, err);
@@ -630,6 +715,7 @@ export async function POST(request: NextRequest) {
       athleteIdentification: validAthleteId, opponentIdentification: validOpponentId,
       idFrameBase64, athletePosition: validAthletePosition,
     });
+    await setCachedAnalysis(cacheKey, result, { frameCount: frames.length, matchStyle: validMatchStyle, athletePosition: validAthletePosition });
     return NextResponse.json(result);
 
   } catch (error: any) {
