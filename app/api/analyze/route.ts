@@ -499,32 +499,23 @@ function normalizeResponse(
     evidenceMap.set(fe.frame_index, fe);
   }
 
-  const frameAnnotations = Array.from({ length: frameCount }, (_, idx) => {
-    const fe = evidenceMap.get(idx);
-    if (fe) {
-      return {
-        frame_number: idx + 1,
-        position: fe.position,
-        action: fe.action,
-        is_key_moment: fe.is_key_moment,
-        ...(fe.key_moment_type && fe.key_moment_type !== '' ? { key_moment_type: fe.key_moment_type } : {}),
-        detail: fe.detail,
-        wrestler_visible: fe.wrestler_visible,
-        rubric_impact: fe.rubric_impact || undefined,
-        confidence: fe.wrestler_visible ? athlete.confidence : athlete.confidence * 0.5,
-      };
-    }
-    return {
-      frame_number: idx + 1,
-      position: 'other' as const,
-      action: 'Frame not analyzed',
-      is_key_moment: false,
-      detail: 'This frame was not selected as key evidence.',
-      wrestler_visible: false,
-      rubric_impact: undefined,
-      confidence: 0,
-    };
-  });
+  // Only include frames that have real evidence from Pass 2 — never fabricate placeholders
+  const frameAnnotations = athlete.frame_evidence.map((fe) => ({
+    frame_number: fe.frame_index + 1,
+    position: fe.position,
+    action: fe.action,
+    is_key_moment: fe.is_key_moment,
+    ...(fe.key_moment_type && fe.key_moment_type !== '' ? { key_moment_type: fe.key_moment_type } : {}),
+    detail: fe.detail,
+    wrestler_visible: fe.wrestler_visible,
+    rubric_impact: fe.rubric_impact || undefined,
+    confidence: fe.wrestler_visible ? athlete.confidence : athlete.confidence * 0.5,
+  }));
+
+  // Fatal error if Pass 2 returned no frame evidence at all
+  if (frameAnnotations.length === 0) {
+    throw new Error(`Analysis failed: Pass 2 returned zero frame evidence for ${frameCount} frames`);
+  }
 
   // Flatten drills to string array for backwards compat
   const flatDrills = athlete.drills.map((d) => `${d.name}: ${d.reps} — ${d.description}`);
@@ -931,13 +922,23 @@ async function runAnalysisPipeline(config: AnalysisConfig): Promise<Record<strin
       position_confidence: positionConfidence,
     });
 
-    // Validate Pass 1 coverage
-    if (allObservations.length < analysisFrames.length * 0.7) {
+    // Validate Pass 1 coverage — fatal error if less than 50% of frames were observed
+    const pass1Coverage = analysisFrames.length > 0
+      ? allObservations.length / analysisFrames.length
+      : 0;
+
+    if (pass1Coverage < 0.5) {
+      const coveragePct = Math.round(pass1Coverage * 100);
+      throw new Error(
+        `Analysis failed: Pass 1 only returned observations for ${allObservations.length}/${analysisFrames.length} frames (${coveragePct}% coverage). Minimum required: 50%.`
+      );
+    }
+
+    if (pass1Coverage < 0.7) {
       logger.warn('pass1_complete', {
-        message: 'Under-reported',
         observations: allObservations.length,
         frames: analysisFrames.length,
-        coverage: Math.round(allObservations.length / analysisFrames.length * 100),
+        coverage: Math.round(pass1Coverage * 100),
       });
     }
 

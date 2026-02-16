@@ -106,17 +106,33 @@ export async function POST(request: NextRequest) {
       response_format: { type: 'json_object' },
       max_tokens: QUICK_PASS1_MAX_TOKENS,
       temperature: 0,
+      seed: 42,
     });
 
     const pass1Content = pass1Response.choices[0]?.message?.content;
-    let observations: any[] = [];
-    if (pass1Content) {
-      try {
-        const parsed = JSON.parse(pass1Content);
-        observations = parsed.observations || [];
-      } catch {
-        // Continue with empty observations
-      }
+    if (!pass1Content) {
+      return NextResponse.json(
+        { error: 'Progressive analysis failed: Pass 1 returned empty response' },
+        { status: 500 },
+      );
+    }
+
+    let observations: any[];
+    try {
+      const parsed = JSON.parse(pass1Content);
+      observations = parsed.observations || [];
+    } catch (parseErr: any) {
+      return NextResponse.json(
+        { error: `Progressive analysis failed: Pass 1 JSON parse error — ${parseErr?.message || 'invalid JSON'}` },
+        { status: 500 },
+      );
+    }
+
+    if (observations.length === 0) {
+      return NextResponse.json(
+        { error: `Progressive analysis failed: Pass 1 returned zero observations for ${frames.length} frames` },
+        { status: 500 },
+      );
     }
 
     // Quick Pass 2 for progressive score
@@ -133,22 +149,31 @@ export async function POST(request: NextRequest) {
       response_format: { type: 'json_schema', json_schema: QUICK_PASS2_SCHEMA },
       max_tokens: QUICK_PASS2_MAX_TOKENS,
       temperature: 0,
+      seed: 42,
     });
 
     const pass2Content = pass2Response.choices[0]?.message?.content;
-    let chunkScores = { overall: 0, standing: 0, top: 0, bottom: 0 };
-    if (pass2Content) {
-      try {
-        const parsed = JSON.parse(pass2Content);
-        chunkScores = {
-          overall: parsed.overall_score || 0,
-          standing: parsed.position_scores?.standing || 0,
-          top: parsed.position_scores?.top || 0,
-          bottom: parsed.position_scores?.bottom || 0,
-        };
-      } catch {
-        // Continue with zero scores
-      }
+    if (!pass2Content) {
+      return NextResponse.json(
+        { error: 'Progressive analysis failed: Pass 2 returned empty response' },
+        { status: 500 },
+      );
+    }
+
+    let chunkScores: { overall: number; standing: number; top: number; bottom: number };
+    try {
+      const parsed = JSON.parse(pass2Content);
+      chunkScores = {
+        overall: parsed.overall_score || 0,
+        standing: parsed.position_scores?.standing || 0,
+        top: parsed.position_scores?.top || 0,
+        bottom: parsed.position_scores?.bottom || 0,
+      };
+    } catch (parseErr: any) {
+      return NextResponse.json(
+        { error: `Progressive analysis failed: Pass 2 JSON parse error — ${parseErr?.message || 'invalid JSON'}` },
+        { status: 500 },
+      );
     }
 
     // Compute progressive weighted average with previous chunks
