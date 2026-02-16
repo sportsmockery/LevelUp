@@ -19,6 +19,7 @@ import {
   TrendingUp,
   Clock,
   Shield,
+  AlertTriangle,
 } from 'lucide-react-native';
 import { useAuth } from '@/lib/auth';
 import { API_BASE } from '@/lib/api';
@@ -53,6 +54,7 @@ export default function ParentHomeScreen() {
 
   const [connections, setConnections] = useState<Connection[]>([]);
   const [loadingConnections, setLoadingConnections] = useState(true);
+  const [connectionsError, setConnectionsError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const [selectedAthleteId, setSelectedAthleteId] = useState<string | null>(null);
@@ -60,12 +62,14 @@ export default function ParentHomeScreen() {
 
   const [matches, setMatches] = useState<Match[]>([]);
   const [loadingMatches, setLoadingMatches] = useState(false);
+  const [matchesError, setMatchesError] = useState<string | null>(null);
 
   const approvedConnections = connections.filter((c) => c.status === 'approved' && c.athlete);
   const pendingConnections = connections.filter((c) => c.status === 'pending');
   const selectedAthlete = approvedConnections.find((c) => c.athlete?.id === selectedAthleteId);
 
   const fetchConnections = useCallback(async () => {
+    setConnectionsError(null);
     try {
       const res = await fetch(`${API_BASE}/api/family/connections`);
       const data = await res.json();
@@ -79,6 +83,7 @@ export default function ParentHomeScreen() {
       }
     } catch (err) {
       console.error('[LevelUp] Fetch connections error:', err);
+      setConnectionsError('Failed to load athlete data');
     } finally {
       setLoadingConnections(false);
     }
@@ -88,25 +93,27 @@ export default function ParentHomeScreen() {
     fetchConnections();
   }, []);
 
-  useEffect(() => {
+  const fetchAthleteMatches = useCallback(async () => {
     if (!selectedAthleteId) return;
-
-    async function fetchMatches() {
-      setLoadingMatches(true);
-      try {
-        const res = await fetch(
-          `${API_BASE}/api/match-history?userId=${selectedAthleteId}&limit=10`,
-        );
-        const data = await res.json();
-        setMatches(data.matches || []);
-      } catch {
-        setMatches([]);
-      } finally {
-        setLoadingMatches(false);
-      }
+    setLoadingMatches(true);
+    setMatchesError(null);
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/match-history?userId=${selectedAthleteId}&limit=10`,
+      );
+      const data = await res.json();
+      setMatches(data.matches || []);
+    } catch {
+      setMatches([]);
+      setMatchesError('Failed to load matches');
+    } finally {
+      setLoadingMatches(false);
     }
-    fetchMatches();
   }, [selectedAthleteId]);
+
+  useEffect(() => {
+    fetchAthleteMatches();
+  }, [fetchAthleteMatches]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -139,6 +146,21 @@ export default function ParentHomeScreen() {
       <SafeAreaView style={styles.container}>
         <View style={styles.centerState}>
           <ActivityIndicator size="large" color="#2563EB" />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (connectionsError && connections.length === 0) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.centerState}>
+          <AlertTriangle size={40} color="#EF4444" />
+          <Text style={styles.errorTitle}>{connectionsError}</Text>
+          <Text style={styles.errorSubtext}>Check your connection and try again.</Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={() => { setLoadingConnections(true); fetchConnections(); }}>
+            <Text style={styles.retryBtnText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -343,6 +365,17 @@ export default function ParentHomeScreen() {
           {loadingMatches ? (
             <View style={{ paddingVertical: 32, alignItems: 'center' }}>
               <ActivityIndicator size="small" color="#2563EB" />
+            </View>
+          ) : matchesError ? (
+            <View style={styles.emptyMatchCard}>
+              <AlertTriangle size={24} color="#EF4444" />
+              <Text style={styles.emptyMatchText}>{matchesError}</Text>
+              <TouchableOpacity
+                style={styles.retryBtnSmall}
+                onPress={fetchAthleteMatches}
+              >
+                <Text style={styles.retryBtnSmallText}>Retry</Text>
+              </TouchableOpacity>
             </View>
           ) : matches.length === 0 ? (
             <View style={styles.emptyMatchCard}>
@@ -588,8 +621,28 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 24,
     alignItems: 'center',
+    gap: 8,
   },
   emptyMatchText: { fontSize: 14, color: '#71717A' },
+
+  // Error & retry
+  errorTitle: { fontSize: 18, fontWeight: '800', color: '#fff', marginTop: 12 },
+  errorSubtext: { fontSize: 14, color: '#71717A', textAlign: 'center' },
+  retryBtn: {
+    backgroundColor: '#2563EB',
+    borderRadius: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    marginTop: 8,
+  },
+  retryBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+  retryBtnSmall: {
+    backgroundColor: '#2563EB',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  retryBtnSmallText: { fontSize: 12, fontWeight: '700', color: '#fff' },
 
   pendingCard: {
     flexDirection: 'row',

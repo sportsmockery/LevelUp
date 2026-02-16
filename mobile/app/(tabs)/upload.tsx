@@ -239,6 +239,8 @@ export default function UploadScreen() {
   const [statusText, setStatusText] = useState('');
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [durationWarning, setDurationWarning] = useState<string | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [analysisStartTime, setAnalysisStartTime] = useState<number | null>(null);
 
   const [athleteName, setAthleteName] = useState('');
 
@@ -249,6 +251,8 @@ export default function UploadScreen() {
   const [opponentSearch, setOpponentSearch] = useState('');
   const [opponentModalVisible, setOpponentModalVisible] = useState(false);
   const [pastOpponents, setPastOpponents] = useState<OpponentSummary[]>([]);
+  const [previousScore, setPreviousScore] = useState<number | null>(null);
+  const [positionAverages, setPositionAverages] = useState<{ standing: number; top: number; bottom: number } | null>(null);
 
   // Smart default: set match style based on athlete's birth year from profile, load athlete name
   useEffect(() => {
@@ -267,13 +271,26 @@ export default function UploadScreen() {
     });
   }, []);
 
-  // Load past opponents for autocomplete
+  // Load past opponents for autocomplete + comparison data
   useEffect(() => {
     fetch(`${API_BASE}/api/match-history?limit=100`)
       .then((res) => res.json())
       .then((data) => {
         if (data.opponents && Array.isArray(data.opponents)) {
           setPastOpponents(data.opponents);
+        }
+        // Compute previous score and position averages from match history
+        const matches = (data.matches || []) as Array<{ overallScore: number; standing: number; top: number; bottom: number; isManualEntry: boolean }>;
+        const videoMatches = matches.filter((m) => !m.isManualEntry);
+        if (videoMatches.length > 0) {
+          // matches are newest-first, so [0] is the most recent
+          setPreviousScore(videoMatches[0].overallScore);
+          const avg = (arr: number[]) => Math.round(arr.reduce((s, v) => s + v, 0) / arr.length);
+          setPositionAverages({
+            standing: avg(videoMatches.map((m) => m.standing)),
+            top: avg(videoMatches.map((m) => m.top)),
+            bottom: avg(videoMatches.map((m) => m.bottom)),
+          });
         }
       })
       .catch(() => {});
@@ -705,9 +722,11 @@ export default function UploadScreen() {
     } catch (err: any) {
       await AsyncStorage.removeItem(PENDING_ANALYSIS_KEY);
       console.error('[LevelUp] Polling error:', err);
-      setStatusText(err?.message || 'Analysis failed. Please try again.');
+      setAnalysisError(err?.message || 'Analysis failed. Please try again.');
+      setStatusText('');
     } finally {
       setAnalyzing(false);
+      setAnalysisStartTime(null);
     }
   };
 
@@ -755,8 +774,10 @@ export default function UploadScreen() {
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setAnalyzing(true);
+    setAnalysisError(null);
     setProgress(0);
     setStatusText('Preparing video...');
+    setAnalysisStartTime(Date.now());
 
     try {
       const durationMs = video.duration || 60000;
@@ -905,8 +926,10 @@ export default function UploadScreen() {
       await completeAnalysis(jobId, pendingState);
     } catch (err: any) {
       console.error('[LevelUp] Analysis error:', err);
-      setStatusText(err?.message || 'Analysis failed. Please try again.');
+      setAnalysisError(err?.message || 'Analysis failed. Please try again.');
+      setStatusText('');
       setAnalyzing(false);
+      setAnalysisStartTime(null);
       await AsyncStorage.removeItem(PENDING_ANALYSIS_KEY);
     }
   };
@@ -936,6 +959,8 @@ export default function UploadScreen() {
     setResult(null);
     setProgress(0);
     setStatusText('');
+    setAnalysisError(null);
+    setAnalysisStartTime(null);
     setOpponentName('');
     setOpponentSchool('');
     setOpponentWeightClass('');
@@ -1043,6 +1068,8 @@ export default function UploadScreen() {
             athleteName={athleteName || undefined}
             showUploadAnother
             onUploadAnother={resetUpload}
+            previousScore={previousScore}
+            positionAverages={positionAverages}
           />
 
           <View style={{ height: 40 }} />
@@ -1763,6 +1790,40 @@ export default function UploadScreen() {
               />
             </View>
             <Text style={styles.progressStatus}>{statusText}</Text>
+            {analysisStartTime && progress > 0 && progress < 100 && (
+              <Text style={styles.progressEstimate}>
+                {progress < 70
+                  ? 'About 60 seconds remaining'
+                  : progress < 90
+                    ? 'About 30 seconds remaining'
+                    : 'Almost done...'}
+              </Text>
+            )}
+          </View>
+        )}
+
+        {analysisError && !analyzing && (
+          <View style={styles.errorSection}>
+            <View style={styles.errorIconWrap}>
+              <XIcon size={24} color="#EF4444" />
+            </View>
+            <Text style={styles.errorTitle}>Analysis Failed</Text>
+            <Text style={styles.errorMessage}>{analysisError}</Text>
+            <TouchableOpacity
+              style={styles.retryBtn}
+              onPress={() => {
+                setAnalysisError(null);
+                analyzeVideo();
+              }}
+            >
+              <Text style={styles.retryBtnText}>Retry Analysis</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.errorBackBtn}
+              onPress={resetUpload}
+            >
+              <Text style={styles.errorBackBtnText}>Start Over</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -2130,6 +2191,37 @@ const styles = StyleSheet.create({
   },
   progressBarFill: { height: '100%', borderRadius: 4 },
   progressStatus: { fontSize: 14, color: '#A1A1AA', textAlign: 'center' },
+  progressEstimate: { fontSize: 12, color: '#52525B', textAlign: 'center', marginTop: 6 },
+  errorSection: {
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    paddingVertical: 40,
+    gap: 12,
+  },
+  errorIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  errorTitle: { fontSize: 18, fontWeight: '800', color: '#fff' },
+  errorMessage: { fontSize: 14, color: '#71717A', textAlign: 'center', lineHeight: 20 },
+  retryBtn: {
+    backgroundColor: '#2563EB',
+    borderRadius: 14,
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    marginTop: 8,
+  },
+  retryBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  errorBackBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  errorBackBtnText: { fontSize: 14, fontWeight: '600', color: '#71717A' },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',

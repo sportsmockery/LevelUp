@@ -58,32 +58,26 @@ export default function ProgressDashboardScreen() {
 
   const chartWidth = Math.min(screenWidth - 64, 340);
 
+  const fetchProgress = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/wrestler/progress`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      setData(json);
+    } catch (err) {
+      console.error('[LevelUp] Progress fetch error:', err);
+      setError('Failed to load progress data');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
-      let cancelled = false;
-      setLoading(true);
-      setError(null);
-
-      fetch(`${API_BASE}/api/wrestler/progress`)
-        .then((res) => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return res.json();
-        })
-        .then((json) => {
-          if (cancelled) return;
-          setData(json);
-        })
-        .catch((err) => {
-          if (cancelled) return;
-          console.error('[LevelUp] Progress fetch error:', err);
-          setError('Failed to load progress data');
-        })
-        .finally(() => {
-          if (!cancelled) setLoading(false);
-        });
-
-      return () => { cancelled = true; };
-    }, [])
+      fetchProgress();
+    }, [fetchProgress])
   );
 
   const positionData = data ? {
@@ -123,10 +117,14 @@ export default function ProgressDashboardScreen() {
           </View>
         )}
 
-        {error && (
+        {error && !loading && (
           <View style={styles.emptyState}>
-            <BarChart3 size={40} color="#52525B" />
+            <AlertTriangle size={40} color="#EF4444" />
             <Text style={styles.emptyText}>{error}</Text>
+            <Text style={styles.emptySubtext}>Check your connection and try again.</Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={fetchProgress}>
+              <Text style={styles.retryBtnText}>Retry</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -516,4 +514,12 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', paddingVertical: 48, gap: 12 },
   emptyText: { fontSize: 18, fontWeight: '700', color: '#52525B' },
   emptySubtext: { fontSize: 13, color: '#3F3F46', textAlign: 'center' },
+  retryBtn: {
+    backgroundColor: '#2563EB',
+    borderRadius: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    marginTop: 4,
+  },
+  retryBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
 });

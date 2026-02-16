@@ -33,10 +33,16 @@ import {
   AlertTriangle,
   Cpu,
   Upload,
+  ChevronsUp,
+  ChevronsDown,
+  ArrowUp,
+  ArrowDown,
+  ArrowRight,
 } from 'lucide-react-native';
 import { useFocusEffect } from 'expo-router';
 import { analyzeFrames, API_BASE } from '@/lib/api';
 import { AnalysisResult, OpponentScoutingResult, MatchStyle, MatchHistoryEntry, OpponentSummary, SINGLET_COLORS } from '@/lib/types';
+import { getScoreTrendIndicator } from '@/lib/score-comparison';
 
 type ScoutWrestler = {
   name: string;
@@ -115,29 +121,27 @@ export default function MatchesScreen() {
   const [scoutStatusText, setScoutStatusText] = useState('');
   const [scoutResult, setScoutResult] = useState<AnalysisResult | null>(null);
 
+  const fetchMatchHistory = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/match-history?limit=100`);
+      const data = await res.json();
+      setMatches(data.matches || []);
+      setOpponents(data.opponents || []);
+    } catch (err) {
+      console.error('[LevelUp] Match history fetch error:', err);
+      setError('Failed to load matches');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // Fetch match history on focus
   useFocusEffect(
     useCallback(() => {
-      let cancelled = false;
-      setLoading(true);
-      fetch(`${API_BASE}/api/match-history?limit=100`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (cancelled) return;
-          setMatches(data.matches || []);
-          setOpponents(data.opponents || []);
-          setError(null);
-        })
-        .catch((err) => {
-          if (cancelled) return;
-          console.error('[LevelUp] Match history fetch error:', err);
-          setError('Failed to load matches');
-        })
-        .finally(() => {
-          if (!cancelled) setLoading(false);
-        });
-      return () => { cancelled = true; };
-    }, [])
+      fetchMatchHistory();
+    }, [fetchMatchHistory])
   );
 
   // Compute stats from real data
@@ -154,6 +158,19 @@ export default function MatchesScreen() {
       (m.opponentName || '').toLowerCase().includes(search.toLowerCase()) ||
       (m.competitionName || '').toLowerCase().includes(search.toLowerCase())
   );
+
+  // Compute score deltas for each match (matches are newest-first)
+  // Video-only matches get deltas computed against the previous video match
+  const matchDeltas = new Map<string, number | null>();
+  const videoMatchesChron = matches.filter((m) => !m.isManualEntry).reverse();
+  for (let i = 0; i < videoMatchesChron.length; i++) {
+    const m = videoMatchesChron[i];
+    if (i === 0) {
+      matchDeltas.set(m.id, null); // first match
+    } else {
+      matchDeltas.set(m.id, m.overallScore - videoMatchesChron[i - 1].overallScore);
+    }
+  }
 
   const filteredScouts = opponents.filter(
     (s) =>
@@ -561,9 +578,26 @@ export default function MatchesScreen() {
     );
   }
 
+  // Render delta arrow icon
+  const renderDeltaIcon = (delta: number | null) => {
+    if (delta === null) return null;
+    const indicator = getScoreTrendIndicator(delta);
+    const size = 12;
+    switch (indicator.icon) {
+      case 'up-double': return <ChevronsUp size={size} color={indicator.color} />;
+      case 'up': return <ArrowUp size={size} color={indicator.color} />;
+      case 'down-double': return <ChevronsDown size={size} color={indicator.color} />;
+      case 'down': return <ArrowDown size={size} color={indicator.color} />;
+      default: return <ArrowRight size={size} color={indicator.color} />;
+    }
+  };
+
   // Render a single match card
   const renderMatchCard = (match: MatchHistoryEntry, indented?: boolean) => {
     const rl = getResultLetter(match);
+    const delta = matchDeltas.get(match.id) ?? undefined;
+    const hasDelta = delta !== undefined && !match.isManualEntry;
+    const indicator = hasDelta ? getScoreTrendIndicator(delta) : null;
     return (
       <View
         key={match.id}
@@ -613,8 +647,18 @@ export default function MatchesScreen() {
           </View>
         </View>
         <View style={styles.matchRight}>
-          {!match.isManualEntry && <Text style={styles.matchScore}>{match.overallScore}</Text>}
-          {match.hasVideo && <Video size={14} color="#2563EB" />}
+          {!match.isManualEntry && (
+            <Text style={styles.matchScore}>{match.overallScore}</Text>
+          )}
+          {hasDelta && indicator && (
+            <View style={[styles.deltaBadge, { backgroundColor: indicator.bgColor }]}>
+              {renderDeltaIcon(delta)}
+              <Text style={[styles.deltaText, { color: indicator.color }]}>
+                {delta !== null && delta > 0 ? `+${delta}` : delta !== null ? `${delta}` : ''}
+              </Text>
+            </View>
+          )}
+          {!hasDelta && match.hasVideo && <Video size={14} color="#2563EB" />}
         </View>
       </View>
     );
@@ -684,7 +728,12 @@ export default function MatchesScreen() {
         {/* Error state */}
         {!loading && error && (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>{error}</Text>
+            <AlertTriangle size={40} color="#EF4444" />
+            <Text style={styles.emptyTitle}>{error}</Text>
+            <Text style={styles.emptyText}>Check your connection and try again.</Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={fetchMatchHistory}>
+              <Text style={styles.retryBtnText}>Retry</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -909,6 +958,14 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: '#A1A1AA' },
   emptyText: { fontSize: 14, color: '#52525B', textAlign: 'center' },
+  retryBtn: {
+    backgroundColor: '#2563EB',
+    borderRadius: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    marginTop: 8,
+  },
+  retryBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
   summaryRow: {
     flexDirection: 'row',
     gap: 10,
@@ -983,8 +1040,17 @@ const styles = StyleSheet.create({
   matchOpponent: { fontSize: 15, fontWeight: '700', color: '#fff' },
   matchMethod: { fontSize: 12, color: '#A1A1AA' },
   matchTournament: { fontSize: 11, color: '#52525B', marginTop: 2 },
-  matchRight: { alignItems: 'flex-end', gap: 6 },
+  matchRight: { alignItems: 'flex-end', gap: 4 },
   matchScore: { fontSize: 20, fontWeight: '800', color: '#2563EB' },
+  deltaBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  deltaText: { fontSize: 11, fontWeight: '700' },
   opponentGroupHeader: {
     flexDirection: 'row',
     alignItems: 'center',

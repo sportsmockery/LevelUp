@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ChevronDown } from 'lucide-react-native';
+import { ChevronDown, AlertTriangle } from 'lucide-react-native';
 import { API_BASE } from '@/lib/api';
 
 type Connection = {
@@ -42,6 +42,7 @@ export default function ParentMatchesScreen() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const approvedConnections = connections.filter((c) => c.status === 'approved' && c.athlete);
@@ -71,6 +72,7 @@ export default function ParentMatchesScreen() {
   const fetchMatches = useCallback(async () => {
     if (!selectedAthleteId) return;
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch(
         `${API_BASE}/api/match-history?userId=${selectedAthleteId}&limit=100`,
@@ -79,6 +81,7 @@ export default function ParentMatchesScreen() {
       setMatches(data.matches || []);
     } catch {
       setMatches([]);
+      setError('Failed to load matches');
     } finally {
       setLoading(false);
     }
@@ -175,6 +178,14 @@ export default function ParentMatchesScreen() {
           {loading ? (
             <View style={{ paddingVertical: 60, alignItems: 'center' }}>
               <ActivityIndicator size="large" color="#2563EB" />
+            </View>
+          ) : error ? (
+            <View style={styles.errorCard}>
+              <AlertTriangle size={32} color="#EF4444" />
+              <Text style={styles.errorText}>{error}</Text>
+              <TouchableOpacity style={styles.retryBtn} onPress={fetchMatches}>
+                <Text style={styles.retryBtnText}>Retry</Text>
+              </TouchableOpacity>
             </View>
           ) : matches.length === 0 ? (
             <View style={styles.emptyCard}>
@@ -365,4 +376,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: { fontSize: 14, color: '#71717A' },
+  errorCard: {
+    backgroundColor: '#18181B',
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
+    gap: 10,
+  },
+  errorText: { fontSize: 14, color: '#71717A' },
+  retryBtn: {
+    backgroundColor: '#2563EB',
+    borderRadius: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    marginTop: 4,
+  },
+  retryBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
 });
