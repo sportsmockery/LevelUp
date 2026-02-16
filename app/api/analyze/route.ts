@@ -362,7 +362,11 @@ async function saveToSupabase(
   matchContext?: MatchContext,
   metadata?: AnalysisMetadata,
 ): Promise<void> {
-  if (!supabase) return;
+  const db = supabaseServer || supabase;
+  if (!db) {
+    console.warn('[LevelUp] No Supabase client available — skipping persistence');
+    return;
+  }
 
   const athleteId = '00000000-0000-0000-0000-000000000000'; // Placeholder until auth is integrated
   const stats = extractMatchStats(pass2Result);
@@ -371,7 +375,7 @@ async function saveToSupabase(
   try {
     const results = await Promise.allSettled([
       // 1. Insert match analysis
-      supabase.from('match_analyses').insert({
+      db.from('match_analyses').insert({
         athlete_id: athleteId,
         overall_score: pass2Result.overall_score,
         standing: pass2Result.position_scores.standing,
@@ -420,7 +424,7 @@ async function saveToSupabase(
       await Promise.allSettled([
         // 2. Insert drill assignments
         ...pass2Result.drills.map((drill) =>
-          supabase.from('drill_assignments').insert({
+          db.from('drill_assignments').insert({
             analysis_id: analysisId,
             athlete_id: athleteId,
             drill_name: drill.name,
@@ -432,7 +436,7 @@ async function saveToSupabase(
         ),
         // 3. Insert earned badges (upsert to avoid duplicates)
         ...badges.map((badge) =>
-          supabase.from('badges').upsert({
+          db.from('badges').upsert({
             athlete_id: athleteId,
             badge_key: badge.key,
             badge_label: badge.label,
@@ -441,7 +445,7 @@ async function saveToSupabase(
           }, { onConflict: 'athlete_id,badge_key' })
         ),
         // 4. Insert level history entry
-        supabase.from('level_history').insert({
+        db.from('level_history').insert({
           athlete_id: athleteId,
           event_type: 'analysis',
           title: `Scored ${pass2Result.overall_score}`,
@@ -676,11 +680,12 @@ export async function POST(request: NextRequest) {
 
     // Async mode: return jobId immediately, run analysis in background
     const asyncMode = request.nextUrl.searchParams.get('async') === 'true';
-    if (asyncMode && supabase) {
+    const asyncDb = supabaseServer || supabase;
+    if (asyncMode && asyncDb) {
       const jobId = crypto.randomUUID();
 
       // Create pending job in Supabase
-      await supabase.from('match_analyses').insert({
+      await asyncDb.from('match_analyses').insert({
         id: jobId,
         athlete_id: '00000000-0000-0000-0000-000000000000',
         overall_score: 0,
@@ -701,7 +706,7 @@ export async function POST(request: NextRequest) {
             athleteIdentification: validAthleteId, opponentIdentification: validOpponentId,
             idFrameBase64, athletePosition: validAthletePosition,
           });
-          await supabase!.from('match_analyses').update({
+          await asyncDb.from('match_analyses').update({
             job_status: 'complete',
             analysis_json: result,
             overall_score: (result as any).overall_score || 0,
@@ -715,7 +720,7 @@ export async function POST(request: NextRequest) {
           console.error(`[LevelUp] Background job ${jobId} failed:`, err);
           const errorCode = err?.message === 'ANALYSIS_TIMEOUT' ? 'ANALYSIS_TIMEOUT' : 'ANALYSIS_ERROR';
           const structuredError = buildAnalysisError(errorCode as 'ANALYSIS_TIMEOUT' | 'ANALYSIS_ERROR', err?.message);
-          await supabase!.from('match_analyses').update({
+          await asyncDb.from('match_analyses').update({
             job_status: 'failed',
             error_message: structuredError.userMessage,
           }).eq('id', jobId);

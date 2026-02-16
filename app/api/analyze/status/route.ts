@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../../../../lib/supabase';
+import { supabaseServer } from '../../../../lib/supabase-server';
 
 export async function GET(request: NextRequest) {
   const jobId = request.nextUrl.searchParams.get('jobId');
@@ -8,12 +9,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Missing jobId parameter' }, { status: 400 });
   }
 
-  if (!supabase) {
+  const db = supabaseServer || supabase;
+  if (!db) {
     return NextResponse.json({ error: 'Supabase not configured' }, { status: 503 });
   }
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('match_analyses')
       .select('job_status, analysis_json, error_message')
       .eq('id', jobId)

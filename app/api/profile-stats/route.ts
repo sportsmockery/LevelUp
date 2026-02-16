@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '../../../lib/supabase';
+import { supabaseServer } from '../../../lib/supabase-server';
 
 type AnalysisRow = {
   overall_score: number;
@@ -25,14 +26,15 @@ type AnalysisRow = {
 };
 
 export async function GET(request: NextRequest) {
-  if (!supabase) {
+  const db = supabaseServer || supabase;
+  if (!db) {
     return NextResponse.json({ error: 'Supabase not configured' }, { status: 503 });
   }
 
   const athleteId = request.nextUrl.searchParams.get('athlete_id') || '00000000-0000-0000-0000-000000000000';
 
   try {
-    const { data, error: analysesError } = await supabase
+    const { data, error: analysesError } = await db
       .from('match_analyses')
       .select('overall_score, standing, top, bottom, confidence, match_result, result_type, match_duration_sec, takedowns_scored, takedowns_allowed, reversals_scored, escapes_scored, near_falls_scored, pins_scored, created_at, competition_name, weight_class, fatigue_flag, strengths, weaknesses')
       .eq('athlete_id', athleteId)
@@ -83,13 +85,13 @@ export async function GET(request: NextRequest) {
       bottom: analyses.slice(0, 20).reverse().map((a: AnalysisRow) => ({ date: a.created_at, score: a.bottom })),
     };
 
-    const { data: badges } = await supabase
+    const { data: badges } = await db
       .from('badges')
       .select('badge_key, badge_label, badge_icon, awarded_at')
       .eq('athlete_id', athleteId)
       .order('awarded_at', { ascending: false });
 
-    const { data: levelHistory } = await supabase
+    const { data: levelHistory } = await db
       .from('level_history')
       .select('event_type, title, subtitle, created_at')
       .eq('athlete_id', athleteId)
