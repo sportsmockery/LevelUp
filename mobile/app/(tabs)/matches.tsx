@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -27,88 +27,27 @@ import {
   Trophy,
   Target,
   ChevronRight,
+  ChevronDown,
   X,
   Shield,
   AlertTriangle,
   Cpu,
   Upload,
 } from 'lucide-react-native';
-import { analyzeFrames } from '@/lib/api';
-import { AnalysisResult, OpponentScoutingResult, MatchStyle, SINGLET_COLORS } from '@/lib/types';
-
-type Match = {
-  id: number;
-  opponent: string;
-  result: 'W' | 'L';
-  method: string;
-  techScore: number;
-  tournament: string;
-  date: string;
-  hasVideo: boolean;
-};
+import { useFocusEffect } from 'expo-router';
+import { analyzeFrames, API_BASE } from '@/lib/api';
+import { AnalysisResult, OpponentScoutingResult, MatchStyle, MatchHistoryEntry, OpponentSummary, SINGLET_COLORS } from '@/lib/types';
 
 type ScoutWrestler = {
-  id: number;
   name: string;
-  school: string;
-  weightClass: string;
-  record: string;
+  school: string | null;
+  weightClass: string | null;
+  matchCount: number;
+  wins: number;
+  losses: number;
   avgScore: number;
-  strengths: string[];
-  weaknesses: string[];
-  recentResults: string[];
-  scoutScore: number;
+  lastFacedDate: string;
 };
-
-const MATCHES: Match[] = [
-  { id: 1, opponent: 'Jake Martinez', result: 'W', method: 'Pin 2:34', techScore: 92, tournament: 'District Duals', date: 'Feb 8', hasVideo: true },
-  { id: 2, opponent: 'Tyler Chen', result: 'W', method: 'Tech Fall 15-0', techScore: 88, tournament: 'District Duals', date: 'Feb 8', hasVideo: true },
-  { id: 3, opponent: 'Marcus Brown', result: 'L', method: 'Dec 3-5', techScore: 71, tournament: 'Eagle Invitational', date: 'Feb 1', hasVideo: false },
-  { id: 4, opponent: 'Ryan Kowalski', result: 'W', method: 'MD 12-4', techScore: 85, tournament: 'Eagle Invitational', date: 'Feb 1', hasVideo: true },
-  { id: 5, opponent: 'Devin Park', result: 'W', method: 'Pin 1:47', techScore: 95, tournament: 'Quad Meet', date: 'Jan 25', hasVideo: false },
-  { id: 6, opponent: 'Aiden Scott', result: 'L', method: 'Dec 2-4', techScore: 68, tournament: 'Quad Meet', date: 'Jan 25', hasVideo: true },
-  { id: 7, opponent: 'Noah Williams', result: 'W', method: 'Dec 7-3', techScore: 79, tournament: 'Conference Duals', date: 'Jan 18', hasVideo: true },
-  { id: 8, opponent: 'Ethan Rivera', result: 'W', method: 'Tech Fall 16-1', techScore: 91, tournament: 'Conference Duals', date: 'Jan 18', hasVideo: false },
-];
-
-const SCOUTS: ScoutWrestler[] = [
-  {
-    id: 1,
-    name: 'Marcus Brown',
-    school: 'Eastview High',
-    weightClass: '126 lbs',
-    record: '24-3',
-    avgScore: 83,
-    strengths: ['Strong single-leg finish', 'Excellent mat returns', 'Conditioning monster'],
-    weaknesses: ['Vulnerable to front headlock', 'Weak on bottom — slow standup', 'Telegraphs shots from distance'],
-    recentResults: ['W Pin vs. T. Adams (1:52)', 'W Dec 8-3 vs. R. Kim', 'L Dec 3-5 vs. D. Park'],
-    scoutScore: 78,
-  },
-  {
-    id: 2,
-    name: 'Devin Park',
-    school: 'Central Academy',
-    weightClass: '126 lbs',
-    record: '28-1',
-    avgScore: 91,
-    strengths: ['Elite scrambler', 'Heavy hands in ties', 'Cradle from top'],
-    weaknesses: ['Can be leg-attacked from open space', 'Gives up underhooks in ties', 'Tires in 3rd period at high pace'],
-    recentResults: ['W Pin vs. M. Brown (3:44)', 'W TF 17-2 vs. J. Lee', 'W Dec 6-4 vs. A. Scott'],
-    scoutScore: 92,
-  },
-  {
-    id: 3,
-    name: 'Aiden Scott',
-    school: 'Westfield Prep',
-    weightClass: '126 lbs',
-    record: '19-8',
-    avgScore: 72,
-    strengths: ['Good ankle pick', 'Solid base on bottom', 'Physical in ties'],
-    weaknesses: ['Poor shot defense on feet', 'Slow to react on top', 'Low gas tank'],
-    recentResults: ['L Dec 4-6 vs. D. Park', 'W Dec 5-2 vs. N. Williams', 'L Pin vs. T. Chen (2:11)'],
-    scoutScore: 65,
-  },
-];
 
 const MATCH_STYLES: { label: string; value: MatchStyle }[] = [
   { label: 'Folkstyle', value: 'folkstyle' },
@@ -116,10 +55,56 @@ const MATCH_STYLES: { label: string; value: MatchStyle }[] = [
   { label: 'Greco', value: 'grecoRoman' },
 ];
 
+function formatMatchDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function formatResultMethod(match: MatchHistoryEntry): string {
+  const parts: string[] = [];
+  if (match.resultType) {
+    const rt = match.resultType.toLowerCase();
+    if (rt === 'pin' || rt === 'fall') {
+      const dur = match.matchDurationSec ? `${Math.floor(match.matchDurationSec / 60)}:${String(match.matchDurationSec % 60).padStart(2, '0')}` : '';
+      parts.push(`Pin${dur ? ` ${dur}` : ''}`);
+    } else if (rt === 'tech_fall') {
+      parts.push('Tech Fall');
+    } else if (rt === 'major_decision') {
+      parts.push('Major Dec');
+    } else if (rt === 'decision') {
+      parts.push('Decision');
+    } else if (rt !== 'unknown') {
+      parts.push(match.resultType);
+    }
+  }
+  if (parts.length === 0 && match.matchResult) {
+    return match.matchResult === 'win' ? 'W' : match.matchResult === 'loss' ? 'L' : match.matchResult;
+  }
+  return parts.join(' ');
+}
+
+function getResultLetter(match: MatchHistoryEntry): 'W' | 'L' | '-' {
+  if (!match.matchResult) return '-';
+  const r = match.matchResult.toLowerCase();
+  if (r === 'win' || r === 'w') return 'W';
+  if (r === 'loss' || r === 'l') return 'L';
+  return '-';
+}
+
 export default function MatchesScreen() {
   const [tab, setTab] = useState<'log' | 'scout'>('log');
   const [search, setSearch] = useState('');
   const [selectedScout, setSelectedScout] = useState<ScoutWrestler | null>(null);
+
+  // Real data state
+  const [matches, setMatches] = useState<MatchHistoryEntry[]>([]);
+  const [opponents, setOpponents] = useState<OpponentSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Grouping state
+  const [groupByOpponent, setGroupByOpponent] = useState(false);
+  const [expandedOpponents, setExpandedOpponents] = useState<Set<string>>(new Set());
 
   // Scouting video upload state
   const [scoutingVideo, setScoutingVideo] = useState<ImagePicker.ImagePickerAsset | null>(null);
@@ -130,21 +115,76 @@ export default function MatchesScreen() {
   const [scoutStatusText, setScoutStatusText] = useState('');
   const [scoutResult, setScoutResult] = useState<AnalysisResult | null>(null);
 
-  const wins = MATCHES.filter((m) => m.result === 'W').length;
-  const losses = MATCHES.filter((m) => m.result === 'L').length;
-  const avgScore = Math.round(MATCHES.reduce((s, m) => s + m.techScore, 0) / MATCHES.length);
-
-  const filteredMatches = MATCHES.filter(
-    (m) =>
-      m.opponent.toLowerCase().includes(search.toLowerCase()) ||
-      m.tournament.toLowerCase().includes(search.toLowerCase())
+  // Fetch match history on focus
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      setLoading(true);
+      fetch(`${API_BASE}/api/match-history?limit=100`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (cancelled) return;
+          setMatches(data.matches || []);
+          setOpponents(data.opponents || []);
+          setError(null);
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          console.error('[LevelUp] Match history fetch error:', err);
+          setError('Failed to load matches');
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+      return () => { cancelled = true; };
+    }, [])
   );
 
-  const filteredScouts = SCOUTS.filter(
+  // Compute stats from real data
+  const wins = matches.filter((m) => getResultLetter(m) === 'W').length;
+  const losses = matches.filter((m) => getResultLetter(m) === 'L').length;
+  const avgScore = matches.length > 0
+    ? Math.round(matches.reduce((s, m) => s + m.overallScore, 0) / matches.length)
+    : 0;
+
+  const filteredMatches = matches.filter(
+    (m) =>
+      (m.opponentName || '').toLowerCase().includes(search.toLowerCase()) ||
+      (m.competitionName || '').toLowerCase().includes(search.toLowerCase())
+  );
+
+  const filteredScouts = opponents.filter(
     (s) =>
       s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.school.toLowerCase().includes(search.toLowerCase())
+      (s.school || '').toLowerCase().includes(search.toLowerCase())
   );
+
+  // Group matches by opponent for "By Opponent" view
+  const opponentGroups = new Map<string, { opponent: OpponentSummary; matches: MatchHistoryEntry[] }>();
+  for (const m of filteredMatches) {
+    const key = (m.opponentName || 'Unknown').toLowerCase().trim();
+    const existing = opponentGroups.get(key);
+    if (existing) {
+      existing.matches.push(m);
+    } else {
+      const opp = opponents.find((o) => o.name.toLowerCase().trim() === key);
+      opponentGroups.set(key, {
+        opponent: opp || { name: m.opponentName || 'Unknown', school: m.opponentSchool, weightClass: m.weightClass, matchCount: 1, wins: 0, losses: 0, lastFacedDate: m.createdAt, avgScore: m.overallScore },
+        matches: [m],
+      });
+    }
+  }
+  // Also include matches with no opponent in a catch-all
+  const ungroupedMatches = filteredMatches.filter((m) => !m.opponentName);
+
+  const toggleOpponentExpanded = (key: string) => {
+    setExpandedOpponents((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   const pickScoutingVideo = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -238,10 +278,10 @@ export default function MatchesScreen() {
     const scouting = scoutResult?.scouting as OpponentScoutingResult | undefined;
     const displayStrengths = scouting
       ? scouting.attack_patterns.map((a) => `${a.technique} — ${a.setup} (${a.effectiveness})`)
-      : selectedScout.strengths;
+      : [];
     const displayWeaknesses = scouting
       ? scouting.defense_patterns.map((d) => d.vulnerability)
-      : selectedScout.weaknesses;
+      : [];
 
     return (
       <SafeAreaView style={styles.container}>
@@ -273,9 +313,9 @@ export default function MatchesScreen() {
             </LinearGradient>
             <Text style={styles.scoutName}>{selectedScout.name}</Text>
             <Text style={styles.scoutSchool}>
-              {selectedScout.school} | {selectedScout.weightClass}
+              {selectedScout.school || 'Unknown School'}{selectedScout.weightClass ? ` | ${selectedScout.weightClass}` : ''}
             </Text>
-            <Text style={styles.scoutRecord}>Record: {selectedScout.record}</Text>
+            <Text style={styles.scoutRecord}>Record vs. you: {selectedScout.wins}-{selectedScout.losses} ({selectedScout.matchCount} matches)</Text>
           </View>
 
           {/* Scout Score */}
@@ -285,11 +325,11 @@ export default function MatchesScreen() {
               style={styles.scoutScoreBadge}
             >
               <View style={styles.scoutScoreInner}>
-                <Text style={styles.scoutScoreValue}>{selectedScout.scoutScore}</Text>
+                <Text style={styles.scoutScoreValue}>{selectedScout.avgScore}</Text>
               </View>
             </LinearGradient>
             <Text style={styles.scoutScoreLabel}>
-              {scouting ? 'AI SCOUTING SCORE' : 'SCOUTING SCORE'}
+              {scouting ? 'AI SCOUTING SCORE' : 'AVG SCORE VS THEM'}
             </Text>
           </View>
 
@@ -320,36 +360,40 @@ export default function MatchesScreen() {
           )}
 
           {/* Their Strengths / Attack Patterns */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Shield size={16} color="#22C55E" />
-              <Text style={[styles.sectionTitle, { color: '#22C55E' }]}>
-                {scouting ? 'ATTACK PATTERNS' : 'THEIR STRENGTHS'}
-              </Text>
-            </View>
-            {displayStrengths.map((s, i) => (
-              <View key={i} style={styles.scoutListItem}>
-                <View style={[styles.dot, { backgroundColor: '#22C55E' }]} />
-                <Text style={styles.scoutListText}>{s}</Text>
+          {displayStrengths.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Shield size={16} color="#22C55E" />
+                <Text style={[styles.sectionTitle, { color: '#22C55E' }]}>
+                  ATTACK PATTERNS
+                </Text>
               </View>
-            ))}
-          </View>
+              {displayStrengths.map((s, i) => (
+                <View key={i} style={styles.scoutListItem}>
+                  <View style={[styles.dot, { backgroundColor: '#22C55E' }]} />
+                  <Text style={styles.scoutListText}>{s}</Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           {/* Attack These / Vulnerabilities */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <AlertTriangle size={16} color="#E91E8C" />
-              <Text style={[styles.sectionTitle, { color: '#E91E8C' }]}>
-                {scouting ? 'VULNERABILITIES' : 'ATTACK THESE'}
-              </Text>
-            </View>
-            {displayWeaknesses.map((w, i) => (
-              <View key={i} style={styles.scoutListItem}>
-                <View style={[styles.dot, { backgroundColor: '#E91E8C' }]} />
-                <Text style={styles.scoutListText}>{w}</Text>
+          {displayWeaknesses.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <AlertTriangle size={16} color="#E91E8C" />
+                <Text style={[styles.sectionTitle, { color: '#E91E8C' }]}>
+                  VULNERABILITIES
+                </Text>
               </View>
-            ))}
-          </View>
+              {displayWeaknesses.map((w, i) => (
+                <View key={i} style={styles.scoutListItem}>
+                  <View style={[styles.dot, { backgroundColor: '#E91E8C' }]} />
+                  <Text style={styles.scoutListText}>{w}</Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           {/* Gameplan (AI-generated) */}
           {scouting && (
@@ -390,26 +434,6 @@ export default function MatchesScreen() {
               )}
             </View>
           )}
-
-          {/* Recent Results */}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: '#A1A1AA' }]}>
-              RECENT RESULTS
-            </Text>
-            {selectedScout.recentResults.map((r, i) => (
-              <View key={i} style={styles.recentResultItem}>
-                <View
-                  style={[
-                    styles.resultDot,
-                    {
-                      backgroundColor: r.startsWith('W') ? '#22C55E' : '#EF4444',
-                    },
-                  ]}
-                />
-                <Text style={styles.recentResultText}>{r}</Text>
-              </View>
-            ))}
-          </View>
 
           {/* Upload Opponent Video */}
           <View style={styles.section}>
@@ -535,6 +559,50 @@ export default function MatchesScreen() {
     );
   }
 
+  // Render a single match card
+  const renderMatchCard = (match: MatchHistoryEntry, indented?: boolean) => {
+    const rl = getResultLetter(match);
+    return (
+      <View
+        key={match.id}
+        style={[styles.matchCard, indented && styles.matchCardIndented]}
+      >
+        <View style={styles.matchLeft}>
+          <View
+            style={[
+              styles.resultBadge,
+              {
+                backgroundColor: rl === 'W' ? '#22C55E20' : rl === 'L' ? '#EF444420' : '#71717A20',
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.resultText,
+                {
+                  color: rl === 'W' ? '#22C55E' : rl === 'L' ? '#EF4444' : '#71717A',
+                },
+              ]}
+            >
+              {rl}
+            </Text>
+          </View>
+          <View style={styles.matchInfo}>
+            <Text style={styles.matchOpponent}>{match.opponentName || 'Unknown Opponent'}</Text>
+            <Text style={styles.matchMethod}>{formatResultMethod(match)}</Text>
+            <Text style={styles.matchTournament}>
+              {match.competitionName || match.matchStyle || ''}{match.competitionName ? ' | ' : ''}{formatMatchDate(match.createdAt)}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.matchRight}>
+          <Text style={styles.matchScore}>{match.overallScore}</Text>
+          {match.hasVideo && <Video size={14} color="#2563EB" />}
+        </View>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -588,108 +656,173 @@ export default function MatchesScreen() {
           />
         </View>
 
-        {tab === 'log' ? (
-          <>
-            {/* Season Summary */}
-            <View style={styles.summaryRow}>
-              <View style={[styles.summaryCard, { borderColor: '#22C55E' }]}>
-                <Text style={[styles.summaryValue, { color: '#22C55E' }]}>
-                  {wins}
-                </Text>
-                <Text style={styles.summaryLabel}>WINS</Text>
-              </View>
-              <View style={[styles.summaryCard, { borderColor: '#EF4444' }]}>
-                <Text style={[styles.summaryValue, { color: '#EF4444' }]}>
-                  {losses}
-                </Text>
-                <Text style={styles.summaryLabel}>LOSSES</Text>
-              </View>
-              <View style={[styles.summaryCard, { borderColor: '#2563EB' }]}>
-                <Text style={[styles.summaryValue, { color: '#2563EB' }]}>
-                  {avgScore}
-                </Text>
-                <Text style={styles.summaryLabel}>AVG SCORE</Text>
-              </View>
-            </View>
+        {/* Loading state */}
+        {loading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#2563EB" />
+            <Text style={styles.loadingText}>Loading matches...</Text>
+          </View>
+        )}
 
-            {/* Match List */}
-            <View style={styles.section}>
-              {filteredMatches.map((match) => (
-                <View key={match.id} style={styles.matchCard}>
-                  <View style={styles.matchLeft}>
-                    <View
-                      style={[
-                        styles.resultBadge,
-                        {
-                          backgroundColor:
-                            match.result === 'W' ? '#22C55E20' : '#EF444420',
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.resultText,
-                          {
-                            color:
-                              match.result === 'W' ? '#22C55E' : '#EF4444',
-                          },
-                        ]}
-                      >
-                        {match.result}
-                      </Text>
-                    </View>
-                    <View style={styles.matchInfo}>
-                      <Text style={styles.matchOpponent}>{match.opponent}</Text>
-                      <Text style={styles.matchMethod}>{match.method}</Text>
-                      <Text style={styles.matchTournament}>
-                        {match.tournament} | {match.date}
-                      </Text>
-                    </View>
+        {/* Error state */}
+        {!loading && error && (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>{error}</Text>
+          </View>
+        )}
+
+        {!loading && !error && tab === 'log' ? (
+          <>
+            {matches.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Video size={40} color="#3F3F46" />
+                <Text style={styles.emptyTitle}>No matches yet</Text>
+                <Text style={styles.emptyText}>Upload a video to get started.</Text>
+              </View>
+            ) : (
+              <>
+                {/* Season Summary */}
+                <View style={styles.summaryRow}>
+                  <View style={[styles.summaryCard, { borderColor: '#22C55E' }]}>
+                    <Text style={[styles.summaryValue, { color: '#22C55E' }]}>
+                      {wins}
+                    </Text>
+                    <Text style={styles.summaryLabel}>WINS</Text>
                   </View>
-                  <View style={styles.matchRight}>
-                    <Text style={styles.matchScore}>{match.techScore}</Text>
-                    {match.hasVideo && <Video size={14} color="#2563EB" />}
+                  <View style={[styles.summaryCard, { borderColor: '#EF4444' }]}>
+                    <Text style={[styles.summaryValue, { color: '#EF4444' }]}>
+                      {losses}
+                    </Text>
+                    <Text style={styles.summaryLabel}>LOSSES</Text>
+                  </View>
+                  <View style={[styles.summaryCard, { borderColor: '#2563EB' }]}>
+                    <Text style={[styles.summaryValue, { color: '#2563EB' }]}>
+                      {avgScore}
+                    </Text>
+                    <Text style={styles.summaryLabel}>AVG SCORE</Text>
                   </View>
                 </View>
-              ))}
-            </View>
+
+                {/* Grouping toggle */}
+                <View style={styles.groupToggleRow}>
+                  <TouchableOpacity
+                    style={[styles.groupToggleBtn, !groupByOpponent && styles.groupToggleBtnActive]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setGroupByOpponent(false);
+                    }}
+                  >
+                    <Text style={[styles.groupToggleText, !groupByOpponent && styles.groupToggleTextActive]}>All Matches</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.groupToggleBtn, groupByOpponent && styles.groupToggleBtnActive]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setGroupByOpponent(true);
+                    }}
+                  >
+                    <Text style={[styles.groupToggleText, groupByOpponent && styles.groupToggleTextActive]}>By Opponent</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Match List */}
+                <View style={styles.section}>
+                  {groupByOpponent ? (
+                    <>
+                      {Array.from(opponentGroups.entries()).map(([key, group]) => {
+                        const isExpanded = expandedOpponents.has(key);
+                        const oppWins = group.matches.filter((m) => getResultLetter(m) === 'W').length;
+                        const oppLosses = group.matches.filter((m) => getResultLetter(m) === 'L').length;
+                        const oppAvg = Math.round(group.matches.reduce((s, m) => s + m.overallScore, 0) / group.matches.length);
+                        return (
+                          <View key={key}>
+                            <TouchableOpacity
+                              style={styles.opponentGroupHeader}
+                              onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                toggleOpponentExpanded(key);
+                              }}
+                            >
+                              <View style={styles.opponentGroupLeft}>
+                                <Text style={styles.opponentGroupName}>
+                                  {group.opponent.name} ({group.matches.length})
+                                </Text>
+                                <Text style={styles.opponentGroupRecord}>
+                                  {oppWins}-{oppLosses} | Avg: {oppAvg}
+                                </Text>
+                              </View>
+                              <ChevronDown
+                                size={18}
+                                color="#71717A"
+                                style={isExpanded ? { transform: [{ rotate: '180deg' }] } : undefined}
+                              />
+                            </TouchableOpacity>
+                            {isExpanded && group.matches.map((m) => renderMatchCard(m, true))}
+                          </View>
+                        );
+                      })}
+                      {ungroupedMatches.length > 0 && (
+                        <View>
+                          <View style={styles.opponentGroupHeader}>
+                            <Text style={styles.opponentGroupName}>No Opponent Listed ({ungroupedMatches.length})</Text>
+                          </View>
+                          {ungroupedMatches.map((m) => renderMatchCard(m))}
+                        </View>
+                      )}
+                    </>
+                  ) : (
+                    filteredMatches.map((match) => renderMatchCard(match))
+                  )}
+                </View>
+              </>
+            )}
           </>
-        ) : (
+        ) : !loading && !error && tab === 'scout' ? (
           <>
-            {/* Scout List */}
+            {/* Scout List from real opponents */}
             <View style={styles.section}>
-              <Text style={styles.weightClassLabel}>126 LBS WEIGHT CLASS</Text>
-              {filteredScouts.map((wrestler) => (
-                <TouchableOpacity
-                  key={wrestler.id}
-                  style={styles.scoutCard}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                    setSelectedScout(wrestler);
-                  }}
-                >
-                  <View style={styles.scoutCardLeft}>
-                    <View style={styles.scoutCardAvatar}>
-                      <Text style={styles.scoutCardInitial}>
-                        {wrestler.name.charAt(0)}
-                      </Text>
-                    </View>
-                    <View>
-                      <Text style={styles.scoutCardName}>{wrestler.name}</Text>
-                      <Text style={styles.scoutCardSchool}>
-                        {wrestler.school} | {wrestler.record}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={styles.scoutCardRight}>
-                    <Text style={styles.scoutCardScore}>{wrestler.avgScore}</Text>
-                    <ChevronRight size={16} color="#52525B" />
-                  </View>
-                </TouchableOpacity>
-              ))}
+              {filteredScouts.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <Target size={40} color="#3F3F46" />
+                  <Text style={styles.emptyTitle}>No opponents yet</Text>
+                  <Text style={styles.emptyText}>Upload a match video with an opponent name to build your scout list.</Text>
+                </View>
+              ) : (
+                <>
+                  <Text style={styles.weightClassLabel}>OPPONENTS ({filteredScouts.length})</Text>
+                  {filteredScouts.map((wrestler, i) => (
+                    <TouchableOpacity
+                      key={i}
+                      style={styles.scoutCard}
+                      onPress={() => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                        setSelectedScout(wrestler);
+                      }}
+                    >
+                      <View style={styles.scoutCardLeft}>
+                        <View style={styles.scoutCardAvatar}>
+                          <Text style={styles.scoutCardInitial}>
+                            {wrestler.name.charAt(0)}
+                          </Text>
+                        </View>
+                        <View>
+                          <Text style={styles.scoutCardName}>{wrestler.name}</Text>
+                          <Text style={styles.scoutCardSchool}>
+                            {wrestler.school || 'Unknown'} | {wrestler.wins}-{wrestler.losses}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.scoutCardRight}>
+                        <Text style={styles.scoutCardScore}>{wrestler.avgScore}</Text>
+                        <ChevronRight size={16} color="#52525B" />
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </>
+              )}
             </View>
           </>
-        )}
+        ) : null}
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -743,6 +876,22 @@ const styles = StyleSheet.create({
     borderColor: '#27272A',
   },
   searchInput: { flex: 1, fontSize: 14, color: '#fff' },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    gap: 14,
+  },
+  loadingText: { fontSize: 14, color: '#71717A' },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 40,
+    gap: 10,
+  },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#A1A1AA' },
+  emptyText: { fontSize: 14, color: '#52525B', textAlign: 'center' },
   summaryRow: {
     flexDirection: 'row',
     gap: 10,
@@ -759,6 +908,27 @@ const styles = StyleSheet.create({
   },
   summaryValue: { fontSize: 28, fontWeight: '800' },
   summaryLabel: { fontSize: 9, color: '#71717A', fontWeight: '700', marginTop: 4, letterSpacing: 1 },
+  groupToggleRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+    marginTop: 16,
+    gap: 8,
+  },
+  groupToggleBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: '#18181B',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#27272A',
+  },
+  groupToggleBtnActive: {
+    backgroundColor: '#2563EB20',
+    borderColor: '#2563EB',
+  },
+  groupToggleText: { fontSize: 12, fontWeight: '700', color: '#71717A' },
+  groupToggleTextActive: { color: '#2563EB' },
   section: { paddingHorizontal: 24, marginTop: 20 },
   sectionLabel: {
     fontSize: 12,
@@ -778,6 +948,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#27272A',
   },
+  matchCardIndented: {
+    marginLeft: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#2563EB',
+  },
   matchLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   resultBadge: {
     width: 36,
@@ -793,6 +968,20 @@ const styles = StyleSheet.create({
   matchTournament: { fontSize: 11, color: '#52525B', marginTop: 2 },
   matchRight: { alignItems: 'flex-end', gap: 6 },
   matchScore: { fontSize: 20, fontWeight: '800', color: '#2563EB' },
+  opponentGroupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#1a1a2e',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#27272A',
+  },
+  opponentGroupLeft: { flex: 1 },
+  opponentGroupName: { fontSize: 14, fontWeight: '700', color: '#E4E4E7' },
+  opponentGroupRecord: { fontSize: 12, color: '#71717A', marginTop: 2 },
   weightClassLabel: {
     fontSize: 12,
     fontWeight: '700',

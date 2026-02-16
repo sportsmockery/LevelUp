@@ -95,6 +95,9 @@ export type MatchContext = {
   competitionName?: string;
   roundNumber?: number;
   daysFromWeighIn?: number;
+  opponentName?: string;
+  opponentSchool?: string;
+  opponentWeightClass?: string;
 };
 
 export type EnrichedAnalysis = {
@@ -128,6 +131,35 @@ export type MatchResult = {
   result: string;
   result_type: string;
   match_duration_seconds: number;
+};
+
+export type MatchHistoryEntry = {
+  id: string;
+  createdAt: string;
+  opponentName: string | null;
+  opponentSchool: string | null;
+  matchResult: string | null;
+  resultType: string | null;
+  matchDurationSec: number | null;
+  overallScore: number;
+  standing: number;
+  top: number;
+  bottom: number;
+  competitionName: string | null;
+  weightClass: string | null;
+  matchStyle: string | null;
+  hasVideo: boolean;
+};
+
+export type OpponentSummary = {
+  name: string;
+  school: string | null;
+  weightClass: string | null;
+  matchCount: number;
+  wins: number;
+  losses: number;
+  lastFacedDate: string;
+  avgScore: number;
 };
 
 export type AnalysisResult = {

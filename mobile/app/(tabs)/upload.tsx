@@ -33,12 +33,16 @@ import {
   Cpu,
   Camera,
   Wifi,
+  UserPlus,
+  X as XIcon,
+  ChevronRight,
 } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { submitAnalysis, identifyWrestler } from '@/lib/api';
 import { pollForCompletion, savePendingJob, requestNotificationPermissions } from '@/lib/analysis-poller';
 import { getStoredPushToken } from '@/lib/notifications';
-import { AnalysisResult, MatchStyle, MatchContext, AthleteIdentification, WrestlerIdentificationResult } from '@/lib/types';
+import { AnalysisResult, MatchStyle, MatchContext, AthleteIdentification, WrestlerIdentificationResult, OpponentSummary } from '@/lib/types';
+import { API_BASE } from '@/lib/api';
 import { addAnalysisEntry } from '@/lib/storage';
 import { trackAnalysis } from '@/lib/athlete-tracking';
 import AnalysisResults from '@/components/AnalysisResults';
@@ -117,6 +121,9 @@ type PendingAnalysis = {
   athleteName?: string;
   competitionName?: string;
   weightClass?: string;
+  opponentName?: string;
+  opponentSchool?: string;
+  opponentWeightClass?: string;
 };
 
 // Check if the device is on Wi-Fi
@@ -210,6 +217,14 @@ export default function UploadScreen() {
 
   const [athleteName, setAthleteName] = useState('');
 
+  // Opponent selection state
+  const [opponentName, setOpponentName] = useState('');
+  const [opponentSchool, setOpponentSchool] = useState('');
+  const [opponentWeightClass, setOpponentWeightClass] = useState('');
+  const [opponentSearch, setOpponentSearch] = useState('');
+  const [opponentModalVisible, setOpponentModalVisible] = useState(false);
+  const [pastOpponents, setPastOpponents] = useState<OpponentSummary[]>([]);
+
   // Smart default: set match style based on athlete's birth year from profile, load athlete name
   useEffect(() => {
     AsyncStorage.getItem('@levelup/athlete_profile').then((raw) => {
@@ -225,6 +240,18 @@ export default function UploadScreen() {
         } catch {}
       }
     });
+  }, []);
+
+  // Load past opponents for autocomplete
+  useEffect(() => {
+    fetch(`${API_BASE}/api/match-history?limit=100`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.opponents && Array.isArray(data.opponents)) {
+          setPastOpponents(data.opponents);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const checkVideoDuration = (asset: ImagePicker.ImagePickerAsset): boolean => {
@@ -634,6 +661,7 @@ export default function UploadScreen() {
         competitionName: pending.competitionName || undefined,
         weightClass: pending.weightClass || undefined,
         matchStyle: pending.matchStyle,
+        opponentName: pending.opponentName || undefined,
       });
 
       // Save to history
@@ -765,12 +793,15 @@ export default function UploadScreen() {
       setProgress(72);
       setStatusText(`Sending ${apiFrames.length} frames to LevelUp...`);
 
-      const context: MatchContext | undefined = (weightClass || competitionName || roundNumber || daysFromWeighIn)
+      const context: MatchContext | undefined = (weightClass || competitionName || roundNumber || daysFromWeighIn || opponentName)
         ? {
             ...(weightClass ? { weightClass } : {}),
             ...(competitionName ? { competitionName } : {}),
             ...(roundNumber ? { roundNumber: parseInt(roundNumber, 10) || undefined } : {}),
             ...(daysFromWeighIn ? { daysFromWeighIn: parseInt(daysFromWeighIn, 10) } : {}),
+            ...(opponentName ? { opponentName } : {}),
+            ...(opponentSchool ? { opponentSchool } : {}),
+            ...(opponentWeightClass ? { opponentWeightClass } : {}),
           }
         : undefined;
 
@@ -836,6 +867,9 @@ export default function UploadScreen() {
         athleteName: athleteName || undefined,
         competitionName: competitionName || undefined,
         weightClass: weightClass || undefined,
+        opponentName: opponentName || undefined,
+        opponentSchool: opponentSchool || undefined,
+        opponentWeightClass: opponentWeightClass || undefined,
       };
       await AsyncStorage.setItem(PENDING_ANALYSIS_KEY, JSON.stringify(pendingState));
 
@@ -877,6 +911,11 @@ export default function UploadScreen() {
     setResult(null);
     setProgress(0);
     setStatusText('');
+    setOpponentName('');
+    setOpponentSchool('');
+    setOpponentWeightClass('');
+    setOpponentSearch('');
+    setOpponentModalVisible(false);
   };
 
   const formatFileSize = (bytes?: number) => {
@@ -1144,6 +1183,86 @@ export default function UploadScreen() {
           </View>
         )}
 
+        {/* Opponent Selection (optional) */}
+        {video && !analyzing && !result && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>OPPONENT <Text style={styles.optionalTag}>OPTIONAL</Text></Text>
+            {opponentName ? (
+              <View style={styles.opponentSelectedCard}>
+                <View style={styles.opponentSelectedInfo}>
+                  <Text style={styles.opponentSelectedName}>{opponentName}</Text>
+                  {opponentSchool ? (
+                    <Text style={styles.opponentSelectedSchool}>{opponentSchool}{opponentWeightClass ? ` | ${opponentWeightClass}` : ''}</Text>
+                  ) : opponentWeightClass ? (
+                    <Text style={styles.opponentSelectedSchool}>{opponentWeightClass}</Text>
+                  ) : null}
+                </View>
+                <TouchableOpacity onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setOpponentName('');
+                  setOpponentSchool('');
+                  setOpponentWeightClass('');
+                }}>
+                  <Text style={styles.changeBtn}>Change</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View>
+                {pastOpponents.length > 0 && (
+                  <>
+                    <TextInput
+                      style={styles.opponentSearchInput}
+                      placeholder="Search past opponents..."
+                      placeholderTextColor="#52525B"
+                      value={opponentSearch}
+                      onChangeText={setOpponentSearch}
+                    />
+                    {pastOpponents
+                      .filter((o) =>
+                        opponentSearch.length === 0 ||
+                        o.name.toLowerCase().includes(opponentSearch.toLowerCase()) ||
+                        (o.school && o.school.toLowerCase().includes(opponentSearch.toLowerCase()))
+                      )
+                      .slice(0, 5)
+                      .map((opp, i) => (
+                        <TouchableOpacity
+                          key={i}
+                          style={styles.pastOpponentRow}
+                          onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            setOpponentName(opp.name);
+                            setOpponentSchool(opp.school || '');
+                            setOpponentWeightClass(opp.weightClass || weightClass);
+                            setOpponentSearch('');
+                          }}
+                        >
+                          <View style={styles.pastOpponentInfo}>
+                            <Text style={styles.pastOpponentName}>{opp.name}</Text>
+                            <Text style={styles.pastOpponentMeta}>
+                              {opp.school || 'Unknown'} | {opp.wins}-{opp.losses} | Last: {new Date(opp.lastFacedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </Text>
+                          </View>
+                          <ChevronRight size={16} color="#52525B" />
+                        </TouchableOpacity>
+                      ))
+                    }
+                  </>
+                )}
+                <TouchableOpacity
+                  style={styles.addNewOpponentBtn}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    setOpponentModalVisible(true);
+                  }}
+                >
+                  <UserPlus size={18} color="#71717A" />
+                  <Text style={styles.addNewOpponentText}>ADD NEW OPPONENT</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
+
         {/* Match Context (optional) */}
         {video && !analyzing && !result && (
           <View style={styles.section}>
@@ -1276,6 +1395,66 @@ export default function UploadScreen() {
               onPress={() => setStyleModalVisible(false)}
             >
               <Text style={styles.modalDismissBtnText}>Got it</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* New Opponent Modal */}
+      <Modal
+        visible={opponentModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setOpponentModalVisible(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setOpponentModalVisible(false)}>
+          <Pressable style={styles.modalContent} onPress={() => {}}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>New Opponent</Text>
+            <View style={{ gap: 14, marginBottom: 20 }}>
+              <View>
+                <Text style={styles.contextFieldLabel}>Name *</Text>
+                <TextInput
+                  style={styles.contextInput}
+                  placeholder="e.g. Jake Martinez"
+                  placeholderTextColor="#52525B"
+                  value={opponentName}
+                  onChangeText={setOpponentName}
+                  autoFocus
+                />
+              </View>
+              <View>
+                <Text style={styles.contextFieldLabel}>School</Text>
+                <TextInput
+                  style={styles.contextInput}
+                  placeholder="e.g. Eastview High"
+                  placeholderTextColor="#52525B"
+                  value={opponentSchool}
+                  onChangeText={setOpponentSchool}
+                />
+              </View>
+              <View>
+                <Text style={styles.contextFieldLabel}>Weight Class</Text>
+                <TextInput
+                  style={styles.contextInput}
+                  placeholder={weightClass || 'e.g. 126 lbs'}
+                  placeholderTextColor="#52525B"
+                  value={opponentWeightClass}
+                  onChangeText={setOpponentWeightClass}
+                />
+              </View>
+            </View>
+            <TouchableOpacity
+              style={[styles.modalDismissBtn, !opponentName.trim() && { opacity: 0.4 }]}
+              disabled={!opponentName.trim()}
+              onPress={() => {
+                if (!opponentWeightClass && weightClass) {
+                  setOpponentWeightClass(weightClass);
+                }
+                setOpponentModalVisible(false);
+              }}
+            >
+              <Text style={styles.modalDismissBtnText}>Done</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>
@@ -1611,4 +1790,56 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#fff',
   },
+  opponentSelectedCard: {
+    backgroundColor: '#18181B',
+    borderRadius: 14,
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#2563EB',
+  },
+  opponentSelectedInfo: { flex: 1 },
+  opponentSelectedName: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  opponentSelectedSchool: { fontSize: 12, color: '#71717A', marginTop: 2 },
+  opponentSearchInput: {
+    backgroundColor: '#18181B',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    fontSize: 14,
+    color: '#fff',
+    borderWidth: 1,
+    borderColor: '#27272A',
+    marginBottom: 8,
+  },
+  pastOpponentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#18181B',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: '#27272A',
+  },
+  pastOpponentInfo: { flex: 1 },
+  pastOpponentName: { fontSize: 14, fontWeight: '600', color: '#E4E4E7' },
+  pastOpponentMeta: { fontSize: 11, color: '#71717A', marginTop: 2 },
+  addNewOpponentBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#18181B',
+    borderRadius: 14,
+    paddingVertical: 14,
+    borderWidth: 1.5,
+    borderColor: '#27272A',
+    borderStyle: 'dashed',
+    marginTop: 4,
+  },
+  addNewOpponentText: { fontSize: 13, fontWeight: '700', color: '#71717A', letterSpacing: 1 },
 });

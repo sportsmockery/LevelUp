@@ -24,6 +24,9 @@ type MatchContext = {
   competitionName?: string;
   roundNumber?: number;
   daysFromWeighIn?: number;
+  opponentName?: string;
+  opponentSchool?: string;
+  opponentWeightClass?: string;
 };
 
 function getOpenAI() {
@@ -395,6 +398,9 @@ async function saveToSupabase(
         pins_scored: stats.pins_scored,
         weight_class: matchContext?.weightClass,
         competition_name: matchContext?.competitionName,
+        opponent_name: matchContext?.opponentName,
+        opponent_school: matchContext?.opponentSchool,
+        opponent_weight_class: matchContext?.opponentWeightClass,
         match_style: matchStyle,
         strengths: pass2Result.strengths,
         weaknesses: pass2Result.weaknesses,
@@ -701,6 +707,11 @@ export async function POST(request: NextRequest) {
         bottom: 0,
         job_status: 'processing',
         match_style: validMatchStyle,
+        opponent_name: validMatchContext?.opponentName,
+        opponent_school: validMatchContext?.opponentSchool,
+        opponent_weight_class: validMatchContext?.opponentWeightClass,
+        competition_name: validMatchContext?.competitionName,
+        weight_class: validMatchContext?.weightClass,
       });
 
       // Run analysis in background after response is sent
