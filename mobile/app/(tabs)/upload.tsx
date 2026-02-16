@@ -1768,6 +1768,12 @@ export default function UploadScreen() {
 
         <View style={{ height: 40 }} />
 
+      </>
+      )}
+
+        <View style={{ height: 40 }} />
+      </ScrollView>
+
       {/* Match Style Info Modal */}
       <Modal
         visible={styleModalVisible}
@@ -1857,8 +1863,6 @@ export default function UploadScreen() {
           </Pressable>
         </Pressable>
       </Modal>
-      </>
-      )}
     </SafeAreaView>
   );
 }
