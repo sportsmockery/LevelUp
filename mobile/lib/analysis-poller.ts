@@ -5,7 +5,7 @@ import { AnalysisResult } from './types';
 
 const PENDING_JOBS_KEY = '@levelup/pending_analysis_jobs';
 const POLL_INTERVAL = 5000; // 5 seconds
-const MAX_POLLS = 60; // 5 minutes max
+const MAX_POLLS = 120; // 10 minutes max
 
 // Configure notification handler (call once at app startup)
 export function configureNotifications() {

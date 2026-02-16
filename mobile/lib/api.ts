@@ -31,13 +31,14 @@ export async function analyzeFrames(
   opponentIdentification?: AthleteIdentification,
   idFrameBase64?: string,
   athletePosition?: 'left' | 'right',
+  athleteName?: string,
 ): Promise<AnalysisResult> {
-  console.log(`[LevelUp] Sending ${frames.length} frames to API (style: ${matchStyle}, mode: ${mode}, id: ${athleteIdentification ? 'yes' : 'none'}, position: ${athletePosition || 'none'}, context: ${matchContext ? 'yes' : 'none'})`);
+  console.log(`[LevelUp] Sending ${frames.length} frames to API (style: ${matchStyle}, mode: ${mode}, id: ${athleteIdentification ? 'yes' : 'none'}, position: ${athletePosition || 'none'}, context: ${matchContext ? 'yes' : 'none'}, name: ${athleteName || 'none'})`);
 
   const response = await fetch(`${API_BASE}/api/analyze`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ frames, matchStyle, mode, matchContext, athleteIdentification, opponentIdentification, idFrameBase64, athletePosition }),
+    body: JSON.stringify({ frames, matchStyle, mode, matchContext, athleteIdentification, opponentIdentification, idFrameBase64, athletePosition, athleteName }),
   });
 
   if (!response.ok) {
@@ -67,13 +68,14 @@ export async function submitAnalysis(
   opponentIdentification?: AthleteIdentification,
   idFrameBase64?: string,
   athletePosition?: 'left' | 'right',
+  athleteName?: string,
 ): Promise<{ jobId: string }> {
-  console.log(`[LevelUp] Submitting async analysis: ${frames.length} frames (position: ${athletePosition || 'none'})`);
+  console.log(`[LevelUp] Submitting async analysis: ${frames.length} frames (position: ${athletePosition || 'none'}, name: ${athleteName || 'none'})`);
 
   const response = await fetch(`${API_BASE}/api/analyze?async=true`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ frames, matchStyle, mode, matchContext, athleteIdentification, opponentIdentification, idFrameBase64, athletePosition }),
+    body: JSON.stringify({ frames, matchStyle, mode, matchContext, athleteIdentification, opponentIdentification, idFrameBase64, athletePosition, athleteName }),
   });
 
   if (!response.ok) {

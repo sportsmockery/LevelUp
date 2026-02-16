@@ -35,7 +35,7 @@ import {
   Wifi,
 } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { analyzeFrames, submitAnalysis, identifyWrestler } from '@/lib/api';
+import { submitAnalysis, identifyWrestler } from '@/lib/api';
 import { pollForCompletion, savePendingJob, requestNotificationPermissions } from '@/lib/analysis-poller';
 import { AnalysisResult, MatchStyle, MatchContext, AthleteIdentification, WrestlerIdentificationResult } from '@/lib/types';
 import { addAnalysisEntry } from '@/lib/storage';
@@ -101,6 +101,22 @@ async function compressForAPI(uri: string): Promise<string> {
 
 const MAX_API_FRAMES = 20;
 const MAX_PAYLOAD_BYTES = 3_500_000; // 3.5MB safety margin under Vercel 4.5MB limit
+const PENDING_ANALYSIS_KEY = '@levelup/pending_analysis';
+const PENDING_ANALYSIS_MAX_AGE_MS = 10 * 60 * 1000; // 10 minutes
+
+type PendingAnalysis = {
+  jobId: string;
+  videoFileName: string;
+  videoUri: string;
+  thumbnailUri: string;
+  frameUris: string[];
+  frameTimestamps: number[];
+  matchStyle: MatchStyle;
+  startedAt: number;
+  athleteName?: string;
+  competitionName?: string;
+  weightClass?: string;
+};
 
 // Check if the device is on Wi-Fi
 async function checkWiFi(): Promise<boolean> {
@@ -589,6 +605,86 @@ export default function UploadScreen() {
     return { frames, firstThumbUri, allFrameUris, frameTimestamps: timestamps };
   };
 
+  // Complete analysis after receiving jobId — handles polling, saving, and cleanup
+  const completeAnalysis = async (
+    jobId: string,
+    pending: PendingAnalysis,
+  ) => {
+    try {
+      const data = await pollForCompletion(jobId, (_status, polls) => {
+        const p = Math.min(82 + Math.round((polls / 120) * 16), 98);
+        setProgress(p);
+        if (polls <= 5) setStatusText('Analyzing technique & scoring performance...');
+        else if (polls <= 15) setStatusText('Scoring against wrestling rubric...');
+        else if (polls <= 30) setStatusText('Generating recommendations...');
+        else setStatusText('Almost done — finalizing analysis...');
+      });
+
+      // Clear pending state on success
+      await AsyncStorage.removeItem(PENDING_ANALYSIS_KEY);
+
+      setProgress(100);
+      setStatusText('Analysis complete!');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setResult(data);
+
+      // Track for longitudinal progress
+      await trackAnalysis(data, {
+        competitionName: pending.competitionName || undefined,
+        weightClass: pending.weightClass || undefined,
+        matchStyle: pending.matchStyle,
+      });
+
+      // Save to history
+      await addAnalysisEntry({
+        id: `analysis_${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        thumbnailUri: pending.thumbnailUri,
+        frameUris: pending.frameUris,
+        frameTimestamps: pending.frameTimestamps,
+        videoUri: pending.videoUri,
+        videoFileName: pending.videoFileName,
+        videoDurationSeconds: 0,
+        singletColors: [],
+        result: data,
+      });
+    } catch (err: any) {
+      await AsyncStorage.removeItem(PENDING_ANALYSIS_KEY);
+      console.error('[LevelUp] Polling error:', err);
+      setStatusText(err?.message || 'Analysis failed. Please try again.');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  // Resume pending analysis on mount
+  useEffect(() => {
+    AsyncStorage.getItem(PENDING_ANALYSIS_KEY).then((raw) => {
+      if (!raw) return;
+      try {
+        const pending: PendingAnalysis = JSON.parse(raw);
+        const age = Date.now() - pending.startedAt;
+        if (age > PENDING_ANALYSIS_MAX_AGE_MS) {
+          // Too old — clean up
+          AsyncStorage.removeItem(PENDING_ANALYSIS_KEY);
+          return;
+        }
+        // Resume polling
+        console.log(`[LevelUp] Resuming pending analysis: jobId=${pending.jobId}, age=${Math.round(age / 1000)}s`);
+        setAnalyzing(true);
+        setProgress(82);
+        setStatusText('Resuming analysis...');
+        setFrameUris(pending.frameUris);
+        setFrameTimestamps(pending.frameTimestamps);
+        setThumbnailUri(pending.thumbnailUri);
+        if (pending.athleteName) setAthleteName(pending.athleteName);
+        completeAnalysis(pending.jobId, pending);
+      } catch {
+        AsyncStorage.removeItem(PENDING_ANALYSIS_KEY);
+      }
+    });
+  }, []);
+
   const analyzeVideo = async () => {
     if (!video) return;
 
@@ -706,86 +802,50 @@ export default function UploadScreen() {
           : undefined;
       console.log(`[LevelUp] Derived athletePosition: ${athletePosition ?? 'none'} (selectedWrestler=${selectedWrestler})`);
 
-      const videoDurationSec = (video.duration || 60000) / 1000;
-      const useAsync = videoDurationSec > 420; // 7+ minute videos use background mode
-      let data: AnalysisResult;
+      // Always use async mode: submit frames, poll for result
+      await requestNotificationPermissions();
+      setProgress(78);
+      setStatusText('Submitting for analysis...');
 
-      if (useAsync) {
-        // Async mode: submit job, poll for completion
-        await requestNotificationPermissions();
-        setProgress(78);
-        setStatusText('Submitting for background analysis...');
-
-        const { jobId } = await submitAnalysis(
-          apiFrames,
-          matchStyle,
-          'athlete',
-          context,
-          athleteId,
-          opponentId,
-          idFrameBase64 ?? undefined,
-          athletePosition,
-        );
-        await savePendingJob(jobId);
-
-        setProgress(82);
-        setStatusText('Analyzing technique & scoring performance...');
-
-        data = await pollForCompletion(jobId, (status, polls) => {
-          const p = Math.min(82 + Math.round((polls / 60) * 16), 98);
-          setProgress(p);
-          if (polls <= 5) setStatusText('Analyzing technique & scoring performance...');
-          else if (polls <= 15) setStatusText('Scoring against wrestling rubric...');
-          else if (polls <= 30) setStatusText('Generating recommendations...');
-          else setStatusText('Almost done — finalizing analysis...');
-        });
-      } else {
-        // Sync mode: wait for full result
-        setProgress(78);
-        setStatusText('Analyzing technique & scoring performance...');
-
-        data = await analyzeFrames(
-          apiFrames,
-          matchStyle,
-          'athlete',
-          context,
-          athleteId,
-          opponentId,
-          idFrameBase64 ?? undefined,
-          athletePosition,
-        );
-      }
-
-      setProgress(100);
-      setStatusText('Analysis complete!');
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setResult(data);
-
-      // Track for longitudinal progress
-      await trackAnalysis(data, {
-        competitionName: competitionName || undefined,
-        weightClass: weightClass || undefined,
+      const { jobId } = await submitAnalysis(
+        apiFrames,
         matchStyle,
-      });
+        'athlete',
+        context,
+        athleteId,
+        opponentId,
+        idFrameBase64 ?? undefined,
+        athletePosition,
+        athleteName || undefined,
+      );
+      await savePendingJob(jobId);
 
-      // Save to history
-      await addAnalysisEntry({
-        id: `analysis_${Date.now()}`,
-        createdAt: new Date().toISOString(),
+      // Persist pending state so analysis survives navigation
+      const pendingState: PendingAnalysis = {
+        jobId,
+        videoFileName: video.fileName || 'Match Video',
+        videoUri: video.uri,
         thumbnailUri: firstThumbUri || '',
         frameUris: allFrameUris,
         frameTimestamps: extractedTimestamps,
-        videoUri: video.uri,
-        videoFileName: video.fileName || 'Match Video',
-        videoDurationSeconds: (video.duration || 0) / 1000,
-        singletColors: [],
-        result: data,
-      });
+        matchStyle,
+        startedAt: Date.now(),
+        athleteName: athleteName || undefined,
+        competitionName: competitionName || undefined,
+        weightClass: weightClass || undefined,
+      };
+      await AsyncStorage.setItem(PENDING_ANALYSIS_KEY, JSON.stringify(pendingState));
+
+      setProgress(82);
+      setStatusText('Analyzing technique & scoring performance...');
+
+      // Poll for completion (resilient — if user navigates away, resume on return)
+      await completeAnalysis(jobId, pendingState);
     } catch (err: any) {
       console.error('[LevelUp] Analysis error:', err);
       setStatusText(err?.message || 'Analysis failed. Please try again.');
-    } finally {
       setAnalyzing(false);
+      await AsyncStorage.removeItem(PENDING_ANALYSIS_KEY);
     }
   };
 
