@@ -9,6 +9,8 @@ import {
   Video,
   AlertTriangle,
   Share2,
+  Zap,
+  Play,
 } from 'lucide-react-native';
 import {
   TrendingUp,
@@ -31,6 +33,15 @@ type Props = {
   onUploadAnother?: () => void;
   previousScore?: number | null;
   positionAverages?: { standing: number; top: number; bottom: number } | null;
+  frameTimestamps?: number[];
+  onJumpToMoment?: (frameIndex: number) => void;
+};
+
+const formatTimestamp = (ms: number): string => {
+  const totalSec = Math.floor(ms / 1000);
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  return `${min}:${sec.toString().padStart(2, '0')}`;
 };
 
 const getScoreColor = (score: number) => {
@@ -40,7 +51,7 @@ const getScoreColor = (score: number) => {
   return '#EF4444';
 };
 
-export default function AnalysisResults({ result, thumbnailUri, videoFileName, athleteName, showUploadAnother, onUploadAnother, previousScore, positionAverages }: Props) {
+export default function AnalysisResults({ result, thumbnailUri, videoFileName, athleteName, showUploadAnother, onUploadAnother, previousScore, positionAverages, frameTimestamps, onJumpToMoment }: Props) {
   const [coachNotes, setCoachNotes] = useState('');
   const [sharing, setSharing] = useState(false);
 
@@ -163,6 +174,48 @@ export default function AnalysisResults({ result, thumbnailUri, videoFileName, a
         </View>
       )}
 
+      {/* Key Moments */}
+      {(() => {
+        const keyMoments = (result.frame_annotations || [])
+          .map((ann, i) => ({ ann, frameIdx: i }))
+          .filter(({ ann }) => ann.is_key_moment);
+        if (keyMoments.length === 0) return null;
+        return (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: '#EAB308' }]}>KEY MOMENTS</Text>
+            {keyMoments.map(({ ann, frameIdx }, listIdx) => {
+              const ts = frameTimestamps?.[frameIdx];
+              const canJump = !!onJumpToMoment && ts !== undefined;
+              return (
+                <TouchableOpacity
+                  key={frameIdx}
+                  style={styles.keyMomentCard}
+                  onPress={() => canJump && onJumpToMoment!(frameIdx)}
+                  disabled={!canJump}
+                  activeOpacity={canJump ? 0.7 : 1}
+                >
+                  <View style={styles.keyMomentLeft}>
+                    <View style={styles.keyMomentIcon}>
+                      <Zap size={14} color="#EAB308" />
+                    </View>
+                    <View style={styles.keyMomentContent}>
+                      <Text style={styles.keyMomentAction}>{ann.action}</Text>
+                      <Text style={styles.keyMomentDetail} numberOfLines={2}>{ann.detail}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.keyMomentRight}>
+                    {ts !== undefined && (
+                      <Text style={styles.keyMomentTimestamp}>{formatTimestamp(ts)}</Text>
+                    )}
+                    {canJump && <Play size={14} color="#2563EB" />}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        );
+      })()}
+
       {/* Strengths */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>STRENGTHS</Text>
@@ -224,7 +277,7 @@ export default function AnalysisResults({ result, thumbnailUri, videoFileName, a
         ]}>
           {result.model === 'fallback'
             ? 'Demo Mode — Connect API key for real analysis'
-            : `Analyzed by GPT-4o | ${result.framesAnalyzed} frames | +${result.xp} XP`
+            : `Analyzed by LevelUp | ${result.framesAnalyzed} frames | +${result.xp} XP`
           }
         </Text>
       </View>
@@ -437,4 +490,58 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   shareButtonText: { fontSize: 13, fontWeight: '700', color: '#fff', letterSpacing: 1 },
+
+  // ---- KEY MOMENTS ----
+  keyMomentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#18181B',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#27272A',
+    borderLeftWidth: 3,
+    borderLeftColor: '#EAB308',
+  },
+  keyMomentLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  keyMomentIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(234, 179, 8, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  keyMomentContent: {
+    flex: 1,
+  },
+  keyMomentAction: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#E4E4E7',
+    marginBottom: 2,
+  },
+  keyMomentDetail: {
+    fontSize: 12,
+    color: '#A1A1AA',
+    lineHeight: 16,
+  },
+  keyMomentRight: {
+    alignItems: 'flex-end',
+    gap: 4,
+    marginLeft: 10,
+  },
+  keyMomentTimestamp: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#EAB308',
+    fontVariant: ['tabular-nums'],
+  },
 });

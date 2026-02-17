@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -50,7 +50,7 @@ import { API_BASE, authHeaders } from '@/lib/api';
 import { addAnalysisEntry } from '@/lib/storage';
 import { trackAnalysis } from '@/lib/athlete-tracking';
 import AnalysisResults from '@/components/AnalysisResults';
-import VideoReviewOverlay from '@/components/VideoReviewOverlay';
+import VideoReviewOverlay, { VideoReviewOverlayHandle } from '@/components/VideoReviewOverlay';
 
 const MATCH_STYLES: { label: string; value: MatchStyle }[] = [
   { label: 'Youth Folk', value: 'youth_folkstyle' },
@@ -163,6 +163,8 @@ export default function UploadScreen() {
   const [manualOpponentSearch, setManualOpponentSearch] = useState('');
   const [showWinLossDropdown, setShowWinLossDropdown] = useState(false);
 
+  const videoReviewRef = useRef<VideoReviewOverlayHandle>(null);
+  const scrollRef = useRef<ScrollView>(null);
   const [video, setVideo] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [matchStyle, setMatchStyle] = useState<MatchStyle>('youth_folkstyle');
   const [styleModalVisible, setStyleModalVisible] = useState(false);
@@ -1063,7 +1065,7 @@ export default function UploadScreen() {
   if (result) {
     return (
       <SafeAreaView style={styles.container}>
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
             <Text style={styles.headerTitle}>LEVELUP ANALYSIS</Text>
             <Text style={styles.headerSub}>AI-Powered Wrestling Breakdown</Text>
@@ -1072,6 +1074,7 @@ export default function UploadScreen() {
           {/* Video Review Overlay — plays video with annotation pauses */}
           {frameUris.length > 0 && (
             <VideoReviewOverlay
+              ref={videoReviewRef}
               frameUris={frameUris}
               frameTimestamps={frameTimestamps}
               videoUri={video?.uri}
@@ -1089,6 +1092,13 @@ export default function UploadScreen() {
             onUploadAnother={resetUpload}
             previousScore={previousScore}
             positionAverages={positionAverages}
+            frameTimestamps={frameTimestamps}
+            onJumpToMoment={(frameIdx) => {
+              scrollRef.current?.scrollTo({ y: 0, animated: true });
+              setTimeout(() => {
+                videoReviewRef.current?.jumpToFrame(frameIdx);
+              }, 300);
+            }}
           />
 
           <View style={{ height: 40 }} />

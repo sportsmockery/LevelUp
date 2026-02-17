@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import {
   View,
   Text,
@@ -25,12 +25,18 @@ import {
   EyeOff,
   ChevronDown,
   ChevronUp,
+  X,
 } from 'lucide-react-native';
 import { AnalysisResult, WrestlingPosition, SINGLET_COLORS } from '@/lib/types';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const FRAME_HEIGHT = (SCREEN_W * 9) / 16;
 const ANNOTATION_PAUSE_MS = 2500;
+const LOOP_DURATION_MS = 10000; // 10-second loop for key moments
+
+export type VideoReviewOverlayHandle = {
+  jumpToFrame: (idx: number) => void;
+};
 
 type Props = {
   frameUris: string[];
@@ -92,7 +98,7 @@ const formatTimestamp = (ms: number): string => {
   return `${min}:${sec.toString().padStart(2, '0')}`;
 };
 
-export default function VideoReviewOverlay({ frameUris, frameTimestamps, videoUri, result, singletColors }: Props) {
+const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function VideoReviewOverlay({ frameUris, frameTimestamps, videoUri, result, singletColors }, ref) {
   const videoRef = useRef<Video>(null);
   const [currentFrame, setCurrentFrame] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -153,14 +159,13 @@ export default function VideoReviewOverlay({ frameUris, frameTimestamps, videoUr
     if (!intentionalPlayRef.current) return;
     const posMs = status.positionMillis;
 
-    // ---- SELECTED FRAME LOOP MODE ----
+    // ---- SELECTED FRAME LOOP MODE (10-second loop) ----
     const sf = selectedFrameRef.current;
     if (sf !== null && status.isPlaying) {
-      const loopEnd = sf < frameTimestamps.length - 1
-        ? frameTimestamps[sf + 1] - 100
-        : frameTimestamps[sf] + 3000;
+      const loopStart = frameTimestamps[sf];
+      const loopEnd = loopStart + LOOP_DURATION_MS;
       if (posMs >= loopEnd) {
-        videoRef.current?.setPositionAsync(frameTimestamps[sf]).catch(() => {});
+        videoRef.current?.setPositionAsync(loopStart).catch(() => {});
       }
       return;
     }
@@ -231,6 +236,21 @@ export default function VideoReviewOverlay({ frameUris, frameTimestamps, videoUr
       await videoRef.current?.setPositionAsync(frameTimestamps[idx]).catch(() => {});
       await videoRef.current?.playAsync();
       setPlaying(true);
+    }
+  };
+
+  // Expose jumpToFrame to parent via ref
+  useImperativeHandle(ref, () => ({ jumpToFrame }), [jumpToFrame, hasVideo, frameTimestamps]);
+
+  const exitLoop = async () => {
+    selectedFrameRef.current = null;
+    setSelectedFrame(null);
+    setPausedForAnnotation(false);
+    if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current);
+    if (hasVideo) {
+      intentionalPlayRef.current = false;
+      await videoRef.current?.pauseAsync();
+      setPlaying(false);
     }
   };
 
@@ -342,6 +362,29 @@ export default function VideoReviewOverlay({ frameUris, frameTimestamps, videoUr
             <Text style={[styles.telScoreText, { color: getScoreColor(result.overall_score) }]}>{result.overall_score}</Text>
           </View>
         </View>
+      )}
+
+      {/* Loop indicator overlay */}
+      {selectedFrame !== null && playing && (
+        <View style={styles.loopIndicator}>
+          <View style={styles.loopBadge}>
+            <Zap size={12} color="#EAB308" />
+            <Text style={styles.loopBadgeText}>LOOPING</Text>
+          </View>
+          <TouchableOpacity style={styles.loopExitBtn} onPress={exitLoop}>
+            <X size={16} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Loop exit when paused on selected frame */}
+      {selectedFrame !== null && !playing && (
+        <TouchableOpacity style={styles.loopExitOverlay} onPress={exitLoop} activeOpacity={0.8}>
+          <View style={styles.loopExitBadge}>
+            <X size={14} color="#fff" />
+            <Text style={styles.loopExitText}>EXIT LOOP</Text>
+          </View>
+        </TouchableOpacity>
       )}
 
       {/* Fallback banner */}
@@ -487,7 +530,11 @@ export default function VideoReviewOverlay({ frameUris, frameTimestamps, videoUr
     </View>
   ) : null;
 
-  // ---------- FRAMES MENU (collapsible, large tap targets) ----------
+  // ---------- FRAMES MENU (collapsible, key moments only) ----------
+  const keyMomentEntries = (result.frame_annotations || [])
+    .map((ann, i) => ({ ann, frameIdx: i }))
+    .filter(({ ann }) => ann.is_key_moment);
+
   const framesMenu = (
     <View style={styles.framesContainer}>
       <View style={styles.framesHeader}>
@@ -497,7 +544,7 @@ export default function VideoReviewOverlay({ frameUris, frameTimestamps, videoUr
           activeOpacity={0.7}
         >
           <Text style={styles.framesHeaderText}>
-            KEY MOMENTS ({result.frame_annotations?.length ?? 0})
+            KEY MOMENTS ({keyMomentEntries.length})
           </Text>
           {framesExpanded
             ? <ChevronUp size={16} color="#A1A1AA" />
@@ -514,23 +561,23 @@ export default function VideoReviewOverlay({ frameUris, frameTimestamps, videoUr
       </View>
       {framesExpanded && (
         <ScrollView style={styles.framesList} nestedScrollEnabled>
-          {result.frame_annotations?.map((ann, i) => {
+          {keyMomentEntries.map(({ ann, frameIdx }, listIdx) => {
             const ps = POSITION_COLORS[ann.position] || POSITION_COLORS.other;
-            const isSelected = i === selectedFrame;
-            const isCurrent = i === currentFrame;
+            const isSelected = frameIdx === selectedFrame;
+            const isCurrent = frameIdx === currentFrame;
             return (
               <TouchableOpacity
-                key={i}
+                key={frameIdx}
                 style={[
                   styles.frameRow,
                   isCurrent && styles.frameRowActive,
                   isSelected && styles.frameRowSelected,
                 ]}
-                onPress={() => jumpToFrame(i)}
+                onPress={() => jumpToFrame(frameIdx)}
                 activeOpacity={0.7}
               >
                 <Text style={[styles.frameRowNum, isCurrent && styles.frameRowNumActive]}>
-                  {i + 1}
+                  {listIdx + 1}
                 </Text>
                 <View style={[styles.confidenceDot, { backgroundColor: (ann.confidence ?? 0.5) >= 0.7 ? '#22C55E' : (ann.confidence ?? 0.5) >= 0.4 ? '#EAB308' : '#EF4444' }]} />
                 <View style={[styles.frameRowPosChip, { backgroundColor: ps.bg }]}>
@@ -541,14 +588,12 @@ export default function VideoReviewOverlay({ frameUris, frameTimestamps, videoUr
                 <View style={styles.frameRowContent}>
                   <Text style={styles.frameRowAction} numberOfLines={1}>{ann.action}</Text>
                 </View>
-                {frameTimestamps && frameTimestamps[i] !== undefined && (
-                  <Text style={styles.frameRowTimestamp}>{formatTimestamp(frameTimestamps[i])}</Text>
+                {frameTimestamps && frameTimestamps[frameIdx] !== undefined && (
+                  <Text style={styles.frameRowTimestamp}>{formatTimestamp(frameTimestamps[frameIdx])}</Text>
                 )}
-                {ann.is_key_moment && (
-                  <View style={styles.frameRowKeyBadge}>
-                    <Zap size={10} color="#EAB308" />
-                  </View>
-                )}
+                <View style={styles.frameRowKeyBadge}>
+                  <Zap size={10} color="#EAB308" />
+                </View>
                 {isSelected && (
                   <Text style={styles.frameRowLoopLabel}>LOOP</Text>
                 )}
@@ -593,7 +638,9 @@ export default function VideoReviewOverlay({ frameUris, frameTimestamps, videoUr
       {framesMenu}
     </View>
   );
-}
+});
+
+export default VideoReviewOverlay;
 
 const styles = StyleSheet.create({
   container: {
@@ -1040,5 +1087,66 @@ const styles = StyleSheet.create({
     color: '#71717A',
     fontWeight: '600',
     marginRight: 4,
+  },
+
+  // ---- LOOP INDICATOR ----
+  loopIndicator: {
+    position: 'absolute',
+    top: 10,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    zIndex: 8,
+  },
+  loopBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(234, 179, 8, 0.2)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(234, 179, 8, 0.5)',
+  },
+  loopBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#EAB308',
+    letterSpacing: 1,
+  },
+  loopExitBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loopExitOverlay: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 8,
+  },
+  loopExitBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(239, 68, 68, 0.3)',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.5)',
+  },
+  loopExitText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: 0.5,
   },
 });
