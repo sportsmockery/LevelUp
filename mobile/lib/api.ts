@@ -83,7 +83,7 @@ export async function submitAnalysis(
   athletePosition?: 'left' | 'right',
   athleteName?: string,
   expoPushToken?: string,
-): Promise<{ jobId: string }> {
+): Promise<{ jobId: string; cached?: boolean; result?: AnalysisResult }> {
   console.log(`[LevelUp] Submitting async analysis: ${frames.length} frames (position: ${athletePosition || 'none'}, name: ${athleteName || 'none'}, push: ${expoPushToken ? 'yes' : 'none'})`);
 
   const response = await fetch(`${API_BASE}/api/analyze?async=true`, {
@@ -98,9 +98,9 @@ export async function submitAnalysis(
   }
 
   const data = await response.json();
-  console.log(`[LevelUp] Async submit response keys: ${Object.keys(data).join(', ')}, jobId: ${data.jobId || 'MISSING'}`);
+  console.log(`[LevelUp] Async submit response: jobId=${data.jobId || 'MISSING'}, cached=${data.cached || false}, keys=${Object.keys(data).join(', ')}`);
   if (!data.jobId) throw new Error('No jobId returned from async submit');
-  return { jobId: data.jobId };
+  return { jobId: data.jobId, cached: !!data.cached, result: data.result };
 }
 
 // Poll for async analysis completion

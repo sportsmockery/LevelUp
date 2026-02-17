@@ -687,16 +687,20 @@ export async function POST(request: NextRequest) {
       ? rawExpoPushToken.trim()
       : undefined;
 
-    // ===== CACHE CHECK: Same input → same score =====
-    const cacheKey = computeAnalysisCacheKey(frames, validMatchStyle, validMode, validAthletePosition, validAthleteId, validMatchContext);
-    console.log(`[LevelUp][cache] Cache key: ${cacheKey.slice(0, 16)}... (${frames.length} frames, ${validMatchStyle}, ${validMode})`);
-    const cachedResult = await getCachedAnalysis(cacheKey);
-    if (cachedResult) {
-      return NextResponse.json(cachedResult);
-    }
-
     // Async mode: return jobId immediately, run analysis in background
     const asyncMode = request.nextUrl.searchParams.get('async') === 'true';
+
+    // ===== CACHE CHECK: Same input → same score =====
+    const cacheKey = computeAnalysisCacheKey(frames, validMatchStyle, validMode, validAthletePosition, validAthleteId, validMatchContext);
+    console.log(`[LevelUp][cache] Cache key: ${cacheKey.slice(0, 16)}... (${frames.length} frames, ${validMatchStyle}, ${validMode}, async=${asyncMode})`);
+    const cachedResult = await getCachedAnalysis(cacheKey);
+    if (cachedResult) {
+      if (asyncMode) {
+        // For async requests, return cached result wrapped with a synthetic jobId
+        return NextResponse.json({ jobId: `cached-${cacheKey.slice(0, 8)}`, status: 'complete', cached: true, result: cachedResult });
+      }
+      return NextResponse.json(cachedResult);
+    }
     const asyncDb = supabaseServer || supabase;
     const userId = auth.user!.id;
     console.log(`[LevelUp] asyncMode=${asyncMode}, asyncDb=${!!asyncDb}, userId=${userId}`);

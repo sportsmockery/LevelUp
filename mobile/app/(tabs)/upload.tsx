@@ -888,7 +888,7 @@ export default function UploadScreen() {
       setProgress(78);
       setStatusText('Submitting for analysis...');
 
-      const { jobId } = await submitAnalysis(
+      const submitResult = await submitAnalysis(
         apiFrames,
         matchStyle,
         'athlete',
@@ -900,6 +900,7 @@ export default function UploadScreen() {
         athleteName || undefined,
         pushToken || undefined,
       );
+      const { jobId } = submitResult;
       await savePendingJob(jobId);
 
       // Persist pending state so analysis survives navigation
@@ -924,8 +925,24 @@ export default function UploadScreen() {
       setProgress(82);
       setStatusText('Analyzing technique & scoring performance...');
 
-      // Poll for completion (resilient — if user navigates away, resume on return)
-      await completeAnalysis(jobId, pendingState);
+      if (submitResult.cached && submitResult.result) {
+        // Cached result — skip polling and use directly
+        console.log('[LevelUp] Using cached analysis result');
+        await AsyncStorage.removeItem(PENDING_ANALYSIS_KEY);
+        setProgress(100);
+        setStatusText('Analysis complete!');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setResult(submitResult.result);
+        await trackAnalysis(submitResult.result, {
+          competitionName: pendingState.competitionName || undefined,
+          weightClass: pendingState.weightClass || undefined,
+          matchStyle: pendingState.matchStyle,
+          opponentName: pendingState.opponentName || undefined,
+        });
+      } else {
+        // Poll for completion (resilient — if user navigates away, resume on return)
+        await completeAnalysis(jobId, pendingState);
+      }
     } catch (err: any) {
       console.error('[LevelUp] Analysis error:', err);
       setAnalysisError(err?.message || 'Analysis failed. Please try again.');
