@@ -98,6 +98,7 @@ export async function submitAnalysis(
   }
 
   const data = await response.json();
+  console.log(`[LevelUp] Async submit response keys: ${Object.keys(data).join(', ')}, jobId: ${data.jobId || 'MISSING'}`);
   if (!data.jobId) throw new Error('No jobId returned from async submit');
   return { jobId: data.jobId };
 }

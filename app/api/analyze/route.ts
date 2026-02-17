@@ -698,13 +698,15 @@ export async function POST(request: NextRequest) {
     // Async mode: return jobId immediately, run analysis in background
     const asyncMode = request.nextUrl.searchParams.get('async') === 'true';
     const asyncDb = supabaseServer || supabase;
+    const userId = auth.user!.id;
+    console.log(`[LevelUp] asyncMode=${asyncMode}, asyncDb=${!!asyncDb}, userId=${userId}`);
     if (asyncMode && asyncDb) {
       const jobId = crypto.randomUUID();
 
       // Create pending job in Supabase
-      await asyncDb.from('match_analyses').insert({
+      const { error: insertError } = await asyncDb.from('match_analyses').insert({
         id: jobId,
-        athlete_id: '00000000-0000-0000-0000-000000000000',
+        athlete_id: userId,
         overall_score: 0,
         standing: 0,
         top: 0,
@@ -717,6 +719,9 @@ export async function POST(request: NextRequest) {
         competition_name: validMatchContext?.competitionName,
         weight_class: validMatchContext?.weightClass,
       });
+      if (insertError) {
+        console.error(`[LevelUp] Job insert failed:`, insertError);
+      }
 
       // Run analysis in background after response is sent
       after(async () => {

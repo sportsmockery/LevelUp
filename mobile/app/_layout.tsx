@@ -57,6 +57,8 @@ function RootNavigator() {
     const inTutorial = segments[0] === 'onboarding-tutorial';
     const isParent = profile?.role === 'parent';
 
+    console.log(`[LevelUp Route] segment=${segments[0]} session=${!!session} profile=${JSON.stringify(profile?.role ?? null)} isParent=${isParent} loading=${loading}`);
+
     if (!session && !inAuth) {
       router.replace('/(auth)/welcome');
     } else if (session && inAuth) {
