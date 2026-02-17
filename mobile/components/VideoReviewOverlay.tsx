@@ -243,12 +243,12 @@ const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function 
     setCurrentFrame(0);
     setPausedForAnnotation(false);
     if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current);
+    setPlaying(true);
     try {
       await videoRef.current?.playFromPositionAsync(0, {
         toleranceMillisBefore: 0,
         toleranceMillisAfter: 0,
       });
-      setPlaying(true);
     } catch (err) {
       console.error('[LevelUp] startVideoPlayback error:', err);
     }
@@ -266,12 +266,12 @@ const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function 
       // Resume loop on selected frame
       const resumeMs = getTimestampForFrame(selectedFrameRef.current);
       intentionalPlayRef.current = true;
+      setPlaying(true);
       try {
         await videoRef.current?.playFromPositionAsync(resumeMs, {
           toleranceMillisBefore: 0,
           toleranceMillisAfter: 0,
         });
-        setPlaying(true);
       } catch (err) {
         console.error('[LevelUp] togglePlay resume error:', err);
       }
@@ -292,17 +292,21 @@ const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function 
         console.warn(`[LevelUp] jumpToFrame(${idx}): video not loaded yet, waiting...`);
         return;
       }
+      if (isSeekingRef.current) return; // prevent re-entrant seeks
       const source = frameTimestamps?.[idx] != null ? 'real' : 'computed';
       console.log(`[LevelUp] jumpToFrame(${idx}): seeking to ${targetMs}ms (${(targetMs / 1000).toFixed(1)}s) [${source}]`);
       intentionalPlayRef.current = true;
+      setPlaying(true);
+      isSeekingRef.current = true;
       try {
         await videoRef.current?.playFromPositionAsync(targetMs, {
           toleranceMillisBefore: 0,
           toleranceMillisAfter: 0,
         });
-        setPlaying(true);
       } catch (err) {
         console.error(`[LevelUp] jumpToFrame(${idx}) seek error:`, err);
+      } finally {
+        isSeekingRef.current = false;
       }
     }
   };
@@ -340,12 +344,12 @@ const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function 
       setCurrentFrame(startIdx);
       intentionalPlayRef.current = true;
       const startPos = startIdx < totalFrames ? getTimestampForFrame(startIdx) : 0;
+      setPlaying(true);
       try {
         await videoRef.current?.playFromPositionAsync(startPos, {
           toleranceMillisBefore: 0,
           toleranceMillisAfter: 0,
         });
-        setPlaying(true);
       } catch (err) {
         console.error('[LevelUp] playThrough seek error:', err);
       }
@@ -383,7 +387,7 @@ const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function 
           source={{ uri: videoUri }}
           style={styles.videoPlayer}
           resizeMode={isFS ? ResizeMode.CONTAIN : ResizeMode.COVER}
-          shouldPlay={false}
+          shouldPlay={playing}
           isMuted
           onLoad={() => setVideoLoaded(true)}
           onPlaybackStatusUpdate={onPlaybackStatusUpdate}
