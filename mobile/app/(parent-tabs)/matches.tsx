@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ChevronDown, AlertTriangle } from 'lucide-react-native';
-import { API_BASE } from '@/lib/api';
+import { API_BASE, authHeaders } from '@/lib/api';
 
 type Connection = {
   connectionId: string;
@@ -51,7 +51,9 @@ export default function ParentMatchesScreen() {
   useEffect(() => {
     async function fetchConnections() {
       try {
-        const res = await fetch(`${API_BASE}/api/family/connections`);
+        const res = await fetch(`${API_BASE}/api/family/connections`, {
+          headers: await authHeaders(),
+        });
         const data = await res.json();
         const conns = data.connections || [];
         setConnections(conns);
@@ -76,6 +78,7 @@ export default function ParentMatchesScreen() {
     try {
       const res = await fetch(
         `${API_BASE}/api/match-history?userId=${selectedAthleteId}&limit=100`,
+        { headers: await authHeaders() },
       );
       const data = await res.json();
       setMatches(data.matches || []);

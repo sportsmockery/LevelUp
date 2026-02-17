@@ -22,6 +22,10 @@ export async function requireAuth(request: NextRequest): Promise<
     return { user: { id: '00000000-0000-0000-0000-000000000000' }, response: null };
   }
 
+  // Check for Bearer token (mobile app) or cookies (web app)
+  const authHeader = request.headers.get('authorization');
+  const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
+
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       getAll() {
@@ -36,7 +40,7 @@ export async function requireAuth(request: NextRequest): Promise<
   const {
     data: { user },
     error,
-  } = await supabase.auth.getUser();
+  } = await supabase.auth.getUser(bearerToken || undefined);
 
   if (error || !user) {
     return {

@@ -1,7 +1,20 @@
 import { AnalysisResult, MatchStyle, AnalysisMode, MatchContext, AthleteIdentification, WrestlerIdentificationResult } from './types';
+import { supabase } from './supabase';
 
 // Points to our Vercel API for AI analysis
 export const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://levelup-chris-burhans-projects.vercel.app';
+
+// Get auth headers for API requests
+export async function authHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (supabase) {
+    const { data } = await supabase.auth.getSession();
+    if (data.session?.access_token) {
+      headers['Authorization'] = `Bearer ${data.session.access_token}`;
+    }
+  }
+  return headers;
+}
 
 // Identify wrestlers in a frame via GPT-4o
 export async function identifyWrestler(frame: string): Promise<WrestlerIdentificationResult> {
@@ -9,7 +22,7 @@ export async function identifyWrestler(frame: string): Promise<WrestlerIdentific
 
   const response = await fetch(`${API_BASE}/api/identify-wrestler`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: await authHeaders(),
     body: JSON.stringify({ frame }),
   });
 
@@ -37,7 +50,7 @@ export async function analyzeFrames(
 
   const response = await fetch(`${API_BASE}/api/analyze`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: await authHeaders(),
     body: JSON.stringify({ frames, matchStyle, mode, matchContext, athleteIdentification, opponentIdentification, idFrameBase64, athletePosition, athleteName }),
   });
 
@@ -75,7 +88,7 @@ export async function submitAnalysis(
 
   const response = await fetch(`${API_BASE}/api/analyze?async=true`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: await authHeaders(),
     body: JSON.stringify({ frames, matchStyle, mode, matchContext, athleteIdentification, opponentIdentification, idFrameBase64, athletePosition, athleteName, expoPushToken }),
   });
 
@@ -95,7 +108,9 @@ export async function checkAnalysisStatus(jobId: string): Promise<{
   result?: AnalysisResult;
   error?: string;
 }> {
-  const response = await fetch(`${API_BASE}/api/analyze/status?jobId=${encodeURIComponent(jobId)}`);
+  const response = await fetch(`${API_BASE}/api/analyze/status?jobId=${encodeURIComponent(jobId)}`, {
+    headers: await authHeaders(),
+  });
   if (!response.ok) {
     throw new Error(`Status check failed (${response.status})`);
   }
@@ -116,7 +131,7 @@ export async function analyzeQuick(
 
   const response = await fetch(`${API_BASE}/api/analyze`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: await authHeaders(),
     body: JSON.stringify({
       frames,
       matchStyle,
@@ -167,7 +182,7 @@ export async function submitProgressiveChunk(
 
   const response = await fetch(`${API_BASE}/api/analyze/progressive`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: await authHeaders(),
     body: JSON.stringify({ sessionId, frames, matchStyle, athletePosition, isLastChunk }),
   });
 
@@ -188,7 +203,9 @@ export async function checkProgressiveSession(sessionId: string): Promise<{
   currentScores: ProgressiveScores;
   finalAnalysisId?: string;
 }> {
-  const response = await fetch(`${API_BASE}/api/analyze/progressive?sessionId=${encodeURIComponent(sessionId)}`);
+  const response = await fetch(`${API_BASE}/api/analyze/progressive?sessionId=${encodeURIComponent(sessionId)}`, {
+    headers: await authHeaders(),
+  });
   if (!response.ok) throw new Error(`Session check failed (${response.status})`);
   return response.json();
 }
@@ -206,7 +223,7 @@ export async function shareAnalysis(
 ): Promise<{ shareToken: string; shareUrl: string }> {
   const response = await fetch(`${API_BASE}/api/share`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: await authHeaders(),
     body: JSON.stringify({
       analysisId,
       sharedBy: options?.sharedBy,
@@ -243,7 +260,7 @@ export type ManualMatchData = {
 export async function saveManualMatch(data: ManualMatchData): Promise<{ id: string }> {
   const response = await fetch(`${API_BASE}/api/matches/manual`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: await authHeaders(),
     body: JSON.stringify(data),
   });
 
@@ -273,6 +290,7 @@ export async function getClubLeaderboard(
 ): Promise<{ rankings: LeaderboardEntry[] }> {
   const response = await fetch(
     `${API_BASE}/api/club/leaderboard?clubId=${encodeURIComponent(clubId)}&type=${type}&limit=${limit}`,
+    { headers: await authHeaders() },
   );
   if (!response.ok) throw new Error(`Leaderboard fetch failed (${response.status})`);
   return response.json();
@@ -297,6 +315,7 @@ export async function getClubActivity(
 ): Promise<{ activities: ActivityEntry[] }> {
   const response = await fetch(
     `${API_BASE}/api/club/activity?clubId=${encodeURIComponent(clubId)}&limit=${limit}&offset=${offset}`,
+    { headers: await authHeaders() },
   );
   if (!response.ok) throw new Error(`Activity fetch failed (${response.status})`);
   return response.json();

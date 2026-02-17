@@ -27,6 +27,11 @@ export default function ForgotPasswordScreen() {
       return;
     }
 
+    if (!supabase) {
+      Alert.alert('Connection error', 'Unable to connect to the server. Please restart the app.');
+      return;
+    }
+
     setLoading(true);
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
     setLoading(false);

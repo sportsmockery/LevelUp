@@ -27,6 +27,10 @@ export default function LoginScreen() {
       Alert.alert('Missing fields', 'Please enter your email and password.');
       return;
     }
+    if (!supabase) {
+      Alert.alert('Connection error', 'Unable to connect to the server. Please restart the app.');
+      return;
+    }
 
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({

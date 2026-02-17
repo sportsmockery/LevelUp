@@ -46,7 +46,7 @@ import { submitAnalysis, identifyWrestler, saveManualMatch } from '@/lib/api';
 import { pollForCompletion, savePendingJob, requestNotificationPermissions } from '@/lib/analysis-poller';
 import { getStoredPushToken } from '@/lib/notifications';
 import { AnalysisResult, MatchStyle, MatchContext, AthleteIdentification, WrestlerIdentificationResult, OpponentSummary } from '@/lib/types';
-import { API_BASE } from '@/lib/api';
+import { API_BASE, authHeaders } from '@/lib/api';
 import { addAnalysisEntry } from '@/lib/storage';
 import { trackAnalysis } from '@/lib/athlete-tracking';
 import AnalysisResults from '@/components/AnalysisResults';
@@ -273,27 +273,29 @@ export default function UploadScreen() {
 
   // Load past opponents for autocomplete + comparison data
   useEffect(() => {
-    fetch(`${API_BASE}/api/match-history?limit=100`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.opponents && Array.isArray(data.opponents)) {
-          setPastOpponents(data.opponents);
-        }
-        // Compute previous score and position averages from match history
-        const matches = (data.matches || []) as Array<{ overallScore: number; standing: number; top: number; bottom: number; isManualEntry: boolean }>;
-        const videoMatches = matches.filter((m) => !m.isManualEntry);
-        if (videoMatches.length > 0) {
-          // matches are newest-first, so [0] is the most recent
-          setPreviousScore(videoMatches[0].overallScore);
-          const avg = (arr: number[]) => Math.round(arr.reduce((s, v) => s + v, 0) / arr.length);
-          setPositionAverages({
-            standing: avg(videoMatches.map((m) => m.standing)),
-            top: avg(videoMatches.map((m) => m.top)),
-            bottom: avg(videoMatches.map((m) => m.bottom)),
-          });
-        }
-      })
-      .catch(() => {});
+    authHeaders().then((hdrs) =>
+      fetch(`${API_BASE}/api/match-history?limit=100`, { headers: hdrs })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.opponents && Array.isArray(data.opponents)) {
+            setPastOpponents(data.opponents);
+          }
+          // Compute previous score and position averages from match history
+          const matches = (data.matches || []) as Array<{ overallScore: number; standing: number; top: number; bottom: number; isManualEntry: boolean }>;
+          const videoMatches = matches.filter((m) => !m.isManualEntry);
+          if (videoMatches.length > 0) {
+            // matches are newest-first, so [0] is the most recent
+            setPreviousScore(videoMatches[0].overallScore);
+            const avg = (arr: number[]) => Math.round(arr.reduce((s, v) => s + v, 0) / arr.length);
+            setPositionAverages({
+              standing: avg(videoMatches.map((m) => m.standing)),
+              top: avg(videoMatches.map((m) => m.top)),
+              bottom: avg(videoMatches.map((m) => m.bottom)),
+            });
+          }
+        })
+        .catch(() => {}),
+    );
   }, []);
 
   const checkVideoDuration = (asset: ImagePicker.ImagePickerAsset): boolean => {

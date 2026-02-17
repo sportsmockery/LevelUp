@@ -47,6 +47,11 @@ export default function SignupScreen() {
       return;
     }
 
+    if (!supabase) {
+      Alert.alert('Connection error', 'Unable to connect to the server. Please restart the app.');
+      return;
+    }
+
     setLoading(true);
     const { error } = await supabase.auth.signUp({
       email: email.trim(),

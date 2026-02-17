@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { ArrowLeft, UserCheck, UserX, Users } from 'lucide-react-native';
-import { API_BASE } from '@/lib/api';
+import { API_BASE, authHeaders } from '@/lib/api';
 
 type ConnectionRequest = {
   id: string;
@@ -34,7 +34,9 @@ export default function ConnectionRequestsScreen() {
 
   const fetchRequests = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/family/requests`);
+      const res = await fetch(`${API_BASE}/api/family/requests`, {
+        headers: await authHeaders(),
+      });
       const data = await res.json();
       setRequests(data.requests || []);
     } catch (err) {
@@ -49,7 +51,7 @@ export default function ConnectionRequestsScreen() {
     try {
       const res = await fetch(`${API_BASE}/api/family/approve`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await authHeaders(),
         body: JSON.stringify({ connectionId: req.id }),
       });
 
@@ -82,7 +84,7 @@ export default function ConnectionRequestsScreen() {
             try {
               const res = await fetch(`${API_BASE}/api/family/deny`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: await authHeaders(),
                 body: JSON.stringify({ connectionId: req.id }),
               });
 

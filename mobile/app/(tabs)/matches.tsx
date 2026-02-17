@@ -40,7 +40,7 @@ import {
   ArrowRight,
 } from 'lucide-react-native';
 import { useFocusEffect } from 'expo-router';
-import { analyzeFrames, API_BASE } from '@/lib/api';
+import { analyzeFrames, API_BASE, authHeaders } from '@/lib/api';
 import { AnalysisResult, OpponentScoutingResult, MatchStyle, MatchHistoryEntry, OpponentSummary, SINGLET_COLORS } from '@/lib/types';
 import { getScoreTrendIndicator } from '@/lib/score-comparison';
 
@@ -125,7 +125,9 @@ export default function MatchesScreen() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/match-history?limit=100`);
+      const res = await fetch(`${API_BASE}/api/match-history?limit=100`, {
+        headers: await authHeaders(),
+      });
       const data = await res.json();
       setMatches(data.matches || []);
       setOpponents(data.opponents || []);

@@ -19,7 +19,7 @@ import {
   BarChart3,
   Minus,
 } from 'lucide-react-native';
-import { API_BASE } from '@/lib/api';
+import { API_BASE, authHeaders } from '@/lib/api';
 import { ProgressDashboardData } from '@/lib/types';
 import { useAuth } from '@/lib/auth';
 import LineChart from '@/components/LineChart';
@@ -60,7 +60,9 @@ export default function ProgressDashboardScreen() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/wrestler/progress`);
+      const res = await fetch(`${API_BASE}/api/wrestler/progress`, {
+        headers: await authHeaders(),
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       setData(json);

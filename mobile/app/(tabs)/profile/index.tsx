@@ -44,7 +44,7 @@ import {
 import { getAnalysisHistory } from '@/lib/storage';
 import { AnalysisHistoryEntry } from '@/lib/types';
 import { getProfileStats, ProfileStats } from '@/lib/profile-stats';
-import { API_BASE } from '@/lib/api';
+import { API_BASE, authHeaders } from '@/lib/api';
 import AnalysisResults from '@/components/AnalysisResults';
 import VideoReviewOverlay from '@/components/VideoReviewOverlay';
 import ComparisonView from '@/components/ComparisonView';
@@ -130,10 +130,12 @@ export default function ProfileScreen() {
     setLoadingStats(false);
 
     // Fetch pending connection request count
-    fetch(`${API_BASE}/api/family/requests/count`)
-      .then((res) => res.json())
-      .then((data) => setPendingConnectionCount(data.count || 0))
-      .catch(() => {});
+    authHeaders().then((hdrs) =>
+      fetch(`${API_BASE}/api/family/requests/count`, { headers: hdrs })
+        .then((res) => res.json())
+        .then((data) => setPendingConnectionCount(data.count || 0))
+        .catch(() => {}),
+    );
   }, []);
 
   useFocusEffect(

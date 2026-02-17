@@ -22,7 +22,7 @@ import {
   AlertTriangle,
 } from 'lucide-react-native';
 import { useAuth } from '@/lib/auth';
-import { API_BASE } from '@/lib/api';
+import { API_BASE, authHeaders } from '@/lib/api';
 
 type Connection = {
   connectionId: string;
@@ -71,7 +71,9 @@ export default function ParentHomeScreen() {
   const fetchConnections = useCallback(async () => {
     setConnectionsError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/family/connections`);
+      const res = await fetch(`${API_BASE}/api/family/connections`, {
+        headers: await authHeaders(),
+      });
       const data = await res.json();
       setConnections(data.connections || []);
 
@@ -100,6 +102,7 @@ export default function ParentHomeScreen() {
     try {
       const res = await fetch(
         `${API_BASE}/api/match-history?userId=${selectedAthleteId}&limit=10`,
+        { headers: await authHeaders() },
       );
       const data = await res.json();
       setMatches(data.matches || []);

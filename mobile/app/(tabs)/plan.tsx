@@ -23,7 +23,7 @@ import {
   Zap,
 } from 'lucide-react-native';
 import { DrillAssignment } from '@/lib/types';
-import { API_BASE } from '@/lib/api';
+import { API_BASE, authHeaders } from '@/lib/api';
 
 const XP_BY_PRIORITY: Record<string, number> = {
   critical: 50,
@@ -83,7 +83,9 @@ export default function PlanScreen() {
 
   const fetchDrills = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/drills?athlete_id=${ATHLETE_ID}`);
+      const res = await fetch(`${API_BASE}/api/drills?athlete_id=${ATHLETE_ID}`, {
+        headers: await authHeaders(),
+      });
       if (res.ok) {
         const data = await res.json();
         setDrills(data.drills || []);
@@ -133,7 +135,7 @@ export default function PlanScreen() {
     try {
       const res = await fetch(`${API_BASE}/api/drills`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await authHeaders(),
         body: JSON.stringify({ drillId: drill.id, athleteId: ATHLETE_ID }),
       });
 
