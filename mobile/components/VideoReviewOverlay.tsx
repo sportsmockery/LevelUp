@@ -113,6 +113,7 @@ const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function 
   const nextAnnotationIdx = useRef(0);
   const pauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const intentionalPlayRef = useRef(false);
+  const isSeekingRef = useRef(false);
   const totalFrames = frameUris.length;
   const [timelineWidth, setTimelineWidth] = useState(0);
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -198,11 +199,14 @@ const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function 
     if (sf !== null && status.isPlaying) {
       const loopStart = getTimestampForFrame(sf);
       const loopEnd = loopStart + LOOP_DURATION_MS;
-      if (posMs >= loopEnd) {
-        videoRef.current?.setPositionAsync(loopStart, {
+      if (posMs >= loopEnd && !isSeekingRef.current) {
+        isSeekingRef.current = true;
+        videoRef.current?.playFromPositionAsync(loopStart, {
           toleranceMillisBefore: 0,
           toleranceMillisAfter: 0,
-        }).catch((err) => console.warn('[LevelUp] Loop seek error:', err));
+        })
+          .catch((err) => console.warn('[LevelUp] Loop seek error:', err))
+          .finally(() => { isSeekingRef.current = false; });
       }
       return;
     }
@@ -240,11 +244,10 @@ const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function 
     setPausedForAnnotation(false);
     if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current);
     try {
-      await videoRef.current?.setPositionAsync(0, {
+      await videoRef.current?.playFromPositionAsync(0, {
         toleranceMillisBefore: 0,
         toleranceMillisAfter: 0,
       });
-      await videoRef.current?.playAsync();
       setPlaying(true);
     } catch (err) {
       console.error('[LevelUp] startVideoPlayback error:', err);
@@ -264,11 +267,10 @@ const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function 
       const resumeMs = getTimestampForFrame(selectedFrameRef.current);
       intentionalPlayRef.current = true;
       try {
-        await videoRef.current?.setPositionAsync(resumeMs, {
+        await videoRef.current?.playFromPositionAsync(resumeMs, {
           toleranceMillisBefore: 0,
           toleranceMillisAfter: 0,
         });
-        await videoRef.current?.playAsync();
         setPlaying(true);
       } catch (err) {
         console.error('[LevelUp] togglePlay resume error:', err);
@@ -294,12 +296,10 @@ const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function 
       console.log(`[LevelUp] jumpToFrame(${idx}): seeking to ${targetMs}ms (${(targetMs / 1000).toFixed(1)}s) [${source}]`);
       intentionalPlayRef.current = true;
       try {
-        await videoRef.current?.pauseAsync();
-        await videoRef.current?.setPositionAsync(targetMs, {
+        await videoRef.current?.playFromPositionAsync(targetMs, {
           toleranceMillisBefore: 0,
           toleranceMillisAfter: 0,
         });
-        await videoRef.current?.playAsync();
         setPlaying(true);
       } catch (err) {
         console.error(`[LevelUp] jumpToFrame(${idx}) seek error:`, err);
@@ -341,12 +341,10 @@ const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function 
       intentionalPlayRef.current = true;
       const startPos = startIdx < totalFrames ? getTimestampForFrame(startIdx) : 0;
       try {
-        await videoRef.current?.pauseAsync();
-        await videoRef.current?.setPositionAsync(startPos, {
+        await videoRef.current?.playFromPositionAsync(startPos, {
           toleranceMillisBefore: 0,
           toleranceMillisAfter: 0,
         });
-        await videoRef.current?.playAsync();
         setPlaying(true);
       } catch (err) {
         console.error('[LevelUp] playThrough seek error:', err);
