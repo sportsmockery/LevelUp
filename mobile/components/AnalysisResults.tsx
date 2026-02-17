@@ -176,6 +176,13 @@ export default function AnalysisResults({ result, thumbnailUri, videoFileName, a
 
       {/* Key Moments */}
       {(() => {
+        const EXTRACTION_INTERVAL_MS = 1000;
+        const getTs = (idx: number): number => {
+          if (frameTimestamps && idx < frameTimestamps.length && frameTimestamps[idx] != null) {
+            return frameTimestamps[idx];
+          }
+          return idx * EXTRACTION_INTERVAL_MS;
+        };
         const keyMoments = (result.frame_annotations || [])
           .map((ann, i) => ({ ann, frameIdx: i }))
           .filter(({ ann }) => ann.is_key_moment);
@@ -184,8 +191,8 @@ export default function AnalysisResults({ result, thumbnailUri, videoFileName, a
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: '#EAB308' }]}>KEY MOMENTS</Text>
             {keyMoments.map(({ ann, frameIdx }, listIdx) => {
-              const ts = frameTimestamps?.[frameIdx];
-              const canJump = !!onJumpToMoment && ts !== undefined;
+              const ts = getTs(frameIdx);
+              const canJump = !!onJumpToMoment;
               return (
                 <TouchableOpacity
                   key={frameIdx}
@@ -204,9 +211,7 @@ export default function AnalysisResults({ result, thumbnailUri, videoFileName, a
                     </View>
                   </View>
                   <View style={styles.keyMomentRight}>
-                    {ts !== undefined && (
-                      <Text style={styles.keyMomentTimestamp}>{formatTimestamp(ts)}</Text>
-                    )}
+                    <Text style={styles.keyMomentTimestamp}>{formatTimestamp(ts)}</Text>
                     {canJump && <Play size={14} color="#2563EB" />}
                   </View>
                 </TouchableOpacity>

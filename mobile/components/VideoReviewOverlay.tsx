@@ -98,6 +98,8 @@ const formatTimestamp = (ms: number): string => {
   return `${min}:${sec.toString().padStart(2, '0')}`;
 };
 
+const EXTRACTION_INTERVAL_MS = 1000; // 1 frame per second = 1000ms between frames
+
 const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function VideoReviewOverlay({ frameUris, frameTimestamps, videoUri, result, singletColors }, ref) {
   const videoRef = useRef<Video>(null);
   const [currentFrame, setCurrentFrame] = useState(0);
@@ -115,13 +117,22 @@ const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function 
   const [timelineWidth, setTimelineWidth] = useState(0);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  const hasVideo = !!videoUri && !!frameTimestamps && frameTimestamps.length > 0;
+  // Compute timestamp for a frame index: use real timestamps when available,
+  // fall back to reconstructing from frame index × extraction interval
+  const getTimestampForFrame = useCallback((idx: number): number => {
+    if (frameTimestamps && idx < frameTimestamps.length && frameTimestamps[idx] != null) {
+      return frameTimestamps[idx];
+    }
+    return idx * EXTRACTION_INTERVAL_MS;
+  }, [frameTimestamps]);
+
+  const hasVideo = !!videoUri && totalFrames > 0;
 
   // === KEY MOMENTS DIAGNOSTIC LOGGING ===
   useEffect(() => {
     if (!result) return;
     console.log('=== KEY MOMENTS DEBUG ===');
-    console.log('hasVideo:', hasVideo, '| videoUri:', !!videoUri, '| frameTimestamps count:', frameTimestamps?.length ?? 0);
+    console.log('hasVideo:', hasVideo, '| videoUri:', !!videoUri, '| frameTimestamps count:', frameTimestamps?.length ?? 0, '| fallback: frame_index * ', EXTRACTION_INTERVAL_MS, 'ms');
     console.log('frame_annotations count:', result.frame_annotations?.length ?? 0);
 
     const keyMoments = (result.frame_annotations || [])
@@ -129,15 +140,16 @@ const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function 
       .filter(({ ann }) => ann.is_key_moment);
 
     keyMoments.forEach(({ ann, frameIdx }, listIdx) => {
-      const ts = frameTimestamps?.[frameIdx];
-      console.log(`Key Moment ${listIdx + 1}: frameIdx=${frameIdx}, timestamp=${ts}ms (${ts !== undefined ? (ts / 1000).toFixed(1) + 's' : 'MISSING'}), action="${ann.action}"`);
+      const ts = getTimestampForFrame(frameIdx);
+      const source = frameTimestamps?.[frameIdx] != null ? 'real' : 'computed';
+      console.log(`Key Moment ${listIdx + 1}: frameIdx=${frameIdx}, timestamp=${ts}ms (${(ts / 1000).toFixed(1)}s) [${source}], action="${ann.action}"`);
     });
 
     if (frameTimestamps && frameTimestamps.length > 0) {
       console.log('All frameTimestamps (ms):', frameTimestamps.join(', '));
     }
     console.log('=== END KEY MOMENTS DEBUG ===');
-  }, [result, frameTimestamps, hasVideo, videoUri]);
+  }, [result, frameTimestamps, hasVideo, videoUri, getTimestampForFrame]);
 
   // Fallback: frame slideshow for history entries without video
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -177,15 +189,14 @@ const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function 
   }, [currentFrame, pausedForAnnotation, hasVideo, playing, selectedFrame]);
 
   const onPlaybackStatusUpdate = useCallback((status: AVPlaybackStatus) => {
-    if (!status.isLoaded || !frameTimestamps) return;
+    if (!status.isLoaded) return;
     if (!intentionalPlayRef.current) return;
     const posMs = status.positionMillis;
 
     // ---- SELECTED FRAME LOOP MODE (10-second loop) ----
     const sf = selectedFrameRef.current;
     if (sf !== null && status.isPlaying) {
-      const loopStart = frameTimestamps[sf];
-      if (loopStart === undefined) return;
+      const loopStart = getTimestampForFrame(sf);
       const loopEnd = loopStart + LOOP_DURATION_MS;
       if (posMs >= loopEnd) {
         videoRef.current?.setPositionAsync(loopStart, {
@@ -198,8 +209,9 @@ const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function 
 
     // ---- PLAY-THROUGH MODE (annotation pause system) ----
     const idx = nextAnnotationIdx.current;
-    if (status.isPlaying && idx < frameTimestamps.length) {
-      if (posMs >= frameTimestamps[idx] - 100) {
+    if (status.isPlaying && idx < totalFrames) {
+      const targetMs = getTimestampForFrame(idx);
+      if (posMs >= targetMs - 100) {
         videoRef.current?.pauseAsync();
         setCurrentFrame(idx);
         setPausedForAnnotation(true);
@@ -216,7 +228,7 @@ const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function 
       setCurrentFrame(0);
       setPlaying(false);
     }
-  }, [frameTimestamps]);
+  }, [getTimestampForFrame, totalFrames]);
 
   const startVideoPlayback = async () => {
     if (!hasVideo) { setPlaying(true); return; }
@@ -249,19 +261,17 @@ const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function 
       setPlaying(false);
     } else if (selectedFrameRef.current !== null) {
       // Resume loop on selected frame
-      const resumeMs = frameTimestamps![selectedFrameRef.current];
-      if (resumeMs !== undefined) {
-        intentionalPlayRef.current = true;
-        try {
-          await videoRef.current?.setPositionAsync(resumeMs, {
-            toleranceMillisBefore: 0,
-            toleranceMillisAfter: 0,
-          });
-          await videoRef.current?.playAsync();
-          setPlaying(true);
-        } catch (err) {
-          console.error('[LevelUp] togglePlay resume error:', err);
-        }
+      const resumeMs = getTimestampForFrame(selectedFrameRef.current);
+      intentionalPlayRef.current = true;
+      try {
+        await videoRef.current?.setPositionAsync(resumeMs, {
+          toleranceMillisBefore: 0,
+          toleranceMillisAfter: 0,
+        });
+        await videoRef.current?.playAsync();
+        setPlaying(true);
+      } catch (err) {
+        console.error('[LevelUp] togglePlay resume error:', err);
       }
     } else {
       await startVideoPlayback();
@@ -274,23 +284,17 @@ const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function 
     setCurrentFrame(idx);
     setPausedForAnnotation(false);
     if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current);
-    if (hasVideo && frameTimestamps) {
-      const targetMs = frameTimestamps[idx];
-      if (targetMs === undefined || targetMs === null) {
-        console.warn(`[LevelUp] jumpToFrame(${idx}): no timestamp found, frameTimestamps length=${frameTimestamps.length}`);
-        return;
-      }
+    if (hasVideo) {
+      const targetMs = getTimestampForFrame(idx);
       if (!videoLoaded) {
         console.warn(`[LevelUp] jumpToFrame(${idx}): video not loaded yet, waiting...`);
-        // Still set state so it seeks when video loads
         return;
       }
-      console.log(`[LevelUp] jumpToFrame(${idx}): seeking to ${targetMs}ms (${(targetMs / 1000).toFixed(1)}s)`);
+      const source = frameTimestamps?.[idx] != null ? 'real' : 'computed';
+      console.log(`[LevelUp] jumpToFrame(${idx}): seeking to ${targetMs}ms (${(targetMs / 1000).toFixed(1)}s) [${source}]`);
       intentionalPlayRef.current = true;
       try {
-        // Pause first for reliable seeking
         await videoRef.current?.pauseAsync();
-        // Seek with tight tolerance for frame-accurate positioning (critical on iOS)
         await videoRef.current?.setPositionAsync(targetMs, {
           toleranceMillisBefore: 0,
           toleranceMillisAfter: 0,
@@ -304,7 +308,7 @@ const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function 
   };
 
   // Expose jumpToFrame to parent via ref
-  useImperativeHandle(ref, () => ({ jumpToFrame }), [jumpToFrame, hasVideo, frameTimestamps]);
+  useImperativeHandle(ref, () => ({ jumpToFrame }), [jumpToFrame, hasVideo, getTimestampForFrame]);
 
   const exitLoop = async () => {
     selectedFrameRef.current = null;
@@ -329,13 +333,13 @@ const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function 
     setSelectedFrame(null);
     setPausedForAnnotation(false);
     if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current);
-    if (hasVideo && frameTimestamps) {
+    if (hasVideo) {
       // Start from the frame after the selected one (or from beginning)
-      const startIdx = sf !== null && sf + 1 < frameTimestamps.length ? sf + 1 : 0;
+      const startIdx = sf !== null && sf + 1 < totalFrames ? sf + 1 : 0;
       nextAnnotationIdx.current = startIdx;
       setCurrentFrame(startIdx);
       intentionalPlayRef.current = true;
-      const startPos = startIdx < frameTimestamps.length ? frameTimestamps[startIdx] : 0;
+      const startPos = startIdx < totalFrames ? getTimestampForFrame(startIdx) : 0;
       try {
         await videoRef.current?.pauseAsync();
         await videoRef.current?.setPositionAsync(startPos, {
@@ -536,8 +540,8 @@ const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function 
             </TouchableOpacity>
           )}
           <Text style={styles.frameNum}>
-            {frameTimestamps && frameTimestamps[currentFrame] !== undefined
-              ? `${formatTimestamp(frameTimestamps[currentFrame])} \u00B7 ${currentFrame + 1}/${totalFrames}`
+            {hasVideo
+              ? `${formatTimestamp(getTimestampForFrame(currentFrame))} \u00B7 ${currentFrame + 1}/${totalFrames}`
               : `${currentFrame + 1}/${totalFrames}`}
           </Text>
         </View>
@@ -660,9 +664,7 @@ const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function 
                 <View style={styles.frameRowContent}>
                   <Text style={styles.frameRowAction} numberOfLines={1}>{ann.action}</Text>
                 </View>
-                {frameTimestamps && frameTimestamps[frameIdx] !== undefined && (
-                  <Text style={styles.frameRowTimestamp}>{formatTimestamp(frameTimestamps[frameIdx])}</Text>
-                )}
+                <Text style={styles.frameRowTimestamp}>{formatTimestamp(getTimestampForFrame(frameIdx))}</Text>
                 <View style={styles.frameRowKeyBadge}>
                   <Zap size={10} color="#EAB308" />
                 </View>
