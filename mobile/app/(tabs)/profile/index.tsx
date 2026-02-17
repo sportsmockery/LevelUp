@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -46,7 +46,7 @@ import { AnalysisHistoryEntry } from '@/lib/types';
 import { getProfileStats, ProfileStats } from '@/lib/profile-stats';
 import { API_BASE, authHeaders } from '@/lib/api';
 import AnalysisResults from '@/components/AnalysisResults';
-import VideoReviewOverlay from '@/components/VideoReviewOverlay';
+import VideoReviewOverlay, { VideoReviewOverlayHandle } from '@/components/VideoReviewOverlay';
 import ComparisonView from '@/components/ComparisonView';
 import { useAuth } from '@/lib/auth';
 
@@ -118,6 +118,8 @@ export default function ProfileScreen() {
   const [compareMode, setCompareMode] = useState(false);
   const [compareSelections, setCompareSelections] = useState<AnalysisHistoryEntry[]>([]);
   const [pendingConnectionCount, setPendingConnectionCount] = useState(0);
+  const historyVideoRef = useRef<VideoReviewOverlayHandle>(null);
+  const historyScrollRef = useRef<ScrollView>(null);
 
   const loadData = useCallback(async () => {
     setLoadingStats(true);
@@ -351,6 +353,7 @@ export default function ProfileScreen() {
               {selectedEntry.frameUris && selectedEntry.frameUris.length > 0 && (
                 <View style={{ marginHorizontal: -24 }}>
                   <VideoReviewOverlay
+                    ref={historyVideoRef}
                     frameUris={selectedEntry.frameUris}
                     frameTimestamps={selectedEntry.frameTimestamps}
                     videoUri={selectedEntry.videoUri}
@@ -364,6 +367,10 @@ export default function ProfileScreen() {
                 result={selectedEntry.result}
                 thumbnailUri={!selectedEntry.frameUris?.length ? (selectedEntry.thumbnailUri || null) : null}
                 videoFileName={selectedEntry.videoFileName}
+                frameTimestamps={selectedEntry.frameTimestamps}
+                onJumpToMoment={(frameIdx) => {
+                  historyVideoRef.current?.jumpToFrame(frameIdx);
+                }}
               />
             </View>
           );

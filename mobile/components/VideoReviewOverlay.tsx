@@ -117,6 +117,28 @@ const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function 
 
   const hasVideo = !!videoUri && !!frameTimestamps && frameTimestamps.length > 0;
 
+  // === KEY MOMENTS DIAGNOSTIC LOGGING ===
+  useEffect(() => {
+    if (!result) return;
+    console.log('=== KEY MOMENTS DEBUG ===');
+    console.log('hasVideo:', hasVideo, '| videoUri:', !!videoUri, '| frameTimestamps count:', frameTimestamps?.length ?? 0);
+    console.log('frame_annotations count:', result.frame_annotations?.length ?? 0);
+
+    const keyMoments = (result.frame_annotations || [])
+      .map((ann, i) => ({ ann, frameIdx: i }))
+      .filter(({ ann }) => ann.is_key_moment);
+
+    keyMoments.forEach(({ ann, frameIdx }, listIdx) => {
+      const ts = frameTimestamps?.[frameIdx];
+      console.log(`Key Moment ${listIdx + 1}: frameIdx=${frameIdx}, timestamp=${ts}ms (${ts !== undefined ? (ts / 1000).toFixed(1) + 's' : 'MISSING'}), action="${ann.action}"`);
+    });
+
+    if (frameTimestamps && frameTimestamps.length > 0) {
+      console.log('All frameTimestamps (ms):', frameTimestamps.join(', '));
+    }
+    console.log('=== END KEY MOMENTS DEBUG ===');
+  }, [result, frameTimestamps, hasVideo, videoUri]);
+
   // Fallback: frame slideshow for history entries without video
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
@@ -163,9 +185,13 @@ const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function 
     const sf = selectedFrameRef.current;
     if (sf !== null && status.isPlaying) {
       const loopStart = frameTimestamps[sf];
+      if (loopStart === undefined) return;
       const loopEnd = loopStart + LOOP_DURATION_MS;
       if (posMs >= loopEnd) {
-        videoRef.current?.setPositionAsync(loopStart).catch(() => {});
+        videoRef.current?.setPositionAsync(loopStart, {
+          toleranceMillisBefore: 0,
+          toleranceMillisAfter: 0,
+        }).catch((err) => console.warn('[LevelUp] Loop seek error:', err));
       }
       return;
     }
@@ -201,9 +227,16 @@ const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function 
     setCurrentFrame(0);
     setPausedForAnnotation(false);
     if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current);
-    await videoRef.current?.setPositionAsync(0).catch(() => {});
-    await videoRef.current?.playAsync();
-    setPlaying(true);
+    try {
+      await videoRef.current?.setPositionAsync(0, {
+        toleranceMillisBefore: 0,
+        toleranceMillisAfter: 0,
+      });
+      await videoRef.current?.playAsync();
+      setPlaying(true);
+    } catch (err) {
+      console.error('[LevelUp] startVideoPlayback error:', err);
+    }
   };
 
   const togglePlay = async () => {
@@ -216,10 +249,20 @@ const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function 
       setPlaying(false);
     } else if (selectedFrameRef.current !== null) {
       // Resume loop on selected frame
-      intentionalPlayRef.current = true;
-      await videoRef.current?.setPositionAsync(frameTimestamps![selectedFrameRef.current]).catch(() => {});
-      await videoRef.current?.playAsync();
-      setPlaying(true);
+      const resumeMs = frameTimestamps![selectedFrameRef.current];
+      if (resumeMs !== undefined) {
+        intentionalPlayRef.current = true;
+        try {
+          await videoRef.current?.setPositionAsync(resumeMs, {
+            toleranceMillisBefore: 0,
+            toleranceMillisAfter: 0,
+          });
+          await videoRef.current?.playAsync();
+          setPlaying(true);
+        } catch (err) {
+          console.error('[LevelUp] togglePlay resume error:', err);
+        }
+      }
     } else {
       await startVideoPlayback();
     }
@@ -232,10 +275,31 @@ const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function 
     setPausedForAnnotation(false);
     if (pauseTimerRef.current) clearTimeout(pauseTimerRef.current);
     if (hasVideo && frameTimestamps) {
+      const targetMs = frameTimestamps[idx];
+      if (targetMs === undefined || targetMs === null) {
+        console.warn(`[LevelUp] jumpToFrame(${idx}): no timestamp found, frameTimestamps length=${frameTimestamps.length}`);
+        return;
+      }
+      if (!videoLoaded) {
+        console.warn(`[LevelUp] jumpToFrame(${idx}): video not loaded yet, waiting...`);
+        // Still set state so it seeks when video loads
+        return;
+      }
+      console.log(`[LevelUp] jumpToFrame(${idx}): seeking to ${targetMs}ms (${(targetMs / 1000).toFixed(1)}s)`);
       intentionalPlayRef.current = true;
-      await videoRef.current?.setPositionAsync(frameTimestamps[idx]).catch(() => {});
-      await videoRef.current?.playAsync();
-      setPlaying(true);
+      try {
+        // Pause first for reliable seeking
+        await videoRef.current?.pauseAsync();
+        // Seek with tight tolerance for frame-accurate positioning (critical on iOS)
+        await videoRef.current?.setPositionAsync(targetMs, {
+          toleranceMillisBefore: 0,
+          toleranceMillisAfter: 0,
+        });
+        await videoRef.current?.playAsync();
+        setPlaying(true);
+      } catch (err) {
+        console.error(`[LevelUp] jumpToFrame(${idx}) seek error:`, err);
+      }
     }
   };
 
@@ -272,9 +336,17 @@ const VideoReviewOverlay = forwardRef<VideoReviewOverlayHandle, Props>(function 
       setCurrentFrame(startIdx);
       intentionalPlayRef.current = true;
       const startPos = startIdx < frameTimestamps.length ? frameTimestamps[startIdx] : 0;
-      await videoRef.current?.setPositionAsync(startPos).catch(() => {});
-      await videoRef.current?.playAsync();
-      setPlaying(true);
+      try {
+        await videoRef.current?.pauseAsync();
+        await videoRef.current?.setPositionAsync(startPos, {
+          toleranceMillisBefore: 0,
+          toleranceMillisAfter: 0,
+        });
+        await videoRef.current?.playAsync();
+        setPlaying(true);
+      } catch (err) {
+        console.error('[LevelUp] playThrough seek error:', err);
+      }
     } else {
       setPlaying(true);
     }
