@@ -21,6 +21,12 @@
 
 ---
 
+## Protected Accounts (DO NOT MODIFY)
+
+- **cbur22@gmail.com** — Role: `athlete`. This account MUST remain `athlete`. Do NOT change the role in Supabase, in code, or via any API call. Do NOT write any migration, seed, or script that could alter this account's role.
+
+---
+
 ## LevelUp AI — Identity & Naming
 
 The AI wrestling coach is named **LevelUp**. All prompts, UI labels, system messages, and references to the AI must use this name. Never refer to it as "GPT-4o", "the AI", or "our model" in user-facing text — it is always **LevelUp**.

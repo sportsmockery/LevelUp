@@ -51,6 +51,9 @@ function RootNavigator() {
   useEffect(() => {
     if (loading || !tutorialChecked) return;
 
+    // Wait for profile to load before making routing decisions
+    if (session && !profile) return;
+
     const inAuth = segments[0] === '(auth)';
     const inParentTabs = segments[0] === '(parent-tabs)';
     const inTabs = segments[0] === '(tabs)';
@@ -72,10 +75,10 @@ function RootNavigator() {
         router.replace('/(tabs)');
       }
     } else if (session && !inAuth && !inTutorial) {
-      // Already in app — handle role-based routing
-      if (isParent && inTabs) {
+      // Ensure user is in the correct tab group — redirect if anywhere wrong
+      if (isParent && !inParentTabs) {
         router.replace('/(parent-tabs)');
-      } else if (!isParent && inParentTabs) {
+      } else if (!isParent && !inTabs) {
         router.replace('/(tabs)');
       }
     }
