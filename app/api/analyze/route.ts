@@ -159,7 +159,7 @@ INSTRUCTIONS:
 2. Score each sub-criterion based ONLY on evidence from the observations. If a position was not observed, score it based on what limited evidence exists (do not assume zero).
 3. Calculate position scores as the sum of their sub-criteria.
 4. Calculate overall = standing*0.4 + top*0.3 + bottom*0.3 (round to nearest integer).
-5. Cite specific frame indices as evidence for your scores.
+5. In frame_evidence, include ONE entry for EVERY frame (frame_index 0 through ${frameCount - 1}). Do NOT skip any frames. For frames with scoring actions or notable technique, set is_key_moment=true with the appropriate key_moment_type. For routine frames, set is_key_moment=false and key_moment_type="".
 6. Recommend drills that directly address the weaknesses found.
 7. Set confidence based on: wrestler visibility across frames, variety of positions observed, video quality indicators.
 
@@ -247,13 +247,15 @@ function detectHallucinations(result: Pass2Response, frameCount: number): string
     warnings.push('All sub-scores are round numbers (multiples of 5) — possible lack of differentiation');
   }
 
-  // 3. Missing frame evidence
+  // 3. Missing frame evidence — we expect one entry per frame
   if (result.frame_evidence.length === 0) {
     warnings.push('No frame evidence provided — analysis may not be grounded in observations');
+  } else if (result.frame_evidence.length < frameCount) {
+    warnings.push(`Only ${result.frame_evidence.length}/${frameCount} frames have evidence — expected all frames`);
   }
 
   // 4. Confidence vs evidence mismatch
-  if (result.confidence > 0.8 && result.frame_evidence.length < 5) {
+  if (result.confidence > 0.8 && result.frame_evidence.length < Math.min(5, frameCount)) {
     warnings.push('High confidence with few frame evidence citations — may be overconfident');
   }
 

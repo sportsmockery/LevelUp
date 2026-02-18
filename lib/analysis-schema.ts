@@ -72,7 +72,7 @@ export const PASS2_RESPONSE_SCHEMA = {
       },
       frame_evidence: {
         type: 'array' as const,
-        description: 'Key frames that informed scoring decisions',
+        description: 'One entry per frame analyzed. MUST include every frame index from 0 to frameCount-1. Mark is_key_moment=true for scoring actions, position changes, and notable technique.',
         items: {
           type: 'object' as const,
           properties: {
