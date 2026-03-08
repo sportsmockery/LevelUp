@@ -18,27 +18,19 @@ export async function middleware(request: NextRequest) {
   const isStockIQDomain = hostname.replace('www.', '').startsWith(STOCKIQ_DOMAIN);
 
   // --- StockIQ domain routing ---
+  // v0 dashboard handles its own login UI inside the iframe,
+  // so we just rewrite all stockiqdash.com requests to /tradingview
+  // with no server-side auth redirect.
   if (isStockIQDomain) {
-    // Allow API routes, _next assets, and login through
-    if (pathname.startsWith('/api/') || pathname.startsWith('/_next/') || pathname === '/login') {
+    // Allow API routes and _next assets through
+    if (pathname.startsWith('/api/') || pathname.startsWith('/_next/')) {
       return NextResponse.next();
     }
 
-    // Root of stockiqdash.com → rewrite to /tradingview (URL stays as /)
-    if (pathname === '/') {
-      const url = request.nextUrl.clone();
-      url.pathname = '/tradingview';
-      return await checkAuth(request, url, '/');
-    }
-
-    // /tradingview on stockiqdash.com → auth check then serve
-    if (pathname === '/tradingview') {
-      return await checkAuth(request, null, '/tradingview');
-    }
-
-    // Any other path on stockiqdash.com → redirect to root
-    const url = new URL('/', request.url);
-    return NextResponse.redirect(url);
+    // All stockiqdash.com paths → rewrite to /tradingview (URL stays as-is)
+    const url = request.nextUrl.clone();
+    url.pathname = '/tradingview';
+    return NextResponse.rewrite(url);
   }
 
   // --- Standard levelupwrestlingapp.com routing ---
