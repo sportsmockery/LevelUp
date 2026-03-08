@@ -3,18 +3,6 @@
     {
       "path": "/api/cron/discover-events",
       "schedule": "0 8,20 * * *"
-    },
-    {
-      "path": "/api/cron/stockiq-analyze",
-      "schedule": "0 9,16 * * 1-5"
-    },
-    {
-      "path": "/api/cron/backtest-refresh",
-      "schedule": "30 16 * * 1-5"
-    },
-    {
-      "path": "/api/cron/data-health",
-      "schedule": "0 * * * *"
     }
   ]
 }

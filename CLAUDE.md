@@ -21,19 +21,6 @@
 
 ---
 
-## Multi-Domain Project
-
-This single Next.js project serves **two domains**:
-
-- **levelupwrestlingapp.com** — Wrestling coaching app (mobile-first, marketing site + API)
-- **stockiqdash.com** — StockIQ investment strategy dashboard (v0 iframe + API)
-
-Domain routing is handled in `middleware.ts`. All `stockiqdash.com` requests rewrite to `/tradingview` (the v0 iframe). API routes (`/api/*`) and static assets (`/_next/*`) pass through for both domains.
-
-Both domains deploy from the same Vercel project. Any code change or deployment affects both sites.
-
----
-
 ## Protected Accounts (DO NOT MODIFY)
 
 - **cbur22@gmail.com** — Role: `athlete`. This account MUST remain `athlete`. Do NOT change the role in Supabase, in code, or via any API call. Do NOT write any migration, seed, or script that could alter this account's role.

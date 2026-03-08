@@ -1,39 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 
-const STOCKIQ_DOMAIN = 'stockiqdash.com';
-
 const PROTECTED_ROUTES = [
   '/admin',
   '/dashboard',
   '/coach',
   '/profile',
   '/onboarding',
-  '/tradingview',
 ];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const hostname = request.headers.get('host') || '';
-  const isStockIQDomain = hostname.replace('www.', '').startsWith(STOCKIQ_DOMAIN);
 
-  // --- StockIQ domain routing ---
-  // v0 dashboard handles its own login UI inside the iframe,
-  // so we just rewrite all stockiqdash.com requests to /tradingview
-  // with no server-side auth redirect.
-  if (isStockIQDomain) {
-    // Allow API routes and _next assets through
-    if (pathname.startsWith('/api/') || pathname.startsWith('/_next/')) {
-      return NextResponse.next();
-    }
-
-    // All stockiqdash.com paths → rewrite to /tradingview (URL stays as-is)
-    const url = request.nextUrl.clone();
-    url.pathname = '/tradingview';
-    return NextResponse.rewrite(url);
-  }
-
-  // --- Standard levelupwrestlingapp.com routing ---
   const isProtected = PROTECTED_ROUTES.some(
     (route) => pathname === route || pathname.startsWith(route + '/'),
   );
@@ -93,10 +71,6 @@ async function checkAuth(
 
 export const config = {
   matcher: [
-    /*
-     * Match all paths except static files and images.
-     * This is needed so stockiqdash.com root (/) gets intercepted.
-     */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 };
