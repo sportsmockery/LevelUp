@@ -26,17 +26,25 @@ interface Trade {
 }
 
 async function fetchCandles(symbol: string, fromTs: number, toTs: number) {
+  const token = getToken()
   const params = new URLSearchParams({
     symbol,
     resolution: "D",
     from: String(fromTs),
     to: String(toTs),
-    token: getToken(),
+    token,
   })
-  const res = await fetch(`${FINNHUB_BASE}/stock/candle?${params}`)
-  if (!res.ok) return null
+  const url = `${FINNHUB_BASE}/stock/candle?${params}`
+  const res = await fetch(url)
+  if (!res.ok) {
+    console.error(`Finnhub candle fetch failed for ${symbol}: HTTP ${res.status}, token present: ${!!token}, token length: ${token.length}`)
+    return null
+  }
   const data = await res.json()
-  if (data.s !== "ok" || !data.c?.length) return null
+  if (data.s !== "ok" || !data.c?.length) {
+    console.error(`Finnhub candle data issue for ${symbol}: status=${data.s}, has closes=${!!data.c?.length}`)
+    return null
+  }
   return data
 }
 
@@ -194,7 +202,8 @@ export async function GET(req: NextRequest) {
     const fromTs = Math.floor(yearStart.getTime() / 1000) - 60 * 86400
 
     const allTrades: Trade[] = []
-    const debug: Record<string, any> = {}
+    const token = getToken()
+    const debug: Record<string, any> = { tokenPresent: !!token, tokenLength: token.length, fromTs, toTs: now }
 
     // Generate SMA crossover trades for each strategy
     for (const s of STRATEGIES) {
