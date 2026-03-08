@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabaseServer } from "@/lib/supabase-server"
+import { recordHealthUpdate } from "@/lib/data-health"
 
 const FINNHUB_BASE = "https://finnhub.io/api/v1"
 const getToken = () => process.env.FINNHUB_API_KEY || ""
@@ -261,6 +262,12 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    await recordHealthUpdate(
+      "backtest_trades",
+      allTrades.length > 0 ? "ok" : "error",
+      allTrades.length > 0 ? `${allTrades.length} trades generated` : "No trades generated — Finnhub candle data unavailable"
+    )
+
     return NextResponse.json({
       ok: true,
       count: allTrades.length,
@@ -270,6 +277,7 @@ export async function GET(req: NextRequest) {
     })
   } catch (error: any) {
     console.error("Backtest refresh error:", error)
+    await recordHealthUpdate("backtest_trades", "error", error.message)
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
   }
 }

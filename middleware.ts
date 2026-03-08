@@ -7,6 +7,7 @@ const PROTECTED_ROUTES = [
   '/coach',
   '/profile',
   '/onboarding',
+  '/tradingview',
 ];
 
 export async function middleware(request: NextRequest) {
@@ -70,5 +71,6 @@ export const config = {
     '/profile/:path*',
     '/onboarding',
     '/onboarding/:path*',
+    '/tradingview',
   ],
 };

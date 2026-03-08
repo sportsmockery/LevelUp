@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import OpenAI from "openai"
 import { supabaseServer } from "@/lib/supabase-server"
+import { recordHealthUpdate } from "@/lib/data-health"
 
 const FINNHUB_BASE = "https://finnhub.io/api/v1"
 const getFinnhubToken = () => process.env.FINNHUB_API_KEY || ""
@@ -184,9 +185,11 @@ Analyze this data using your full quantitative framework. For each tracked strat
       return NextResponse.json({ ok: false, error: "Failed to store findings" }, { status: 500 })
     }
 
+    await recordHealthUpdate("stockiq_findings", "ok", `${findings.length} findings generated`)
     return NextResponse.json({ ok: true, count: findings.length, findings })
   } catch (error: any) {
     console.error("StockIQ cron error:", error)
+    await recordHealthUpdate("stockiq_findings", "error", error.message)
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
   }
 }
