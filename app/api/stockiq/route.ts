@@ -175,7 +175,76 @@ The S&P 500 benchmark delivered ~86.1% cumulative total return over 2023–2025 
 | #5 Sector Rotation | 69.2% | 0/3 | Lower vol |
 
 ### Key Thesis
-The momentum anomaly is the single most robust, well-documented, and persistent factor premium in financial markets. Whether expressed through growth concentration (QQQ), factor-based selection (SPMO), regime switching, or cross-asset rotation, momentum consistently generates risk-adjusted alpha. Winners keep winning — until they don't, which is why the best implementations pair momentum with systematic risk management.`,
+The momentum anomaly is the single most robust, well-documented, and persistent factor premium in financial markets. Whether expressed through growth concentration (QQQ), factor-based selection (SPMO), regime switching, or cross-asset rotation, momentum consistently generates risk-adjusted alpha. Winners keep winning — until they don't, which is why the best implementations pair momentum with systematic risk management.
+
+## Indicator & Signal Reference
+
+### Trend Indicators
+| Indicator | What It Measures | Bullish Signal | Bearish Signal |
+|-----------|-----------------|----------------|----------------|
+| 50-day MA | Intermediate trend; faster trigger line | Price above 50 MA, MA slope rising | Price below 50 MA, MA slope falling |
+| 100-day MA | Medium-term trend confirmation | Price above, used as support | Price below, acts as resistance |
+| 200-day MA | Long-term trend regime filter | Price above = positive regime | Price below = higher downside risk |
+| Trend Channel | Expected path of trend; overextension | Price within rising channel | Breaking lower boundary or accelerating beyond upper |
+
+### Momentum Indicators
+| Indicator | What It Measures | Bullish Signal | Bearish Signal |
+|-----------|-----------------|----------------|----------------|
+| RSI | Speed/magnitude of price changes; overbought/oversold | RSI rising, confirms uptrend strength (can stay overbought in strong trends) | RSI falling, divergence from price highs |
+| ROC | Percentage price change over lookback period; pure momentum | Positive and rising = strong momentum | Negative or declining = weakening momentum |
+| Relative Strength vs Benchmark | Which asset outperforms over comparison window (not RSI) | Asset outperforming benchmark over 6-12 months | Asset lagging benchmark = extra risk without reward |
+
+### Price-Location & Volatility
+| Indicator | What It Measures | Bullish Signal | Bearish Signal |
+|-----------|-----------------|----------------|----------------|
+| VWAP | Volume-weighted average price; institutional fair-value reference | Price above VWAP = intraday strength | Price below VWAP = weak buyer participation |
+| Bollinger Bands | Volatility range (2 std devs around 20-period MA) | Price riding upper band in strong trend; squeeze before breakout | Price riding lower band; expansion after breakdown |
+
+### Breadth Indicators
+| Indicator | What It Measures | Bullish Signal | Bearish Signal |
+|-----------|-----------------|----------------|----------------|
+| Advance/Decline Line | Cumulative advancing minus declining stocks; market participation width | A/D rising with index = broad support | A/D weakening while index rises = internal deterioration |
+| New Highs / New Lows | Count of stocks at fresh highs vs lows | Many more new highs = healthy leadership | New lows expanding = deteriorating market |
+| % Stocks Above 200-day MA | Broad internal trend health (80%+ very strong, 20% weak) | High percentage = widespread strength | Low percentage = index masking weakness |
+
+### Risk Environment
+| Indicator | What It Measures | Bullish Signal | Bearish Signal |
+|-----------|-----------------|----------------|----------------|
+| VIX | Expected S&P 500 volatility; fear gauge (<15 calm, 15-25 normal, 25-40 elevated, 40+ crisis) | Low/declining VIX = complacency/calm | Spiking VIX = increasing fear/stress |
+| MOVE Index | Bond market volatility; macro stress early warning | Low MOVE = stable macro conditions | Rising MOVE = cross-asset stress building |
+| Credit Spreads | Extra yield for corporate vs Treasury bonds; financial stress | Tight/tightening spreads = risk-on | Widening spreads = financial stress, recession risk |
+
+### Liquidity Indicators
+| Indicator | What It Measures | Bullish Signal | Bearish Signal |
+|-----------|-----------------|----------------|----------------|
+| 10-Year Treasury Yield | Cost of capital; equity valuation driver | Falling yields support growth stocks | Rising yields pressure valuations |
+| DXY (Dollar Index) | Dollar strength; global liquidity proxy | Weak dollar supports risk assets | Strong dollar tightens global liquidity |
+| Fed Balance Sheet | System liquidity (QE vs QT) | Expansion = liquidity injection | Contraction = liquidity withdrawal |
+
+### Volume Indicators
+| Indicator | What It Measures | Bullish Signal | Bearish Signal |
+|-----------|-----------------|----------------|----------------|
+| Volume Profile | Trading volume at each price level; value areas | High-volume nodes as support | High-volume nodes as resistance |
+| Relative Volume | Current volume vs 20-day average; conviction | 2x+ volume confirms move | Low volume = weak follow-through |
+| Accumulation/Distribution | Buying vs selling pressure via close/range/volume | A/D rising with price = supported move | A/D diverging from price = warning |
+
+### Strategy Performance Metrics
+| Metric | What It Measures | Good Sign | Warning Sign |
+|--------|-----------------|-----------|-------------|
+| Equity Curve | Account value over time | Smooth upward slope | Jagged, unstable path |
+| Strategy vs S&P 500 | Relative performance vs benchmark | Consistent outperformance | Persistent underperformance |
+| Max Drawdown | Worst peak-to-trough decline | <20% for moderate strategies | >40% may be unacceptable |
+| Win Rate | % of profitable trades (pair with expectancy) | >50% with favorable avg win/loss ratio | High win rate but large losses |
+| Expectancy | Average trade value (win rate × avg win - loss rate × avg loss) | Positive = real edge exists | Negative = no edge |
+| Exposure / Time in Market | % of time invested vs cash | High returns with lower exposure = efficient signals | Always invested may mean no selectivity |
+
+### Signal & Regime Layers
+| Layer | What It Measures | Usage |
+|-------|-----------------|-------|
+| Buy/Sell Markers | Visual outputs of strategy logic on chart | Debug and explain strategy behavior |
+| Signal Confidence Score | Composite of trend + momentum + breadth + risk alignment | Higher score = more conditions aligned; weight transparency critical |
+| Market Regime | Bull/bear/sideways/high-vol/low-vol classification | Strategies behave differently per regime; adapt before trusting signals |
+| Market Risk Score | Composite of VIX + breadth + credit + momentum + liquidity (20-40 low, 60-80 elevated, 80+ crisis) | Morning risk barometer for position sizing decisions |`,
       },
     ]
 
