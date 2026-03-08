@@ -10,6 +10,8 @@ const getOpenAI = () => new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "" })
 const TRACKED_SYMBOLS = ["QQQ", "SPY", "SPMO", "MTUM"]
 const MACRO_SYMBOLS = ["TLT", "UUP", "HYG", "GLD", "VXX"]
 
+const delay = (ms: number) => new Promise(r => setTimeout(r, ms))
+
 async function fetchFinnhub(endpoint: string, params: Record<string, string> = {}) {
   const query = new URLSearchParams({ ...params, token: getFinnhubToken() })
   const res = await fetch(`${FINNHUB_BASE}/${endpoint}?${query}`)
@@ -20,27 +22,29 @@ async function fetchFinnhub(endpoint: string, params: Record<string, string> = {
 async function gatherMarketIntelligence() {
   const allSymbols = [...TRACKED_SYMBOLS, ...MACRO_SYMBOLS]
 
-  // Fetch quotes for all symbols
-  const quotes = await Promise.all(
-    allSymbols.map(async (symbol) => {
-      const quote = await fetchFinnhub("quote", { symbol })
-      if (!quote || quote.c === 0) return null
-      return { symbol, price: quote.c, change: quote.d, changePercent: quote.dp, high: quote.h, low: quote.l, open: quote.o, prevClose: quote.pc }
-    })
-  )
+  // Fetch quotes sequentially to respect Finnhub 60 calls/min rate limit
+  const quotes: any[] = []
+  for (const symbol of allSymbols) {
+    await delay(1200)
+    const quote = await fetchFinnhub("quote", { symbol })
+    if (quote && quote.c !== 0) {
+      quotes.push({ symbol, price: quote.c, change: quote.d, changePercent: quote.dp, high: quote.h, low: quote.l, open: quote.o, prevClose: quote.pc })
+    }
+  }
 
   // Fetch general market news
+  await delay(1200)
   const news = await fetchFinnhub("news", { category: "general" })
 
   // Fetch company news for tracked symbols
   const today = new Date().toISOString().split("T")[0]
   const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().split("T")[0]
-  const symbolNews = await Promise.all(
-    TRACKED_SYMBOLS.map(async (symbol) => {
-      const articles = await fetchFinnhub("company-news", { symbol, from: weekAgo, to: today })
-      return { symbol, articles: (articles || []).slice(0, 3) }
-    })
-  )
+  const symbolNews: any[] = []
+  for (const symbol of TRACKED_SYMBOLS) {
+    await delay(1200)
+    const articles = await fetchFinnhub("company-news", { symbol, from: weekAgo, to: today })
+    symbolNews.push({ symbol, articles: (articles || []).slice(0, 3) })
+  }
 
   // Fetch recent TV alerts from our database
   let recentAlerts: any[] = []
@@ -64,12 +68,23 @@ async function gatherMarketIntelligence() {
     previousFindings = data || []
   }
 
+  // Fetch backtest trades for cross-strategy correlation analysis
+  let backtestTrades: any[] = []
+  if (supabaseServer) {
+    const { data } = await supabaseServer
+      .from("Backtest_Trades")
+      .select("*")
+      .order("entry_time", { ascending: false })
+    backtestTrades = data || []
+  }
+
   return {
     quotes: quotes.filter(Boolean),
     generalNews: (news || []).slice(0, 5).map((n: any) => ({ headline: n.headline, summary: n.summary, source: n.source })),
     symbolNews,
     recentAlerts,
     previousFindings,
+    backtestTrades,
     timestamp: new Date().toISOString(),
   }
 }
@@ -99,7 +114,7 @@ export async function GET(req: NextRequest) {
           role: "system",
           content: `You are StockIQ, an elite quantitative trading AI analyst. You are running your scheduled analysis cycle.
 
-Your job: Analyze all market data, news, alerts, and previous findings to produce SPECIFIC DIRECTIONAL CALLS — LONG or EXIT — for investors following QQQ, SPMO, MTUM momentum strategies vs S&P 500 benchmark.
+Your job: Analyze all market data, news, alerts, backtest trades, and previous findings to produce SPECIFIC DIRECTIONAL CALLS — LONG or EXIT — for investors following QQQ, SPMO, MTUM momentum strategies vs S&P 500 benchmark.
 
 You ONLY publish a finding when you have a specific directional opinion:
 - "long" = investors should enter or hold a long position in this asset
@@ -114,11 +129,20 @@ IMPORTANT RULES:
 - Do NOT repeat previous findings unless the situation has materially changed
 - Think like a hedge fund PM making allocation decisions, not a commentator
 
+CROSS-STRATEGY CORRELATION ANALYSIS (REQUIRED):
+Analyze the backtest trades across all strategies (QQQ, SPMO, MTUM, DualMomentum) for correlations:
+- Are multiple strategies entering or exiting at the same time? This signals a broad momentum regime shift.
+- Are strategies diverging (e.g., QQQ long while MTUM exits)? This signals sector rotation or factor breakdown.
+- Do winning/losing trades cluster together across strategies? Correlated losses = systemic risk.
+- Is one strategy consistently leading the others (entering first, exiting first)? That strategy may be a leading indicator.
+- Compare PnL patterns: are all strategies profitable or are some dragging? Underperformers may need to be avoided.
+- If you find meaningful cross-strategy correlation or divergence, publish it as a finding with category "regime" or "risk".
+
 Respond with a JSON object: { "findings": [...] }. Each finding:
 {
   "confidence_score": number (0-100),
   "direction": "long" | "exit",
-  "category": "signal" | "risk" | "opportunity" | "regime" | "alert",
+  "category": "signal" | "risk" | "opportunity" | "regime" | "alert" | "correlation",
   "message": "concise directional call (1-2 sentences max)",
   "reasoning": "specific data points, indicator readings, and dashboard layers supporting this call",
   "symbols": ["relevant", "tickers"]
@@ -145,7 +169,10 @@ ${JSON.stringify(intel.recentAlerts, null, 2)}
 PREVIOUS STOCKIQ FINDINGS (avoid repeating):
 ${JSON.stringify(intel.previousFindings, null, 2)}
 
-Analyze this data using your full quantitative framework. For each tracked strategy (QQQ, SPMO, MTUM), determine if you have a directional call. Only publish findings where you have genuine conviction.`,
+YTD BACKTEST TRADES (for cross-strategy correlation analysis):
+${JSON.stringify(intel.backtestTrades, null, 2)}
+
+Analyze this data using your full quantitative framework. For each tracked strategy (QQQ, SPMO, MTUM), determine if you have a directional call. Also analyze backtest trades across all strategies for correlations, divergences, and regime signals. Only publish findings where you have genuine conviction.`,
         },
       ],
       response_format: { type: "json_object" },

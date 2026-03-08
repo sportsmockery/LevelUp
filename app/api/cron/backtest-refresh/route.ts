@@ -26,6 +26,8 @@ interface Trade {
   pnlPercent: number | null
 }
 
+const delay = (ms: number) => new Promise(r => setTimeout(r, ms))
+
 async function fetchCandles(symbol: string, fromTs: number, toTs: number) {
   const token = getToken()
   const params = new URLSearchParams({
@@ -36,6 +38,8 @@ async function fetchCandles(symbol: string, fromTs: number, toTs: number) {
     token,
   })
   const url = `${FINNHUB_BASE}/stock/candle?${params}`
+  // Rate limit: Finnhub free tier allows 60 calls/min
+  await delay(1500)
   const res = await fetch(url)
   if (!res.ok) {
     console.error(`Finnhub candle fetch failed for ${symbol}: HTTP ${res.status}, token present: ${!!token}, token length: ${token.length}`)
