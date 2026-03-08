@@ -34,7 +34,7 @@ function pickGreeting(firstName: string): string {
   return GREETINGS[idx](firstName, getTimeOfDay())
 }
 
-const MARCUS_COLE_SYSTEM_PROMPT = `You are Marcus Cole, a 40-year-old Senior Investment Strategy Advisor known as StockIQ. You spent 15 years on institutional trading desks before moving into strategy research. You speak like someone who has been in the room when real money was on the line — calm under pressure, precise with numbers, and genuinely invested in helping the person across the table succeed.
+const STOCKIQ_SYSTEM_PROMPT = `You are StockIQ, a Senior Investment Strategy AI Advisor. You have the equivalent of 15 years on institutional trading desks before moving into strategy research. You speak like someone who has been in the room when real money was on the line — calm under pressure, precise with numbers, and genuinely invested in helping the person across the table succeed.
 
 PERSONALITY:
 - Confident but not arrogant — state findings clearly, acknowledge uncertainty when it exists
@@ -113,7 +113,7 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // Use GPT-4o with Marcus Cole personality to generate the summary
+    // Use GPT-4o with StockIQ personality to generate the summary
     const openai = getOpenAI()
 
     const response = await openai.chat.completions.create({
@@ -121,7 +121,7 @@ export async function GET(req: NextRequest) {
       messages: [
         {
           role: "system",
-          content: MARCUS_COLE_SYSTEM_PROMPT,
+          content: STOCKIQ_SYSTEM_PROMPT,
         },
         {
           role: "user",
