@@ -244,7 +244,68 @@ The momentum anomaly is the single most robust, well-documented, and persistent 
 | Buy/Sell Markers | Visual outputs of strategy logic on chart | Debug and explain strategy behavior |
 | Signal Confidence Score | Composite of trend + momentum + breadth + risk alignment | Higher score = more conditions aligned; weight transparency critical |
 | Market Regime | Bull/bear/sideways/high-vol/low-vol classification | Strategies behave differently per regime; adapt before trusting signals |
-| Market Risk Score | Composite of VIX + breadth + credit + momentum + liquidity (20-40 low, 60-80 elevated, 80+ crisis) | Morning risk barometer for position sizing decisions |`,
+| Market Risk Score | Composite of VIX + breadth + credit + momentum + liquidity (20-40 low, 60-80 elevated, 80+ crisis) | Morning risk barometer for position sizing decisions |
+
+## 6 Crash Prediction Indicators
+
+These are the signals hedge funds watch obsessively — historically predict 80% of major market crashes and bear markets:
+
+1. **Yield Curve Inversion** — Preceded every U.S. recession since 1955 (one exception: 1966). Lead time: 6-24 months. Key insight: recessions often begin AFTER the curve un-inverts as the Fed cuts rates — normalization itself is the danger signal.
+2. **Credit Spread Blowout** — Widening spreads = rising default risk. TED Spread hit 4.65% during Lehman collapse (complete banking seizure). High-yield spreads above 7% = serious risk. Weighted 25% in professional crash-risk systems.
+3. **VIX Term Structure Inversion** — When VIX flips from contango (normal) to backwardation, options traders are pricing imminent panic. Precedes major market dislocations.
+4. **Valuation Extremes** — CAPE > 30 and Buffett Indicator > 150% = structural vulnerability. Valuations alone don't trigger crashes but dramatically increase magnitude when catalysts emerge.
+5. **Margin Debt / Leverage** — Elevated margin debt creates forced selling cascades. Margin calls → forced liquidation → price drops → more margin calls. Amplifies drawdowns beyond fundamentals.
+6. **Breadth Deterioration** — Fewer than 50% of S&P 500 stocks above 200-day MA while index makes new highs = rally driven by increasingly narrow set of stocks. One of the most reliable warning signs.
+
+Professional crash monitoring weights: Valuation extremes (30%), Credit stress (25%), Volatility regime (20%), Economic deterioration (15%), Sentiment extremes (10%).
+
+## Decision Theory — The Hidden Discipline
+
+- **Expected Utility**: Rational agents maximize subjective utility, not raw monetary value. Utility curvature captures risk attitude (concave = risk-averse, the majority).
+- **Kelly Criterion in Practice**: Full Kelly maximizes geometric growth but creates unacceptable drawdowns. Fractional Kelly (25-50%) dramatically reduces drawdowns while preserving most growth. Hedge funds: 0.5-2% risk per trade. Smart retail: 2-5%.
+- **The Three Core Truths**: (1) Markets are probability distributions, not predictable trajectories. (2) Small edges compound massively via Edge × Frequency × Discipline. (3) Risk asymmetry — protecting downside matters more because a 50% loss requires 100% gain to recover.
+
+## Dashboard Decision Chain (8-Layer Confirmation System)
+
+No single indicator works alone. The dashboard forms a chain of confirmation flowing from macro to micro:
+
+\`\`\`
+Layer 1: Market Regime → sets context (bull/bear/sideways/high-vol)
+    ↓
+Layer 2: Price Structure → MAs, VWAP, Bands confirm/deny trend
+    ↓
+Layer 3: Breadth → A/D, % above 200d, new highs/lows confirm participation
+    ↓
+Layer 4: Risk Environment → VIX, MOVE, credit spreads confirm macro safety
+    ↓
+Layer 5: Liquidity → 10Y yield, DXY, Fed balance sheet confirm funding
+    ↓
+Layer 6: Volume Intelligence → relative volume, A/D line confirm conviction
+    ↓
+Layer 7: Strategy Performance → equity curve, drawdown, win rate validate algorithm
+    ↓
+Layer 8: Signal Output → BUY/SELL, confidence score, risk score, recommendation
+\`\`\`
+
+Every layer either ADDS CONFIDENCE or RAISES A FLAG. The dashboard doesn't just say "buy" — it shows WHY across every dimension an institutional desk would check before putting capital at risk.
+
+Key connections:
+- 200-day MA (Layer 2) is the primary trend gate for Strategies 1, 3, 4, 5. Below it = no long positions.
+- 50/200 MA relationship (Layer 2) is Strategy 1's core signal — 50 above 200 + price above 50 = long.
+- Breadth divergence (Layer 3) warns BEFORE price breaks — A/D peaked 2 years before Nasdaq crashed in 2000.
+- Risk environment (Layer 4) can VETO a buy signal — a buy in high VIX/widening spreads is far less trustworthy.
+- Liquidity (Layer 5) explains WHY price/breadth behave a certain way — tightening liquidity = bullish chart on borrowed time.
+- Volume (Layer 6) validates or undermines — breakout on heavy volume is credible, on light volume is suspect.
+- Strategy performance (Layer 7) across 1M/3M/6M/1Y/2Y/3Y timeframe cards validates robustness, not just total return.
+
+## Advanced Quantitative Concepts (Dissertation-Level)
+
+- **Fat Tails**: S&P 500 top 3-4 daily observations over 60+ years account for ~99% of kurtosis. Financial markets are power-law distributions where Gaussian models systematically underestimate catastrophic loss probability.
+- **Alpha Decay**: Average cost = 9.9% of returns (Europe), 5.6% (U.S.), accelerating at 36bps/year due to faster information dissemination and signal crowding.
+- **Overfitting Prevention**: Require 60/20/20 train/test/validation splits, walk-forward analysis across regimes, Monte Carlo resampling, minimum 30-500+ trades, 95% confidence significance.
+- **Renaissance Edge**: Medallion Fund averaged ~66% annual returns (pre-fees), Sharpe > 2.0. During 2008 crisis: +98% return. Formula: Edge × Frequency × Discipline with extreme diversification across thousands of positions.
+- **HMM Regime Detection**: Gaussian HMMs on 20 years SPY data show volatility as most significant regime differentiator. Significantly higher Sharpe during "calm" regimes validates HMMs as systematic circuit breakers.
+- **Fourier Analysis**: Reconstructing price using top 25 FFT frequencies produces de-noised series. DFT-based chart classification achieves 58% accuracy (above random), and reducing information via DFT actually improves performance vs raw prices (avoids overfitting noise).`,
       },
     ]
 
