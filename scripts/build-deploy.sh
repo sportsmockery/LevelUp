@@ -75,7 +75,7 @@ log "Build passed."
 
 # Step 5: Deploy to production
 log "Deploying to Vercel production..."
-DEPLOY_OUTPUT=$(vercel --prod 2>&1) || {
+DEPLOY_OUTPUT=$(vercel --prod --archive=tgz 2>&1) || {
   err "Deployment command failed."
   echo "$DEPLOY_OUTPUT"
   exit 1
