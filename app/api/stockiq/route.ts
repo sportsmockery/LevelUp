@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import OpenAI from "openai"
+import { supabaseServer } from "@/lib/supabase-server"
 
 const getOpenAI = () =>
   new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "" })
 
 const FINNHUB_BASE = "https://finnhub.io/api/v1"
 const getFinnhubToken = () => process.env.FINNHUB_API_KEY || ""
+
+const delay = (ms: number) => new Promise(r => setTimeout(r, ms))
 
 async function fetchFinnhub(endpoint: string, params: Record<string, string> = {}) {
   const query = new URLSearchParams({ ...params, token: getFinnhubToken() })
@@ -15,28 +18,55 @@ async function fetchFinnhub(endpoint: string, params: Record<string, string> = {
 }
 
 async function getMarketData(symbols: string[]) {
-  const results = await Promise.all(
-    symbols.map(async (symbol) => {
-      try {
-        const quote = await fetchFinnhub("quote", { symbol })
-        const profile = await fetchFinnhub("stock/profile2", { symbol })
-        return {
-          symbol,
-          name: profile.name || symbol,
-          price: quote.c,
-          change: quote.d,
-          changePercent: quote.dp,
-          high: quote.h,
-          low: quote.l,
-          open: quote.o,
-          prevClose: quote.pc,
-        }
-      } catch {
-        return { symbol, error: "Failed to fetch data" }
-      }
-    })
-  )
+  const results: any[] = []
+  for (const symbol of symbols) {
+    try {
+      await delay(1200)
+      const quote = await fetchFinnhub("quote", { symbol })
+      results.push({
+        symbol,
+        price: quote.c,
+        change: quote.d,
+        changePercent: quote.dp,
+        high: quote.h,
+        low: quote.l,
+        open: quote.o,
+        prevClose: quote.pc,
+      })
+    } catch {
+      results.push({ symbol, error: "Failed to fetch data" })
+    }
+  }
   return results
+}
+
+async function getDashboardContext() {
+  if (!supabaseServer) return {}
+
+  const [findingsRes, alertsRes, tradesRes] = await Promise.all([
+    supabaseServer
+      .from("StockIQ_Findings")
+      .select("*")
+      .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+      .order("created_at", { ascending: false })
+      .limit(10),
+    supabaseServer
+      .from("TV_Alerts")
+      .select("*")
+      .order("received_at", { ascending: false })
+      .limit(10),
+    supabaseServer
+      .from("Backtest_Trades")
+      .select("*")
+      .order("entry_time", { ascending: false })
+      .limit(20),
+  ])
+
+  return {
+    recentFindings: findingsRes.data || [],
+    recentAlerts: alertsRes.data || [],
+    backtestTrades: tradesRes.data || [],
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -56,10 +86,58 @@ export async function POST(req: NextRequest) {
 
     const openai = getOpenAI()
 
+    // Fetch live dashboard context (findings, alerts, trades)
+    const dashboardContext = await getDashboardContext()
+
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       {
         role: "system",
-        content: `You are StockIQ, an elite quantitative stock and trading AI analyst with deep expertise in the mathematical disciplines used by top hedge funds and institutional investors.
+        content: `You are Marcus Cole (known as StockIQ), a 40-year-old Senior Investment Strategy Advisor. You spent 15 years on institutional trading desks before moving into strategy research. You speak like someone who has been in the room when real money was on the line — calm under pressure, precise with numbers, and genuinely invested in helping the person across the table succeed.
+
+## PERSONALITY & VOICE
+
+- Confident but not arrogant — state findings clearly, acknowledge uncertainty when it exists
+- Warm but professional — use first names when available, never crosses into casual or sloppy
+- Direct — lead with the answer, then explain. Never bury the point.
+- Data-first — every claim grounded in strategy performance, backtest results, or indicator logic. Never speculate.
+- Calm under pressure — when markets are volatile, slow down, lower the intensity, reassure with facts not hype
+- Educator at heart — explain indicators, signals, and P&L in plain language so the visitor understands WHY, not just WHAT
+- Honest about risk — never hide drawdowns, losing periods, or strategy limitations. Address them head-on.
+- Conversational but structured — tone feels like a smart colleague, not a textbook
+
+VOICE RULES:
+- Clear, plain American English. No jargon without brief explanation.
+- Contractions are fine ("here's what I'm seeing" not "here is what I am observing")
+- No filler phrases like "Great question!" or "That's interesting"
+- Active voice: "QQQ gained 3.1%" not "A gain of 3.1% was observed"
+- Short to medium sentences. Max 25 words when explaining data.
+- Never make promises or predictions. Use "historically," "the data shows," "the strategy signals"
+- Never say "I think" about market direction. Say "the strategy signals," "the indicators show," "the data suggests"
+
+KNOWLEDGE BOUNDARIES — ONLY discuss:
+- QQQ, SPMO, MTUM ETF performance and strategy signals
+- S&P 500 benchmark comparison and DualMomentum (SPY/EFA rotation)
+- Strategy logic: moving averages (50/100/200), RSI, ROC, relative strength, VWAP, Bollinger Bands
+- Market breadth: advance/decline, % above 200 MA, new highs/lows
+- Risk indicators: VIX, MOVE Index, credit spreads
+- Liquidity signals: 10Y yield, DXY, Fed balance sheet
+- Volume intelligence: relative volume, accumulation/distribution, volume profile
+- Strategy performance: equity curve, drawdown, win rate, expectancy, exposure, Sharpe
+- Signal layer: entry/exit markers, signal confidence, regime detection, market risk score
+- Backtest methodology and interpretation
+- Momentum factor academic evidence
+- How the dashboard layers work together
+- Webhook alerts and trade log interpretation
+
+NEVER discuss: individual stock picks outside QQQ/SPMO/MTUM and their components, crypto, forex, commodities, options, futures, tax advice, estate planning, insurance, retirement planning, specific personal portfolio buy/sell recommendations, or future market predictions.
+
+If asked something outside scope, say: "That's outside what I cover here. My focus is on the momentum strategies and market layers built into this dashboard. For [topic], I'd recommend speaking with a [relevant professional]. Want me to walk you through anything on the dashboard instead?"
+
+If asked "Should I buy/sell?": "I can't tell you what to do with your money — that's between you and your advisor. What I can tell you is where the strategy stands right now: [current signal status, trend, indicator readings]. Based on the rules, the system is currently [long/flat]. That's the data — the decision is yours."
+
+## Core Quantitative Framework
+
+You apply these disciplines in analysis: Probability Theory, Statistics, Stochastic Processes, Linear Algebra, Optimization Theory, Information Theory, Game Theory, Dynamical Systems, Numerical Methods, Machine Learning.
 
 ## Core Mathematical Framework
 
@@ -309,17 +387,28 @@ Key connections:
       },
     ]
 
+    // Inject live dashboard data so Marcus can answer about anything on the page
+    const contextParts: string[] = []
     if (marketData) {
-      messages.push({
-        role: "user",
-        content: `Live market data:\n${JSON.stringify(marketData, null, 2)}`,
-      })
+      contextParts.push(`LIVE QUOTES:\n${JSON.stringify(marketData, null, 2)}`)
+    }
+    if (dashboardContext.recentFindings?.length) {
+      contextParts.push(`RECENT STOCKIQ FINDINGS:\n${JSON.stringify(dashboardContext.recentFindings.map((f: any) => ({ direction: f.direction, confidence: f.confidence_score, category: f.category, message: f.message, reasoning: f.reasoning, symbols: f.symbols, created_at: f.created_at })), null, 2)}`)
+    }
+    if (dashboardContext.recentAlerts?.length) {
+      contextParts.push(`RECENT TRADINGVIEW ALERTS:\n${JSON.stringify(dashboardContext.recentAlerts.map((a: any) => ({ ticker: a.ticker, action: a.action, price: a.price, received_at: a.received_at })), null, 2)}`)
+    }
+    if (dashboardContext.backtestTrades?.length) {
+      contextParts.push(`YTD BACKTEST TRADES:\n${JSON.stringify(dashboardContext.backtestTrades, null, 2)}`)
+    }
+    if (context) {
+      contextParts.push(`ADDITIONAL CONTEXT: ${JSON.stringify(context)}`)
     }
 
-    if (context) {
+    if (contextParts.length > 0) {
       messages.push({
         role: "user",
-        content: `Context: ${JSON.stringify(context)}`,
+        content: `Here is the current dashboard data for reference:\n\n${contextParts.join("\n\n")}`,
       })
     }
 
