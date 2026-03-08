@@ -1,36 +1,60 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { supabaseServer } from "@/lib/supabase-server"
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     if (!supabaseServer) {
       return NextResponse.json({ ok: false, error: "Database unavailable" }, { status: 500 })
     }
 
-    const { data, error } = await supabaseServer
+    const { searchParams } = new URL(req.url)
+    const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 100)
+    const since = searchParams.get("since") // ISO timestamp to fetch only newer alerts
+
+    let query = supabaseServer
       .from("TV_Alerts")
       .select("*")
       .order("received_at", { ascending: false })
-      .limit(1)
-      .single()
+      .limit(limit)
 
-    if (error) {
-      return NextResponse.json({ ok: true, alert: null })
+    if (since) {
+      query = query.gt("received_at", since)
     }
 
-    return NextResponse.json({
-      ok: true,
-      alert: {
-        id: data.id,
-        receivedAt: data.received_at,
-        ticker: data.ticker,
-        action: data.action,
-        price: data.price,
-        payload: data.payload,
-      },
-    })
+    const { data, error } = await query
+
+    if (error) {
+      console.error("TV_Alerts fetch error:", error)
+      return NextResponse.json({ ok: true, alerts: [] })
+    }
+
+    const alerts = (data || []).map((row: any) => ({
+      id: row.id,
+      receivedAt: row.received_at,
+      ticker: row.ticker,
+      action: row.action,
+      price: row.price,
+      message: row.payload?.message || row.payload?.alert_message || null,
+      isExit: isExitSignal(row.action, row.payload),
+      payload: row.payload,
+    }))
+
+    return NextResponse.json({ ok: true, alerts })
   } catch (error: any) {
-    console.error("Latest alert error:", error)
-    return NextResponse.json({ ok: false, error: "Failed to fetch alert" }, { status: 500 })
+    console.error("Latest alerts error:", error)
+    return NextResponse.json({ ok: false, error: "Failed to fetch alerts" }, { status: 500 })
   }
+}
+
+function isExitSignal(action: string | null, payload: any): boolean {
+  const actionLower = (action || "").toLowerCase()
+  const message = (payload?.message || payload?.alert_message || "").toLowerCase()
+  return (
+    actionLower.includes("exit") ||
+    actionLower.includes("sell") ||
+    actionLower.includes("close") ||
+    message.includes("exit") ||
+    message.includes("sell") ||
+    message.includes("close")
+  )
 }
