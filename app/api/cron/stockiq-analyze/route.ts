@@ -98,22 +98,28 @@ export async function GET(req: NextRequest) {
           role: "system",
           content: `You are StockIQ, an elite quantitative trading AI analyst. You are running your scheduled analysis cycle.
 
-Your job: Analyze all provided market data, news, alerts, and your previous findings to produce NEW actionable findings for investors following QQQ, SPMO, MTUM momentum strategies vs S&P 500 benchmark.
+Your job: Analyze all market data, news, alerts, and previous findings to produce SPECIFIC DIRECTIONAL CALLS — LONG or EXIT — for investors following QQQ, SPMO, MTUM momentum strategies vs S&P 500 benchmark.
+
+You ONLY publish a finding when you have a specific directional opinion:
+- "long" = investors should enter or hold a long position in this asset
+- "exit" = investors should exit or avoid this position
 
 IMPORTANT RULES:
-- Only report findings that are VALUABLE and ACTIONABLE for momentum strategy investors
+- EVERY finding MUST have a direction: "long" or "exit"
+- Only publish when you have conviction (60+ confidence). No wishy-washy observations.
+- Each finding must explain WHY: what specific data, indicators, or conditions support this call
+- Reference actual numbers: prices, percentage changes, MA levels, relative strength readings
+- Include which of the 8 dashboard layers (regime, price, breadth, risk, liquidity, volume, strategy performance, signal) support or contradict your call
 - Do NOT repeat previous findings unless the situation has materially changed
-- Each finding must include a confidence_score (0-100) reflecting your mathematical certainty
-- Each finding needs a category: "signal", "risk", "opportunity", "regime", "alert", or "insight"
-- Be specific — reference actual numbers, prices, percentages
-- Think like a hedge fund analyst writing morning notes
+- Think like a hedge fund PM making allocation decisions, not a commentator
 
-Respond with a JSON array of findings. Each finding:
+Respond with a JSON object: { "findings": [...] }. Each finding:
 {
   "confidence_score": number (0-100),
-  "category": "signal" | "risk" | "opportunity" | "regime" | "alert" | "insight",
-  "message": "concise bullet-point finding (1-2 sentences max)",
-  "reasoning": "brief mathematical/analytical basis for this finding",
+  "direction": "long" | "exit",
+  "category": "signal" | "risk" | "opportunity" | "regime" | "alert",
+  "message": "concise directional call (1-2 sentences max)",
+  "reasoning": "specific data points, indicator readings, and dashboard layers supporting this call",
   "symbols": ["relevant", "tickers"]
 }
 
@@ -138,7 +144,7 @@ ${JSON.stringify(intel.recentAlerts, null, 2)}
 PREVIOUS STOCKIQ FINDINGS (avoid repeating):
 ${JSON.stringify(intel.previousFindings, null, 2)}
 
-Analyze this data using your full quantitative framework. Produce findings.`,
+Analyze this data using your full quantitative framework. For each tracked strategy (QQQ, SPMO, MTUM), determine if you have a directional call. Only publish findings where you have genuine conviction.`,
         },
       ],
       response_format: { type: "json_object" },
@@ -162,6 +168,7 @@ Analyze this data using your full quantitative framework. Produce findings.`,
     // Store findings in Supabase
     const rows = findings.map((f: any) => ({
       confidence_score: f.confidence_score,
+      direction: f.direction || null,
       category: f.category,
       message: f.message,
       reasoning: f.reasoning,
