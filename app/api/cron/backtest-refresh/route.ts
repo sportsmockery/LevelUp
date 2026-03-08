@@ -194,20 +194,25 @@ export async function GET(req: NextRequest) {
     const fromTs = Math.floor(yearStart.getTime() / 1000) - 60 * 86400
 
     const allTrades: Trade[] = []
+    const debug: Record<string, any> = {}
 
     // Generate SMA crossover trades for each strategy
     for (const s of STRATEGIES) {
       const candles = await fetchCandles(s.ticker, fromTs, now)
       if (!candles) {
-        console.warn(`No candle data for ${s.ticker}`)
+        debug[s.ticker] = { error: "No candle data returned" }
         continue
       }
+      debug[s.ticker] = { dataPoints: candles.c.length, firstDate: new Date(candles.t[0] * 1000).toISOString(), lastDate: new Date(candles.t[candles.t.length - 1] * 1000).toISOString() }
       const trades = generateSmaCrossoverTrades(
         s.strategy, s.ticker, candles.c, candles.t, s.fastPeriod, s.slowPeriod
       )
+      debug[s.ticker].allTradesGenerated = trades.length
       // Filter to YTD only (entries after Jan 1)
       const ytdStart = yearStart.toISOString()
-      allTrades.push(...trades.filter(t => t.entryTime >= ytdStart))
+      const ytdTrades = trades.filter(t => t.entryTime >= ytdStart)
+      debug[s.ticker].ytdTrades = ytdTrades.length
+      allTrades.push(...ytdTrades)
     }
 
     // Generate Dual Momentum trades
@@ -215,10 +220,14 @@ export async function GET(req: NextRequest) {
       fetchCandles("SPY", fromTs, now),
       fetchCandles("EFA", fromTs, now),
     ])
+    debug.SPY = spyCandles ? { dataPoints: spyCandles.c.length } : { error: "No data" }
+    debug.EFA = efaCandles ? { dataPoints: efaCandles.c.length } : { error: "No data" }
     if (spyCandles && efaCandles) {
       const dmTrades = generateDualMomentumTrades(spyCandles, efaCandles, DUAL_MOMENTUM.lookback)
       const ytdStart = yearStart.toISOString()
-      allTrades.push(...dmTrades.filter(t => t.entryTime >= ytdStart))
+      const ytdDm = dmTrades.filter(t => t.entryTime >= ytdStart)
+      debug.DualMomentum = { allTrades: dmTrades.length, ytdTrades: ytdDm.length }
+      allTrades.push(...ytdDm)
     }
 
     // Clear old backtest trades and insert new ones
@@ -248,6 +257,7 @@ export async function GET(req: NextRequest) {
       count: allTrades.length,
       strategies: [...new Set(allTrades.map(t => t.strategy))],
       trades: allTrades,
+      debug,
     })
   } catch (error: any) {
     console.error("Backtest refresh error:", error)
