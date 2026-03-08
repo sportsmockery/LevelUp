@@ -85,6 +85,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, user: { id: data.user.id, email: data.user.email } })
     }
 
+    case "update-credentials": {
+      const { userId, email: newEmail, password: newPassword } = body
+      if (!userId) {
+        return NextResponse.json({ ok: false, error: "Missing userId" }, { status: 400 })
+      }
+      if (!newEmail && !newPassword) {
+        return NextResponse.json({ ok: false, error: "Must provide email and/or password to update" }, { status: 400 })
+      }
+
+      // Protect the admin account email from being changed
+      const { data: targetUser } = await admin.auth.admin.getUserById(userId)
+      if (targetUser?.user?.email === ADMIN_EMAIL && newEmail && newEmail !== ADMIN_EMAIL) {
+        return NextResponse.json({ ok: false, error: "Cannot change the admin account email" }, { status: 403 })
+      }
+
+      const updates: Record<string, string> = {}
+      if (newEmail) updates.email = newEmail
+      if (newPassword) updates.password = newPassword
+
+      const { data: updatedUser, error: updateError } = await admin.auth.admin.updateUserById(userId, updates)
+      if (updateError) {
+        return NextResponse.json({ ok: false, error: updateError.message }, { status: 500 })
+      }
+
+      return NextResponse.json({
+        ok: true,
+        message: "User credentials updated",
+        user: { id: updatedUser.user.id, email: updatedUser.user.email },
+      })
+    }
+
     case "reset-password": {
       const { userId, password } = body
       if (!userId || !password) {
