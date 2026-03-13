@@ -1,5 +1,66 @@
 # Healthy Start Command Center — Guide
 
+## Colab Server Setup (Do This First)
+
+The AI runs on Google Colab (GPU). You must start the Colab server before using `/hs/loop`.
+
+### First Time Setup
+
+1. Open the notebook: GitHub > `sportsmockery/LevelUp` > `python/colab_server.ipynb`
+2. Select **GPU runtime**: Runtime > Change runtime type > T4 or A100
+3. Run cells in order:
+
+| Cell | What it does | Action needed |
+|---|---|---|
+| **1** | Mounts Google Drive, clones repo, installs deps | Just run it. Authorize Drive when prompted. |
+| **2** | Downloads SAM model, restores YOLO + trained models from Drive | Upload `yolov12s_010826.pt` if first time (Cell 2b) |
+| **3** | Sets Roboflow API key, fetches dental datasets | Paste your key where it says `ROBOFLOW_API_KEY = ''` |
+| **4** | Starts ngrok tunnel | Paste your ngrok token. Copy the PUBLIC URL it prints. |
+| **5** | Starts the FastAPI server | Just run it. Server blocks here (keeps running). |
+
+### Restarting the Server
+
+**IMPORTANT: You must restart ngrok (Cell 4) BEFORE restarting the server (Cell 5).** The order matters:
+
+1. Stop the server cell (click the stop button on Cell 5)
+2. Re-run **Cell 4** (ngrok) — this creates a new tunnel
+3. Re-run **Cell 5** (server)
+4. If the ngrok URL changed, update Vercel:
+   - Tell Claude the new URL, or manually run:
+   - `vercel env rm HS_DETECTION_URL production --yes`
+   - `echo "NEW_URL" | vercel env add HS_DETECTION_URL production`
+   - Redeploy: `npm run build-deploy`
+
+### Updating Code on Colab
+
+When code changes are pushed to GitHub, pull them on Colab:
+```
+!cd /content/levelup && git pull origin main
+```
+Then restart Cell 4 (ngrok) + Cell 5 (server).
+
+### Common Issues
+
+| Problem | Cause | Fix |
+|---|---|---|
+| "fetch failed" or HTML error with `ERR_NGROK_3200` | Ngrok tunnel died (Colab disconnected) | Restart Cells 4 + 5, update URL in Vercel if changed |
+| "ROBOFLOW_API_KEY not set" | Key not in server env | Re-run Cell 3 with your key, restart Cell 4 + 5 |
+| Training failed — best.pt not created | Path issues or bad data | Pull latest code (`git pull`), restart Cells 4 + 5 |
+| Loop shows generic tooth labels (m3, canR) | Trained models missing | Click Start — auto-training will begin (~20 min) |
+| Models lost after Colab restart | Drive not mounted | Ensure Cell 1 runs first (mounts Drive). Models auto-restore from Drive. |
+
+### Google Drive Persistence
+
+Trained models are saved to **Google Drive > My Drive > hs_models/**:
+- `detector_best.pt` — 9-class YOLO detector
+- `classifier_best.pt` — ResNet18 contact classifier
+- `yolov12s_010826.pt` — Base YOLO model
+- `sam_vit_b_01ec64.pth` — SAM segmentation model
+
+On Colab restart, Cell 2 restores these from Drive instantly — **no retraining needed**. The first training run takes ~20 min, but every restart after that is instant.
+
+---
+
 ## What the Loop Does
 
 The scoring loop runs your dental images through a **3-stage pipeline** on every pass:
@@ -298,9 +359,11 @@ While training runs, the loop page shows:
 ### After Training Completes
 
 Once both models are ready:
+- Models are **automatically saved to Google Drive** (no manual step)
 - Click **Start** again — the loop now runs the full 3-stage pipeline
 - Results include clinical labels, gap measurements, hardware suggestions
 - The OMMS tab starts scoring each run
+- On next Colab restart, models restore from Drive instantly — no retraining
 
 ### Manual Training (Advanced)
 
