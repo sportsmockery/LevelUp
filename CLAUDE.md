@@ -85,3 +85,118 @@ For every analysis, LevelUp MUST provide 2-3 sentence reasoning per position (st
 3. What lost points and why
 
 This reasoning serves as both coaching feedback AND verification that the correct wrestler was identified and scored.
+
+---
+
+## HS — Healthy Start Dental AI System
+
+### Architecture
+
+The Healthy Start system runs as a **Python FastAPI server on Google Colab** connected to the **Vercel frontend** via an ngrok tunnel.
+
+```
+Browser -> levelupwrestlingapp.com/hs/loop (Vercel)
+  -> /api/hs/* (Next.js API routes)
+    -> HS_DETECTION_URL (ngrok tunnel -> Colab Python server)
+      -> YOLO + SAM + ResNet18 inference on Colab GPU
+```
+
+### Colab Setup Process
+
+The Python server runs on Colab because it needs GPU for YOLO/SAM inference. The notebook is at `python/colab_server.ipynb`. Steps:
+
+1. **Cell 1** — Clone repo + install deps (`ultralytics`, `fastapi`, `segment-anything`, `pyngrok`)
+2. **Cell 2** — Download SAM model (auto from Meta), check for YOLO model (`yolov12s_010826.pt` — must be uploaded manually, 18MB)
+3. **Cell 3** — Set `ROBOFLOW_API_KEY` (writes `.env.local` so server reads it) + fetch datasets
+4. **Cell 4** — Start ngrok tunnel (requires `NGROK_AUTH_TOKEN`) — outputs a public URL
+5. **Cell 5** — Start FastAPI server on port 8100
+
+### Ngrok Tunnel Management (CRITICAL)
+
+- The ngrok tunnel **dies when Colab disconnects** (inactivity, runtime timeout)
+- Each restart generates a **new URL** — must update `HS_DETECTION_URL` in Vercel env vars
+- When user reports "fetch failed" or HTML error with `ERR_NGROK_3200`, the tunnel is dead
+- Fix: restart Colab cells 4+5, get new URL, update Vercel env var, redeploy
+- Free ngrok tier = new URL every time. Paid ($8/mo) = fixed subdomain.
+
+### Vercel Environment Variable
+
+- `HS_DETECTION_URL` — must be set to the **bare ngrok URL** (e.g. `https://abc123.ngrok-free.dev`)
+- Do NOT set it to the full ngrok object string — just the URL
+- Update with: `vercel env rm HS_DETECTION_URL production --yes && echo "URL" | vercel env add HS_DETECTION_URL production`
+- Redeploy after changing: `npm run build-deploy`
+
+### Auto-Training Pipeline
+
+When **Start** is clicked on `/hs/loop` and trained models don't exist, the server auto-trains:
+
+1. Generates 300 synthetic dental images with 9-class YOLO labels (~1 min)
+2. Fine-tunes YOLO detector on synthetic data (~15-20 min on T4 GPU)
+3. Extracts contact crops, auto-sorts into normal/open/unclear (~1 min)
+4. Trains ResNet18 contact classifier (~5 min)
+
+Training progress shows on the loop page. Models saved to:
+- `runs/detect/contacts_detector_v1/weights/best.pt` (detector)
+- `runs/classify/contacts_classifier_v1/best.pt` (classifier)
+
+### Key Endpoints (Python Server)
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /health` | Server status |
+| `POST /loop/start` | Start scoring loop (auto-trains if models missing) |
+| `POST /loop/stop` | Stop scoring loop |
+| `GET /loop/status` | Loop state + pass history |
+| `POST /train/start` | Manually trigger auto-training |
+| `GET /train/status` | Training progress |
+| `GET /command-center` | Drift analytics dashboard data |
+| `GET /audit/progression` | OMMS scores + production readiness |
+| `POST /audit/validate` | Run hard clinical logic ruleset |
+| `POST /audit/score` | Calculate and record OMMS score |
+| `POST /truth-engine/override` | Clinical override back-propagation |
+| `GET /truth-engine/stats` | Override history + tier distribution |
+| `POST /diagnose` | Per-image diagnosis + hardware recommendations |
+
+### Frontend Pages
+
+- `/hs` — Single image upload + analysis (detect, segment, broken-contacts, enhance, sam-factory)
+- `/hs/loop` — Command Center dashboard with 5 tabs:
+  - **Scoring Loop** — per-image diagnosis, hardware suggestions, label distribution
+  - **OMMS / Production** — model maturity score, production readiness, learning velocity
+  - **Drift Analytics** — YOLO vs SAM divergence, tier distribution, score trends
+  - **Hard Samples** — worst images ranked by quality metrics
+  - **Modality Gaps** — per-modality performance comparison
+
+### Hard Clinical Logic (Validated Every Run)
+
+- Sagittal: Class II Div 1/2, Class III, surgical risk from overjet + molar relation
+- Vertical: Open bite (overbite < 0mm), deep bite (overbite > 40%)
+- Transverse: Posterior crossbite (maxillary < mandibular width)
+- Hardware: RPE if crowding > 5mm, TADs if overjet > 6mm
+- **CRITICAL**: Biological breach if hardware < 1mm from root apex — blocks inference
+
+### OMMS (Orthodontic Model Maturity Score)
+
+```
+OMMS = (0.3 * S_geo) + (0.7 * S_clin) - (10 * B_crit)
+```
+
+- RED: OMMS < 85 or any biological breach
+- YELLOW: OMMS 85-91
+- GREEN: OMMS >= 92 for 3 consecutive runs = production ready
+
+### Key Files
+
+| Path | Purpose |
+|---|---|
+| `python/server.py` | FastAPI server (all endpoints) |
+| `python/broken_contacts/` | Core ML pipeline (21 modules) |
+| `python/broken_contacts/auto_train.py` | Auto-training pipeline |
+| `python/broken_contacts/clinical_auditor.py` | Hard logic + OMMS scoring |
+| `python/broken_contacts/truth_engine.py` | Clinical override back-propagation |
+| `python/broken_contacts/labeling.py` | Comprehensive ortho scan labeling schema |
+| `python/colab_server.ipynb` | Colab notebook for running the server |
+| `app/hs/page.tsx` | Single image analysis UI |
+| `app/hs/loop/page.tsx` | Command Center dashboard |
+| `app/api/hs/` | Next.js API routes proxying to Python |
+| `docs/HS_Loop_Guide.md` | Full user guide |
