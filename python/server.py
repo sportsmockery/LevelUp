@@ -444,6 +444,68 @@ async def loop_status():
     return JSONResponse(scoring_loop.get_status())
 
 
+# =========================================================================
+# Command Center Endpoints
+# =========================================================================
+
+@app.get("/command-center")
+async def command_center():
+    """Get full Command Center dashboard data.
+
+    Returns iteration history, modality gaps, hard samples,
+    overconfident failures, and scatter data for drift visualization.
+    """
+    from broken_contacts.drift_monitor import get_dashboard_data
+    data = get_dashboard_data()
+    return JSONResponse(data)
+
+
+@app.post("/factory/run")
+async def factory_run(config: dict = {}):
+    """Run one iteration of the ContinuousTrainer factory loop."""
+    from broken_contacts.factory_loop import ContinuousTrainer
+
+    yolo_path = config.get("yolo_model", str(YOLO_MODEL_PATH))
+    sam_path = config.get("sam_model", str(SAM_MODEL_PATH))
+    image_dir = config.get("image_dir", "data/raw/train/images")
+
+    if not Path(yolo_path).exists():
+        return JSONResponse({"error": f"YOLO model not found: {yolo_path}"}, status_code=503)
+    if not Path(sam_path).exists():
+        return JSONResponse({"error": f"SAM model not found: {sam_path}"}, status_code=503)
+
+    try:
+        trainer = ContinuousTrainer(
+            yolo_model_path=yolo_path,
+            sam_checkpoint_path=sam_path,
+            yolo_confidence=config.get("confidence", 0.25),
+            retrain_threshold=config.get("retrain_threshold", 100),
+        )
+        result = trainer.run_iteration(
+            image_dir=image_dir,
+            enhance=config.get("enhance", True),
+        )
+        trainer.cleanup()
+
+        return JSONResponse({
+            "status": "complete",
+            "iteration": result.iteration,
+            "images": result.images_processed,
+            "platinum": result.platinum_count,
+            "gold": result.gold_count,
+            "silver": result.silver_count,
+            "reject": result.reject_count,
+            "mean_score": result.mean_final_score,
+            "mean_iou": result.mean_iou,
+            "mean_drift": result.mean_drift_px,
+            "modality_breakdown": result.modality_breakdown,
+            "hard_samples": result.hard_samples[:10],
+            "duration": result.duration_seconds,
+        })
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8100)

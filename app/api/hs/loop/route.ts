@@ -4,11 +4,16 @@ export const maxDuration = 30;
 
 const PYTHON_SERVICE_URL = process.env.HS_DETECTION_URL || 'http://localhost:8100';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const response = await fetch(`${PYTHON_SERVICE_URL}/loop/status`);
+    const { searchParams } = new URL(request.url);
+    const view = searchParams.get('view');
+
+    // Command center view returns drift analytics
+    const endpoint = view === 'command-center' ? 'command-center' : 'loop/status';
+    const response = await fetch(`${PYTHON_SERVICE_URL}/${endpoint}`);
     if (!response.ok) {
-      return NextResponse.json({ error: 'Loop service unavailable' }, { status: 502 });
+      return NextResponse.json({ error: 'Service unavailable' }, { status: 502 });
     }
     const data = await response.json();
     return NextResponse.json(data);
