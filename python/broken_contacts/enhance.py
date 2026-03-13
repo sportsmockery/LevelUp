@@ -66,7 +66,7 @@ def enhance_dental_image(
     # Measure original sharpness
     laplacian_var = cv2.Laplacian(l_channel, cv2.CV_64F).var()
     metrics["original_variance"] = round(float(laplacian_var), 2)
-    metrics["blur_detected"] = laplacian_var < blur_threshold
+    metrics["blur_detected"] = bool(laplacian_var < blur_threshold)
 
     # Apply CLAHE to luminance channel
     clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_size)
