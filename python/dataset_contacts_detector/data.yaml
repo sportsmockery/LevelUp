@@ -1,0 +1,19 @@
+# Broken Contacts — Stage 1 Multi-Class Segmentation/Detection
+# Mirrors config/data.yaml for dataset_contacts_detector paths
+# 9 classes for YOLO detection + SAM2 mask refinement
+
+path: ../dataset_contacts_detector
+train: train/images
+val: val/images
+
+nc: 9
+names:
+  0: tooth_crown
+  1: mesial_surface
+  2: distal_surface
+  3: occlusal_surface
+  4: restoration_margin
+  5: contact_gap_candidate
+  6: articulating_mark
+  7: ortho_hardware
+  8: gingival_margin

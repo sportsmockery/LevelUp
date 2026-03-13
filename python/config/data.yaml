@@ -1,0 +1,19 @@
+# Dental Contact Pipeline — Stage 1 Detector & Segmentation Classes
+# 9 classes for YOLO detection + SAM2 mask refinement
+
+path: ../data/processed
+train: images/train
+val: images/val
+test: images/test
+
+nc: 9
+names:
+  0: tooth_crown            # Main body of tooth; primary anchor for all pairs
+  1: mesial_surface          # Anterior-facing proximal wall
+  2: distal_surface          # Posterior-facing proximal wall; critical for shortest-distance logic
+  3: occlusal_surface        # Biting surface; filtered for articulating marks or wear facets
+  4: restoration_margin      # Interface between tooth structure and filling/crown material
+  5: contact_gap_candidate   # Visual space/void between teeth (likely open contact)
+  6: articulating_mark       # Ink marks on occlusal surface; mapped for localized force
+  7: ortho_hardware          # EXCLUSION: brackets/wires — masked out from distance calcs
+  8: gingival_margin         # Gum line; used for vertical food impaction depth

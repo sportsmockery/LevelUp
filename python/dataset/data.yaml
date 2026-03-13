@@ -1,0 +1,14 @@
+# Healthy Start — Teeth Detection Dataset
+# Update class names and count to match your labeling scheme
+
+train: ./train/images
+val: ./val/images
+
+# Number of classes — update this to match your labels
+nc: 1
+
+# Class names — update these to match your labels
+# Examples for dental detection:
+#   Single class:  ['tooth']
+#   Multi-class:   ['tooth', 'cavity', 'crown', 'filling', 'root_canal']
+names: ['tooth']

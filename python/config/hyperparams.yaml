@@ -1,0 +1,40 @@
+# Hyperparameters for all pipeline stages
+
+stage1_detector:
+  base_model: yolov12s_010826.pt
+  epochs: 100
+  batch_size: 8
+  imgsz: 640
+  lr0: 0.0005
+  patience: 25
+  confidence: 0.3
+  iou_threshold: 0.5
+  use_segmentation: true
+
+stage2_geometry:
+  crop_size: 512
+  min_tooth_overlap_y: 0.3
+  min_crown_context: 0.20
+  interproximal_padding: 0.15
+  rotation_normalize: true
+
+stage3_classifier:
+  model: resnet18
+  pretrained: true
+  epochs: 25
+  batch_size: 16
+  imgsz: 224
+  lr: 0.001
+  confidence_threshold: 0.5
+
+rules_layer:
+  geometric_gap_override_mm: 1.0
+  geometric_gap_monitor_mm: 0.5
+  bitewing_overlap_threshold_mm: 0.1
+  low_quality_threshold: 0.3
+
+modality_weights:
+  bitewing: 0.40
+  intraoral_photo: 0.30
+  periapical: 0.20
+  other: 0.10

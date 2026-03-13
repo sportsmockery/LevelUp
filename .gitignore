@@ -41,6 +41,19 @@ yarn-error.log*
 next-env.d.ts
 .env*.local
 
+# Python service
+/python/venv
+/python/data
+/python/runs
+/python/__pycache__
+/python/broken_contacts/__pycache__
+/python/dataset_contacts_detector/train
+/python/dataset_contacts_detector/val
+/python/dataset_contacts_classifier/train
+/python/dataset_contacts_classifier/val
+*.pt
+*.pth
+
 # source assets
 /LevelUpLogos
 /docs
