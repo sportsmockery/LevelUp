@@ -350,6 +350,18 @@ export default function CommandCenterPage() {
           <div className="bg-red-900/30 border border-red-700 rounded-xl p-4 text-red-300 text-sm">{error}</div>
         )}
 
+        {/* Service errors from the Python loop */}
+        {status && status.errors && status.errors.length > 0 && (
+          <div className="bg-amber-900/30 border border-amber-700 rounded-xl p-4 text-sm">
+            <h3 className="text-amber-300 font-medium mb-2">Loop Messages</h3>
+            <ul className="space-y-1">
+              {status.errors.map((err, i) => (
+                <li key={i} className="text-amber-200/80 text-xs font-mono">{err}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {/* Live Progress */}
         {isRunning && status && (
           <div className="bg-zinc-900 rounded-2xl p-6 border border-zinc-800">
