@@ -164,6 +164,7 @@ export default function CommandCenterPage() {
   const [configOpen, setConfigOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'loop' | 'drift' | 'hard' | 'modality'>('loop');
   const [expandedPass, setExpandedPass] = useState<number | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Config
@@ -198,23 +199,49 @@ export default function CommandCenterPage() {
   }, [status?.running, fetchAll]);
 
   const handleStart = async () => {
-    await fetch('/api/hs/loop', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'start', config: {
-        source_dir: sourceDir, interval_seconds: interval,
-        enable_augmentation: augEnabled, num_variants: numVariants,
-        modality, detector_confidence: detConf, auto_fetch_datasets: true,
-      }}),
-    });
-    fetchAll();
+    setActionLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/hs/loop', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'start', config: {
+          source_dir: sourceDir, interval_seconds: interval,
+          enable_augmentation: augEnabled, num_variants: numVariants,
+          modality, detector_confidence: detConf, auto_fetch_datasets: true,
+        }}),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.error || `Start failed (${res.status})`);
+      } else {
+        await fetchAll();
+      }
+    } catch (e) {
+      setError(`Cannot reach Python service — is it running on port 8100? (${e instanceof Error ? e.message : 'unknown error'})`);
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const handleStop = async () => {
-    await fetch('/api/hs/loop', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'stop' }),
-    });
-    fetchAll();
+    setActionLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/hs/loop', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'stop' }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.error || `Stop failed (${res.status})`);
+      } else {
+        await fetchAll();
+      }
+    } catch (e) {
+      setError(`Cannot reach Python service (${e instanceof Error ? e.message : 'unknown error'})`);
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const isRunning = status?.running ?? false;
@@ -256,14 +283,14 @@ export default function CommandCenterPage() {
               Config
             </button>
             {isRunning ? (
-              <button onClick={handleStop}
-                className="px-6 py-2 rounded-xl text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors">
-                Stop
+              <button onClick={handleStop} disabled={actionLoading}
+                className="px-6 py-2 rounded-xl text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                {actionLoading ? 'Stopping...' : 'Stop'}
               </button>
             ) : (
-              <button onClick={handleStart}
-                className="px-6 py-2 rounded-xl text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors">
-                Start
+              <button onClick={handleStart} disabled={actionLoading}
+                className="px-6 py-2 rounded-xl text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                {actionLoading ? 'Starting...' : 'Start'}
               </button>
             )}
           </div>
