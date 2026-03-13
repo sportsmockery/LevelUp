@@ -665,6 +665,97 @@ async def diagnose_image(body: dict = {}):
     return JSONResponse(diagnosis)
 
 
+# =========================================================================
+# Clinical Auditor & OMMS Endpoints
+# =========================================================================
+
+from broken_contacts.clinical_auditor import (
+    run_hard_logic, SagittalInput, VerticalInput, TransverseInput, HardwareInput,
+    calculate_omms, compute_s_geo, compute_s_clin, OMMSScore, audit_history,
+)
+
+
+@app.post("/audit/validate")
+async def audit_validate(body: dict = {}):
+    """Run the hard clinical logic ruleset against provided measurements."""
+    sag = body.get("sagittal", {})
+    vert = body.get("vertical", {})
+    trans = body.get("transverse", {})
+    hw = body.get("hardware", {})
+
+    result = run_hard_logic(
+        sagittal=SagittalInput(
+            molar_relation=sag.get("molar_relation", "neutral"),
+            overjet_mm=sag.get("overjet_mm", 2.0),
+            incisor_inclination=sag.get("incisor_inclination", "normal"),
+            ANB_angle=sag.get("ANB_angle", 2.0),
+        ),
+        vertical=VerticalInput(
+            overbite_mm=vert.get("overbite_mm", 2.0),
+            overbite_percent=vert.get("overbite_percent", 25.0),
+        ),
+        transverse=TransverseInput(
+            maxillary_width=trans.get("maxillary_width", 35.0),
+            mandibular_width=trans.get("mandibular_width", 34.0),
+        ),
+        hardware=HardwareInput(
+            crowding_mm=hw.get("crowding_mm", 0.0),
+            overjet_mm=hw.get("overjet_mm", sag.get("overjet_mm", 2.0)),
+            anchorage_need=hw.get("anchorage_need", "low"),
+            d_min_contacts=hw.get("d_min_contacts", []),
+            root_proximity_mm=hw.get("root_proximity_mm", 5.0),
+            tad_position=hw.get("tad_position"),
+        ),
+        ai_diagnosis=body.get("ai_diagnosis", ""),
+    )
+    return JSONResponse(result.to_dict())
+
+
+@app.post("/audit/score")
+async def audit_score(body: dict = {}):
+    """Calculate OMMS for a model run and record it."""
+    import time as _time
+
+    mean_drift = body.get("mean_drift_mm", 0.5)
+    mask_iou = body.get("mask_iou", 0.7)
+    logic_match = body.get("logic_match_pct", 80.0)
+    hardware_match = body.get("hardware_match_pct", 80.0)
+    bio_breaches = body.get("biological_breaches", 0)
+    class_accuracy = body.get("class_accuracy", {})
+    clusters_purged = body.get("clusters_purged", 0)
+    images_purged = body.get("images_purged", 0)
+
+    s_geo = compute_s_geo(mean_drift, mask_iou)
+    s_clin = compute_s_clin(logic_match, hardware_match)
+    omms, status = calculate_omms(s_geo, s_clin, bio_breaches)
+
+    score = OMMSScore(
+        run_id=body.get("run_id", f"run-{int(_time.time())}"),
+        timestamp=_time.time(),
+        s_geo=s_geo,
+        s_clin=s_clin,
+        b_crit=bio_breaches,
+        omms=omms,
+        status=status,
+        mean_drift_mm=mean_drift,
+        mask_iou=mask_iou,
+        logic_match_pct=logic_match,
+        hardware_match_pct=hardware_match,
+        class_accuracy=class_accuracy,
+        clusters_purged=clusters_purged,
+        images_purged=images_purged,
+    )
+    audit_history.record_run(score)
+
+    return JSONResponse(score.to_dict())
+
+
+@app.get("/audit/progression")
+async def audit_progression():
+    """Get full OMMS progression data for the dashboard."""
+    return JSONResponse(audit_history.get_progression())
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8100)

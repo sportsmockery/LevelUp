@@ -162,7 +162,9 @@ export default function CommandCenterPage() {
   const [ccData, setCcData] = useState<CommandCenterData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [configOpen, setConfigOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'loop' | 'drift' | 'hard' | 'modality'>('loop');
+  const [activeTab, setActiveTab] = useState<'loop' | 'drift' | 'hard' | 'modality' | 'omms'>('loop');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [auditData, setAuditData] = useState<any>(null);
   const [expandedPass, setExpandedPass] = useState<number | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -177,12 +179,14 @@ export default function CommandCenterPage() {
 
   const fetchAll = useCallback(async () => {
     try {
-      const [statusRes, ccRes] = await Promise.all([
+      const [statusRes, ccRes, auditRes] = await Promise.all([
         fetch('/api/hs/loop'),
         fetch('/api/hs/loop?view=command-center'),
+        fetch('/api/hs/audit'),
       ]);
       if (statusRes.ok) setStatus(await statusRes.json());
       if (ccRes.ok) setCcData(await ccRes.json());
+      if (auditRes.ok) setAuditData(await auditRes.json());
       setError(null);
     } catch {
       setError('Cannot reach services');
@@ -334,12 +338,14 @@ export default function CommandCenterPage() {
 
         {/* Tab Navigation */}
         <div className="max-w-6xl mx-auto mt-4 flex gap-2">
-          {(['loop', 'drift', 'hard', 'modality'] as const).map(tab => (
+          {(['loop', 'omms', 'drift', 'hard', 'modality'] as const).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)}
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-                activeTab === tab ? 'bg-[#2563EB] text-white' : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                activeTab === tab
+                  ? tab === 'omms' ? 'bg-gradient-to-r from-blue-600 to-green-500 text-white' : 'bg-[#2563EB] text-white'
+                  : 'bg-zinc-800 text-zinc-400 hover:text-white'
               }`}>
-              {tab === 'loop' ? 'Scoring Loop' : tab === 'drift' ? 'Drift Analytics' : tab === 'hard' ? 'Hard Samples' : 'Modality Gaps'}
+              {tab === 'loop' ? 'Scoring Loop' : tab === 'omms' ? 'OMMS / Production' : tab === 'drift' ? 'Drift Analytics' : tab === 'hard' ? 'Hard Samples' : 'Modality Gaps'}
             </button>
           ))}
         </div>
@@ -775,8 +781,194 @@ export default function CommandCenterPage() {
           </>
         )}
 
+        {/* ==================== TAB: OMMS / PRODUCTION ==================== */}
+        {activeTab === 'omms' && (
+          <>
+            {auditData?.latest ? (() => {
+              const lt = auditData.latest;
+              const prog = auditData;
+              const statusColor = lt.status === 'GREEN' ? 'text-green-400' : lt.status === 'YELLOW' ? 'text-yellow-400' : 'text-red-400';
+              const statusBorder = lt.status === 'GREEN' ? 'border-green-500/30' : lt.status === 'YELLOW' ? 'border-yellow-500/30' : 'border-red-500/30';
+              const readinessColor = prog.production_readiness === 'GREEN' ? 'text-green-400' : prog.production_readiness === 'YELLOW' ? 'text-yellow-400' : 'text-red-400';
+
+              return (
+                <>
+                  {/* OMMS Hero Card */}
+                  <div className={`bg-slate-900 p-6 rounded-2xl border ${statusBorder}`}>
+                    <div className="flex justify-between items-end mb-4">
+                      <div>
+                        <h2 className="text-xl font-bold">Model Version: {lt.run_id}</h2>
+                        <p className="text-blue-400 text-sm">
+                          Learning Velocity: {prog.omms_velocity >= 0 ? '+' : ''}{prog.omms_velocity}% per run
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <div className={`text-3xl font-mono font-bold ${statusColor}`}>OMMS: {lt.omms}</div>
+                        <div className="text-xs text-slate-500 uppercase">Target: 92.0</div>
+                      </div>
+                    </div>
+
+                    {/* Production Progress Bar */}
+                    <div className="w-full bg-slate-800 h-4 rounded-full overflow-hidden border border-slate-700">
+                      <div className="bg-gradient-to-r from-blue-600 to-green-500 h-full transition-all"
+                        style={{ width: `${Math.min(lt.omms, 100)}%` }} />
+                    </div>
+                    <div className="flex justify-between mt-1 text-xs text-zinc-600">
+                      <span>0</span>
+                      <span className="text-red-500">RED &lt;85</span>
+                      <span className="text-yellow-500">YELLOW 85-91</span>
+                      <span className="text-green-500">GREEN 92+</span>
+                      <span>100</span>
+                    </div>
+
+                    {/* Key Metrics */}
+                    <div className="grid grid-cols-4 gap-4 mt-6">
+                      <div className="bg-zinc-800 rounded-xl p-3 text-center">
+                        <div className="text-lg font-mono text-blue-400">{lt.mean_drift_mm.toFixed(2)}mm</div>
+                        <div className="text-xs text-zinc-500">Mean Drift</div>
+                        {lt.drift_delta !== 0 && (
+                          <div className={`text-xs ${lt.drift_delta < 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {lt.drift_delta > 0 ? '+' : ''}{lt.drift_delta.toFixed(3)}mm
+                          </div>
+                        )}
+                      </div>
+                      <div className="bg-zinc-800 rounded-xl p-3 text-center">
+                        <div className="text-lg font-mono text-emerald-400">{lt.logic_match_pct.toFixed(1)}%</div>
+                        <div className="text-xs text-zinc-500">Logic Match</div>
+                        {lt.logic_delta !== 0 && (
+                          <div className={`text-xs ${lt.logic_delta > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {lt.logic_delta > 0 ? '+' : ''}{lt.logic_delta.toFixed(1)}%
+                          </div>
+                        )}
+                      </div>
+                      <div className="bg-zinc-800 rounded-xl p-3 text-center">
+                        <div className={`text-lg font-mono ${lt.b_crit === 0 ? 'text-green-400' : 'text-red-400'}`}>{lt.b_crit}</div>
+                        <div className="text-xs text-zinc-500">Bio Breaches</div>
+                      </div>
+                      <div className="bg-zinc-800 rounded-xl p-3 text-center">
+                        <div className="text-lg font-mono text-purple-400">{lt.hardware_match_pct.toFixed(0)}%</div>
+                        <div className="text-xs text-zinc-500">HW Accuracy</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Production Readiness */}
+                  <div className={`rounded-2xl p-6 border ${
+                    prog.production_readiness === 'GREEN' ? 'bg-green-950/30 border-green-700' :
+                    prog.production_readiness === 'YELLOW' ? 'bg-yellow-950/30 border-yellow-700' :
+                    'bg-red-950/30 border-red-700'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className={`text-sm font-bold uppercase ${readinessColor}`}>
+                          Production Readiness: {prog.production_readiness}
+                        </h3>
+                        <p className="text-zinc-400 text-sm mt-1">{prog.production_label}</p>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-zinc-500 text-xs">Green Streak: {prog.green_streak} runs</span>
+                        <span className="text-zinc-600 text-xs block">Need 3 consecutive GREEN</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Layer Performance Table */}
+                  {prog.layer_performance && prog.layer_performance.length > 0 && (
+                    <div className="bg-zinc-900 rounded-2xl p-6 border border-zinc-800">
+                      <h2 className="text-lg font-heading mb-4">Intelligence Audit</h2>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-zinc-700">
+                              <th className="text-left py-2 text-zinc-500 font-normal">Layer</th>
+                              <th className="text-left py-2 text-zinc-500 font-normal">Performance Metric</th>
+                              <th className="text-right py-2 text-zinc-500 font-normal">Delta (vs 7D Avg)</th>
+                              <th className="text-right py-2 text-zinc-500 font-normal">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {prog.layer_performance.map((lp: Record<string, string>, idx: number) => (
+                              <tr key={idx} className="border-b border-zinc-800">
+                                <td className="py-2 text-zinc-300 font-medium">{lp.layer}</td>
+                                <td className="py-2 text-zinc-400">{lp.metric}: <span className="text-white font-mono">{lp.value}</span></td>
+                                <td className="py-2 text-right font-mono text-zinc-400">{lp.delta}</td>
+                                <td className="py-2 text-right">
+                                  <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                    lp.status === 'improving' ? 'bg-green-900/50 text-green-400' :
+                                    lp.status === 'secure' ? 'bg-green-900/50 text-green-400' :
+                                    lp.status === 'drift' ? 'bg-yellow-900/50 text-yellow-400' :
+                                    lp.status === 'breach' ? 'bg-red-900/50 text-red-400' :
+                                    'bg-zinc-800 text-zinc-400'
+                                  }`}>
+                                    {lp.status === 'improving' ? 'Improving' :
+                                     lp.status === 'secure' ? 'Secure' :
+                                     lp.status === 'drift' ? 'Logic Drift' :
+                                     lp.status === 'breach' ? 'BREACH' :
+                                     lp.status === 'needs_work' ? 'Needs Work' : 'Stable'}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* OMMS Run History */}
+                  {prog.omms_history && prog.omms_history.length > 1 && (
+                    <div className="bg-zinc-900 rounded-2xl p-6 border border-zinc-800">
+                      <h2 className="text-lg font-heading mb-4">OMMS Trend (Last {prog.omms_history.length} Runs)</h2>
+                      <div className="flex items-end gap-1 h-32">
+                        {prog.omms_history.map((h: Record<string, unknown>, i: number) => {
+                          const score = h.omms as number;
+                          const barH = Math.max(4, (score / 100) * 120);
+                          const color = (h.status as string) === 'GREEN' ? 'bg-green-500' :
+                                        (h.status as string) === 'YELLOW' ? 'bg-yellow-500' : 'bg-red-500';
+                          return (
+                            <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                              <span className="text-xs text-zinc-500">{score.toFixed(0)}</span>
+                              <div className={`w-full ${color} rounded-t`} style={{ height: `${barH}px` }} />
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {/* 92.0 target line indicator */}
+                      <div className="text-xs text-zinc-600 mt-2 text-center">
+                        Target: 92.0 for 3 consecutive GREEN runs = Production Ready
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Top Failure Mode */}
+                  {prog.top_failure_mode && (
+                    <div className="bg-red-950/20 border border-red-800 rounded-2xl p-6">
+                      <h3 className="text-sm font-bold text-red-400 uppercase mb-2">Top Model Failure Mode</h3>
+                      <p className="text-zinc-300 text-sm">
+                        <span className="font-medium">{prog.top_failure_mode.pattern}</span>
+                        {' '}— Accuracy: <span className="text-red-400 font-mono">{prog.top_failure_mode.accuracy}%</span>
+                      </p>
+                      <p className="text-zinc-500 text-xs mt-1">
+                        Action: {prog.top_failure_mode.action}
+                      </p>
+                    </div>
+                  )}
+                </>
+              );
+            })() : (
+              <div className="bg-zinc-900 rounded-2xl p-12 border border-zinc-800 text-center">
+                <p className="text-zinc-400 text-lg">No OMMS Data Yet</p>
+                <p className="text-zinc-600 text-sm mt-2">
+                  Run a scoring pass with trained models to generate OMMS scores.
+                  The auditor validates every run against clinical hard logic.
+                </p>
+              </div>
+            )}
+          </>
+        )}
+
         {/* Empty state */}
-        {!isRunning && passes.length === 0 && !ccData?.latest && (
+        {!isRunning && passes.length === 0 && !ccData?.latest && activeTab === 'loop' && (
           <div className="bg-zinc-900 rounded-2xl p-12 border border-zinc-800 text-center">
             <p className="text-zinc-400 text-lg">Command Center — No Data Yet</p>
             <p className="text-zinc-600 text-sm mt-2">Start the scoring loop or run a factory iteration to populate analytics</p>
