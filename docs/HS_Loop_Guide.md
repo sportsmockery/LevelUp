@@ -276,6 +276,56 @@ The YOLO detector identifies existing hardware:
 
 ---
 
+## Auto-Training Pipeline
+
+When you click **Start** on the loop page and the trained models don't exist yet, the system automatically starts the full training pipeline. No manual Colab cells needed.
+
+### What Happens Automatically
+
+1. **Synthetic Data Generation** (~1 min) — Creates 300 labeled dental images with teeth, gaps, restorations, and gum lines. All 9 YOLO classes are annotated.
+2. **YOLO Detector Training** (~15-20 min on T4 GPU) — Fine-tunes the base model on synthetic data to detect tooth surfaces, gaps, restorations, and hardware.
+3. **Contact Crop Generation** (~1 min) — Extracts interproximal crops from the synthetic data and auto-sorts them into normal/open/unclear.
+4. **ResNet18 Classifier Training** (~5 min on T4 GPU) — Trains the contact classifier on the crops.
+
+### Training Progress on the Dashboard
+
+While training runs, the loop page shows:
+- **Progress bar** with percentage (0-100%)
+- **Current phase**: synth_gen, detector_train, crop_gen, classifier_train
+- **Model status**: Detector Ready / Classifier Ready indicators
+- **Error details** if anything fails
+
+### After Training Completes
+
+Once both models are ready:
+- Click **Start** again — the loop now runs the full 3-stage pipeline
+- Results include clinical labels, gap measurements, hardware suggestions
+- The OMMS tab starts scoring each run
+
+### Manual Training (Advanced)
+
+You can also trigger training manually:
+- **POST /api/hs/train** with optional config:
+  ```json
+  {
+    "num_synth_images": 500,
+    "detector_epochs": 80,
+    "classifier_epochs": 30,
+    "batch_size": 16
+  }
+  ```
+- **GET /api/hs/train** to check status at any time
+
+### Retraining After Overrides
+
+After accumulating Clinical Overrides via the Truth Engine, retrain to improve the model:
+1. The Truth Engine has already purged bad training data (SCRAP tier)
+2. Trigger a new training run via POST /api/hs/train
+3. The new model will be trained on cleaner data
+4. OMMS should increase on the next scoring pass
+
+---
+
 ## Recommended Workflow
 
 ### Daily Clinical Workflow

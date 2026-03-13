@@ -165,6 +165,8 @@ export default function CommandCenterPage() {
   const [activeTab, setActiveTab] = useState<'loop' | 'drift' | 'hard' | 'modality' | 'omms'>('loop');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [auditData, setAuditData] = useState<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [trainStatus, setTrainStatus] = useState<any>(null);
   const [expandedPass, setExpandedPass] = useState<number | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -179,14 +181,16 @@ export default function CommandCenterPage() {
 
   const fetchAll = useCallback(async () => {
     try {
-      const [statusRes, ccRes, auditRes] = await Promise.all([
+      const [statusRes, ccRes, auditRes, trainRes] = await Promise.all([
         fetch('/api/hs/loop'),
         fetch('/api/hs/loop?view=command-center'),
         fetch('/api/hs/audit'),
+        fetch('/api/hs/train'),
       ]);
       if (statusRes.ok) setStatus(await statusRes.json());
       if (ccRes.ok) setCcData(await ccRes.json());
       if (auditRes.ok) setAuditData(await auditRes.json());
+      if (trainRes.ok) setTrainStatus(await trainRes.json());
       setError(null);
     } catch {
       setError('Cannot reach services');
@@ -354,6 +358,40 @@ export default function CommandCenterPage() {
       <div className="max-w-6xl mx-auto p-6 space-y-6">
         {error && (
           <div className="bg-red-900/30 border border-red-700 rounded-xl p-4 text-red-300 text-sm">{error}</div>
+        )}
+
+        {/* Training Progress */}
+        {trainStatus && (trainStatus.running || trainStatus.phase === 'done' || trainStatus.phase === 'error') && (
+          <div className={`rounded-2xl p-6 border ${
+            trainStatus.phase === 'error' ? 'bg-red-950/30 border-red-700' :
+            trainStatus.phase === 'done' ? 'bg-green-950/30 border-green-700' :
+            'bg-blue-950/30 border-blue-700'
+          }`}>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-heading">
+                {trainStatus.phase === 'done' ? 'Training Complete' :
+                 trainStatus.phase === 'error' ? 'Training Error' :
+                 'Auto-Training Pipeline'}
+              </h2>
+              <span className="text-sm text-zinc-400">{trainStatus.progress_pct.toFixed(0)}%</span>
+            </div>
+            <div className="w-full bg-zinc-800 rounded-full h-3 mb-2">
+              <div className={`h-3 rounded-full transition-all ${
+                trainStatus.phase === 'error' ? 'bg-red-500' :
+                trainStatus.phase === 'done' ? 'bg-green-500' :
+                'bg-blue-500'
+              }`} style={{ width: `${trainStatus.progress_pct}%` }} />
+            </div>
+            <p className="text-zinc-400 text-sm">{trainStatus.message}</p>
+            <div className="flex gap-4 mt-2 text-xs text-zinc-500">
+              <span>Detector: {trainStatus.detector_exists || trainStatus.detector_ready ? 'Ready' : 'Pending'}</span>
+              <span>Classifier: {trainStatus.classifier_exists || trainStatus.classifier_ready ? 'Ready' : 'Pending'}</span>
+              <span>Phase: {trainStatus.phase.replace(/_/g, ' ')}</span>
+            </div>
+            {trainStatus.error && (
+              <p className="text-red-400 text-xs mt-2">{trainStatus.error}</p>
+            )}
+          </div>
         )}
 
         {/* Service errors from the Python loop */}

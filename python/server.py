@@ -413,11 +413,42 @@ async def sam_factory_endpoint(
 # =========================================================================
 
 from broken_contacts.loop import scoring_loop, LoopConfig
+from broken_contacts.auto_train import (
+    start_training, get_status as get_train_status, models_exist,
+)
+
+
+@app.post("/train/start")
+async def train_start(config: dict = {}):
+    """Start the auto-training pipeline (synth data + detector + classifier)."""
+    result = start_training(
+        num_synth_images=config.get("num_synth_images", 300),
+        detector_epochs=config.get("detector_epochs", 50),
+        classifier_epochs=config.get("classifier_epochs", 20),
+        batch_size=config.get("batch_size", 16),
+    )
+    return JSONResponse(result)
+
+
+@app.get("/train/status")
+async def train_status():
+    """Get current training pipeline status."""
+    return JSONResponse(get_train_status())
 
 
 @app.post("/loop/start")
 async def loop_start(config: dict = {}):
-    """Start the continuous scoring loop."""
+    """Start the continuous scoring loop. Auto-trains if models are missing."""
+    # Check if models exist — if not, start training first
+    if not models_exist():
+        train_result = start_training()
+        return JSONResponse({
+            "status": "training_started",
+            "message": "Trained models not found. Auto-training pipeline started. "
+                       "The loop will be available once training completes (~20 min).",
+            "train": train_result,
+        })
+
     lc = LoopConfig(
         source_dir=config.get("source_dir", "data/raw/train/images"),
         interval_seconds=config.get("interval_seconds", 60),

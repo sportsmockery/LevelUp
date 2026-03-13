@@ -1,0 +1,308 @@
+"""Auto-training pipeline — runs when trained models are missing.
+
+Called automatically when the loop starts and detector/classifier
+models don't exist. Generates synthetic data, trains both models,
+and makes the full 3-stage pipeline available.
+"""
+
+import threading
+import time
+from dataclasses import dataclass, asdict
+from pathlib import Path
+from typing import Optional
+
+
+@dataclass
+class TrainStatus:
+    running: bool = False
+    phase: str = "idle"           # idle, synth_gen, detector_train, crop_gen, classifier_train, done, error
+    progress_pct: float = 0.0
+    message: str = ""
+    detector_ready: bool = False
+    classifier_ready: bool = False
+    error: Optional[str] = None
+    started_at: float = 0.0
+    finished_at: float = 0.0
+
+
+_status = TrainStatus()
+_lock = threading.Lock()
+_thread: Optional[threading.Thread] = None
+
+
+def get_status() -> dict:
+    with _lock:
+        s = asdict(_status)
+    # Also check if models exist right now
+    s["detector_exists"] = Path("runs/detect/contacts_detector_v1/weights/best.pt").exists()
+    s["classifier_exists"] = Path("runs/classify/contacts_classifier_v1/best.pt").exists()
+    return s
+
+
+def models_exist() -> bool:
+    return (
+        Path("runs/detect/contacts_detector_v1/weights/best.pt").exists()
+        and Path("runs/classify/contacts_classifier_v1/best.pt").exists()
+    )
+
+
+def start_training(
+    num_synth_images: int = 300,
+    detector_epochs: int = 50,
+    classifier_epochs: int = 20,
+    batch_size: int = 16,
+) -> dict:
+    """Start the auto-training pipeline in a background thread."""
+    global _thread
+
+    with _lock:
+        if _status.running:
+            return {"status": "already_running", "phase": _status.phase}
+
+        _status.running = True
+        _status.phase = "starting"
+        _status.progress_pct = 0.0
+        _status.message = "Initializing training pipeline..."
+        _status.error = None
+        _status.started_at = time.time()
+        _status.finished_at = 0.0
+
+    _thread = threading.Thread(
+        target=_run_pipeline,
+        args=(num_synth_images, detector_epochs, classifier_epochs, batch_size),
+        daemon=True,
+    )
+    _thread.start()
+    return {"status": "started"}
+
+
+def _update(phase: str, pct: float, msg: str) -> None:
+    with _lock:
+        _status.phase = phase
+        _status.progress_pct = pct
+        _status.message = msg
+
+
+def _run_pipeline(
+    num_synth: int,
+    det_epochs: int,
+    cls_epochs: int,
+    batch_size: int,
+) -> None:
+    """Full training pipeline — runs in background thread."""
+    try:
+        # ── Phase 1: Generate synthetic data ────────────────────────
+        _update("synth_gen", 5.0, f"Generating {num_synth} synthetic dental images...")
+
+        from broken_contacts.synth_generator import generate_dataset
+        summary = generate_dataset(
+            output_dir="data/synth_detector",
+            num_images=num_synth,
+            train_split=0.8,
+            img_w=640,
+            img_h=480,
+            gap_probability=0.3,
+            restoration_probability=0.2,
+        )
+        _update("synth_gen", 15.0, f"Generated {summary['total_images']} images ({summary['total_gaps']} gaps)")
+
+        # ── Phase 2: Train YOLO detector ────────────────────────────
+        _update("detector_train", 20.0, f"Training 9-class YOLO detector ({det_epochs} epochs)...")
+
+        from ultralytics import YOLO
+        base_model = Path("yolov12s_010826.pt")
+        if not base_model.exists():
+            raise FileNotFoundError("Base YOLO model yolov12s_010826.pt not found")
+
+        model = YOLO(str(base_model))
+        model.train(
+            data=str(Path("data/synth_detector/data.yaml").resolve()),
+            epochs=det_epochs,
+            imgsz=640,
+            batch=batch_size,
+            name="contacts_detector_v1",
+            patience=15,
+            lr0=0.0005,
+            augment=True,
+            save=True,
+            val=True,
+            verbose=True,
+            project="runs/detect",
+        )
+
+        det_best = Path("runs/detect/contacts_detector_v1/weights/best.pt")
+        if not det_best.exists():
+            raise FileNotFoundError("Detector training failed — best.pt not created")
+
+        with _lock:
+            _status.detector_ready = True
+        _update("detector_train", 60.0, f"Detector trained: {det_best}")
+
+        # ── Phase 3: Generate classifier crops ──────────────────────
+        _update("crop_gen", 65.0, "Generating contact crops from synthetic data...")
+
+        import json
+        import random
+        from PIL import Image
+        from broken_contacts.config import Config
+        from broken_contacts.crops import generate_crops_from_labels
+
+        config = Config()
+        config.crop_size = 224
+
+        synth_dir = Path("data/synth_detector")
+        cls_dir = Path("data/classifier_dataset")
+        for split in ["train", "val"]:
+            for cls in ["normal_contact", "open_contact", "unclear_contact"]:
+                (cls_dir / split / cls).mkdir(parents=True, exist_ok=True)
+
+        crop_count = {"normal_contact": 0, "open_contact": 0, "unclear_contact": 0}
+
+        for split in ["train", "val"]:
+            img_dir = synth_dir / split / "images"
+            lbl_dir = synth_dir / split / "labels"
+            rel_dir = synth_dir / "relational"
+            if not img_dir.exists():
+                continue
+
+            for img_path in sorted(img_dir.glob("*.jpg")):
+                label_path = lbl_dir / f"{img_path.stem}.txt"
+                rel_path = rel_dir / f"{img_path.stem}.json"
+                if not label_path.exists():
+                    continue
+
+                gap_pairs = set()
+                if rel_path.exists():
+                    with open(rel_path) as f:
+                        rel = json.load(f)
+                    for pair in rel.get("contact_pairs", []):
+                        if pair.get("has_gap", False):
+                            gap_pairs.add(pair["pair_index"])
+
+                try:
+                    crops = generate_crops_from_labels(
+                        image_path=str(img_path),
+                        label_path=str(label_path),
+                        config=config,
+                        output_dir=None,
+                    )
+                except Exception:
+                    continue
+
+                for ci, crop_data in enumerate(crops):
+                    crop_img = crop_data.get("crop_image")
+                    if crop_img is None:
+                        continue
+                    if ci in gap_pairs:
+                        label = "open_contact"
+                    elif random.random() < 0.05:
+                        label = "unclear_contact"
+                    else:
+                        label = "normal_contact"
+                    out = cls_dir / split / label / f"{img_path.stem}_p{ci}.jpg"
+                    crop_img.save(str(out))
+                    crop_count[label] += 1
+
+        total_crops = sum(crop_count.values())
+        _update("crop_gen", 70.0, f"Generated {total_crops} crops: {crop_count}")
+
+        if total_crops < 10:
+            raise ValueError(f"Too few crops ({total_crops}) — classifier training would fail")
+
+        # ── Phase 4: Train ResNet18 classifier ──────────────────────
+        _update("classifier_train", 75.0, f"Training contact classifier ({cls_epochs} epochs)...")
+
+        import torch
+        import torch.nn as nn
+        from torch.utils.data import DataLoader
+        from torchvision import datasets, transforms
+        from broken_contacts.classifier import build_classifier_model
+
+        device = torch.device(
+            "cuda" if torch.cuda.is_available()
+            else "mps" if hasattr(torch.backends, "mps") and torch.backends.mps.is_available()
+            else "cpu"
+        )
+
+        train_tf = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomRotation(15),
+            transforms.ColorJitter(brightness=0.2, contrast=0.2),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        ])
+        val_tf = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        ])
+
+        train_ds = datasets.ImageFolder(str(cls_dir / "train"), transform=train_tf)
+        val_ds = datasets.ImageFolder(str(cls_dir / "val"), transform=val_tf)
+
+        train_loader = DataLoader(train_ds, batch_size=32, shuffle=True, num_workers=2)
+        val_loader = DataLoader(val_ds, batch_size=32, shuffle=False, num_workers=2)
+
+        cls_model = build_classifier_model(num_classes=len(train_ds.classes), pretrained=True)
+        cls_model.to(device)
+
+        criterion = nn.CrossEntropyLoss()
+        optimizer = torch.optim.Adam(cls_model.parameters(), lr=0.001)
+        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
+
+        cls_run_dir = Path("runs/classify/contacts_classifier_v1")
+        cls_run_dir.mkdir(parents=True, exist_ok=True)
+        best_acc = 0.0
+
+        for epoch in range(cls_epochs):
+            cls_model.train()
+            for images, labels in train_loader:
+                images, labels = images.to(device), labels.to(device)
+                optimizer.zero_grad()
+                loss = criterion(cls_model(images), labels)
+                loss.backward()
+                optimizer.step()
+            scheduler.step()
+
+            cls_model.eval()
+            correct, total = 0, 0
+            with torch.no_grad():
+                for images, labels in val_loader:
+                    images, labels = images.to(device), labels.to(device)
+                    _, pred = torch.max(cls_model(images), 1)
+                    correct += (pred == labels).sum().item()
+                    total += labels.size(0)
+
+            acc = correct / max(total, 1)
+            pct = 75.0 + (epoch / cls_epochs) * 20.0
+            _update("classifier_train", pct, f"Epoch {epoch+1}/{cls_epochs} — val acc: {acc:.4f}")
+
+            if acc > best_acc:
+                best_acc = acc
+                torch.save({
+                    "epoch": epoch + 1,
+                    "model_state_dict": cls_model.state_dict(),
+                    "val_acc": acc,
+                    "classes": train_ds.classes,
+                }, str(cls_run_dir / "best.pt"))
+
+        cls_best = cls_run_dir / "best.pt"
+        if not cls_best.exists():
+            raise FileNotFoundError("Classifier training failed — best.pt not created")
+
+        with _lock:
+            _status.classifier_ready = True
+
+        _update("done", 100.0, f"Training complete! Detector + Classifier ready. Best val acc: {best_acc:.4f}")
+
+    except Exception as e:
+        with _lock:
+            _status.phase = "error"
+            _status.error = str(e)
+            _status.message = f"Training failed: {e}"
+
+    finally:
+        with _lock:
+            _status.running = False
+            _status.finished_at = time.time()
