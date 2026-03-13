@@ -162,12 +162,20 @@ def _run_pipeline(
 ) -> None:
     """Full training pipeline — runs in background thread."""
     try:
+        import os
+
+        # Resolve the python/ directory as our base for all paths
+        base_dir = Path(__file__).parent.parent.resolve()
+        os.chdir(str(base_dir))
+        _update("synth_gen", 2.0, f"Working directory: {base_dir}")
+
         # ── Phase 1: Generate synthetic data ────────────────────────
         _update("synth_gen", 5.0, f"Generating {num_synth} synthetic dental images...")
 
         from broken_contacts.synth_generator import generate_dataset
+        synth_out = base_dir / "data" / "synth_detector"
         summary = generate_dataset(
-            output_dir="data/synth_detector",
+            output_dir=str(synth_out),
             num_images=num_synth,
             train_split=0.8,
             img_w=640,
@@ -177,17 +185,53 @@ def _run_pipeline(
         )
         _update("synth_gen", 15.0, f"Generated {summary['total_images']} images ({summary['total_gaps']} gaps)")
 
+        # Verify data.yaml exists and fix path to be absolute
+        data_yaml = synth_out / "data.yaml"
+        if not data_yaml.exists():
+            raise FileNotFoundError(f"data.yaml not found at {data_yaml}")
+
+        # Rewrite data.yaml with absolute paths to ensure YOLO finds the images
+        yaml_content = f"""# Synthetic Dental Dataset — Auto-Generated
+path: {synth_out}
+train: train/images
+val: val/images
+
+nc: 9
+names:
+  0: tooth_crown
+  1: mesial_surface
+  2: distal_surface
+  3: occlusal_surface
+  4: restoration_margin
+  5: contact_gap_candidate
+  6: articulating_mark
+  7: ortho_hardware
+  8: gingival_margin
+"""
+        data_yaml.write_text(yaml_content)
+
+        # Verify images actually exist
+        train_imgs = list((synth_out / "train" / "images").glob("*.jpg"))
+        val_imgs = list((synth_out / "val" / "images").glob("*.jpg"))
+        _update("synth_gen", 18.0, f"Verified: {len(train_imgs)} train, {len(val_imgs)} val images")
+
+        if len(train_imgs) == 0:
+            raise FileNotFoundError(f"No training images found in {synth_out / 'train' / 'images'}")
+
         # ── Phase 2: Train YOLO detector ────────────────────────────
         _update("detector_train", 20.0, f"Training 9-class YOLO detector ({det_epochs} epochs)...")
 
         from ultralytics import YOLO
-        base_model = Path("yolov12s_010826.pt")
+        base_model = base_dir / "yolov12s_010826.pt"
         if not base_model.exists():
-            raise FileNotFoundError("Base YOLO model yolov12s_010826.pt not found")
+            raise FileNotFoundError(f"Base YOLO model not found at {base_model}")
+
+        det_project = base_dir / "runs" / "detect"
+        det_project.mkdir(parents=True, exist_ok=True)
 
         model = YOLO(str(base_model))
         model.train(
-            data=str(Path("data/synth_detector/data.yaml").resolve()),
+            data=str(data_yaml),
             epochs=det_epochs,
             imgsz=640,
             batch=batch_size,
@@ -198,12 +242,31 @@ def _run_pipeline(
             save=True,
             val=True,
             verbose=True,
-            project="runs/detect",
+            project=str(det_project),
+            exist_ok=True,
         )
 
-        det_best = Path("runs/detect/contacts_detector_v1/weights/best.pt")
+        # YOLO may save to contacts_detector_v1 or contacts_detector_v12 etc.
+        # Find the actual output directory
+        det_best = det_project / "contacts_detector_v1" / "weights" / "best.pt"
         if not det_best.exists():
-            raise FileNotFoundError("Detector training failed — best.pt not created")
+            # Search for any best.pt under the project dir
+            candidates = list(det_project.glob("contacts_detector_v1*/weights/best.pt"))
+            if candidates:
+                det_best = candidates[-1]  # Use most recent
+                # Copy to expected location
+                expected = det_project / "contacts_detector_v1" / "weights" / "best.pt"
+                expected.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(str(det_best), str(expected))
+                det_best = expected
+
+        if not det_best.exists():
+            # List what was actually created for debugging
+            all_files = list(det_project.rglob("*.pt"))
+            raise FileNotFoundError(
+                f"Detector best.pt not found. Project dir: {det_project}. "
+                f"Found .pt files: {[str(f) for f in all_files[:10]]}"
+            )
 
         with _lock:
             _status.detector_ready = True
@@ -221,8 +284,8 @@ def _run_pipeline(
         config = Config()
         config.crop_size = 224
 
-        synth_dir = Path("data/synth_detector")
-        cls_dir = Path("data/classifier_dataset")
+        synth_dir = base_dir / "data" / "synth_detector"
+        cls_dir = base_dir / "data" / "classifier_dataset"
         for split in ["train", "val"]:
             for cls in ["normal_contact", "open_contact", "unclear_contact"]:
                 (cls_dir / split / cls).mkdir(parents=True, exist_ok=True)
@@ -322,7 +385,7 @@ def _run_pipeline(
         optimizer = torch.optim.Adam(cls_model.parameters(), lr=0.001)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10, gamma=0.5)
 
-        cls_run_dir = Path("runs/classify/contacts_classifier_v1")
+        cls_run_dir = base_dir / "runs" / "classify" / "contacts_classifier_v1"
         cls_run_dir.mkdir(parents=True, exist_ok=True)
         best_acc = 0.0
 
