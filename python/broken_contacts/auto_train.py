@@ -1,15 +1,29 @@
-"""Auto-training pipeline — runs when trained models are missing.
+"""Auto-training pipeline with Google Drive persistence.
 
 Called automatically when the loop starts and detector/classifier
 models don't exist. Generates synthetic data, trains both models,
 and makes the full 3-stage pipeline available.
+
+Models are saved to Google Drive after training so they persist
+across Colab restarts. On startup, models are restored from Drive
+if available — skipping retraining entirely.
 """
 
+import shutil
 import threading
 import time
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Optional
+
+# Google Drive model storage
+# Saves to /content/drive/MyDrive/hs_models/ on mounted Colab Drive
+GDRIVE_MODEL_DIR = Path("/content/drive/MyDrive/hs_models")
+DETECTOR_LOCAL = Path("runs/detect/contacts_detector_v1/weights/best.pt")
+CLASSIFIER_LOCAL = Path("runs/classify/contacts_classifier_v1/best.pt")
+DETECTOR_GDRIVE = GDRIVE_MODEL_DIR / "detector_best.pt"
+CLASSIFIER_GDRIVE = GDRIVE_MODEL_DIR / "classifier_best.pt"
+TRAIN_VERSION_FILE = GDRIVE_MODEL_DIR / "version.txt"
 
 
 @dataclass
@@ -39,11 +53,68 @@ def get_status() -> dict:
     return s
 
 
-def models_exist() -> bool:
-    return (
-        Path("runs/detect/contacts_detector_v1/weights/best.pt").exists()
-        and Path("runs/classify/contacts_classifier_v1/best.pt").exists()
+def _drive_mounted() -> bool:
+    """Check if Google Drive is mounted (Colab-specific)."""
+    return Path("/content/drive/MyDrive").exists()
+
+
+def save_to_drive() -> dict:
+    """Save trained models to Google Drive for persistence across restarts."""
+    if not _drive_mounted():
+        return {"saved": False, "reason": "Google Drive not mounted"}
+
+    GDRIVE_MODEL_DIR.mkdir(parents=True, exist_ok=True)
+    saved = []
+
+    if DETECTOR_LOCAL.exists():
+        shutil.copy2(str(DETECTOR_LOCAL), str(DETECTOR_GDRIVE))
+        saved.append(f"detector ({DETECTOR_LOCAL.stat().st_size / 1e6:.1f} MB)")
+
+    if CLASSIFIER_LOCAL.exists():
+        shutil.copy2(str(CLASSIFIER_LOCAL), str(CLASSIFIER_GDRIVE))
+        saved.append(f"classifier ({CLASSIFIER_LOCAL.stat().st_size / 1e6:.1f} MB)")
+
+    # Write version info
+    TRAIN_VERSION_FILE.write_text(
+        f"saved_at={time.strftime('%Y-%m-%dT%H:%M:%S')}\n"
+        f"detector={'yes' if DETECTOR_GDRIVE.exists() else 'no'}\n"
+        f"classifier={'yes' if CLASSIFIER_GDRIVE.exists() else 'no'}\n"
     )
+
+    return {"saved": True, "models": saved}
+
+
+def restore_from_drive() -> dict:
+    """Restore trained models from Google Drive if available."""
+    if not _drive_mounted():
+        return {"restored": False, "reason": "Google Drive not mounted"}
+
+    restored = []
+
+    if DETECTOR_GDRIVE.exists() and not DETECTOR_LOCAL.exists():
+        DETECTOR_LOCAL.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(str(DETECTOR_GDRIVE), str(DETECTOR_LOCAL))
+        restored.append(f"detector ({DETECTOR_GDRIVE.stat().st_size / 1e6:.1f} MB)")
+
+    if CLASSIFIER_GDRIVE.exists() and not CLASSIFIER_LOCAL.exists():
+        CLASSIFIER_LOCAL.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(str(CLASSIFIER_GDRIVE), str(CLASSIFIER_LOCAL))
+        restored.append(f"classifier ({CLASSIFIER_GDRIVE.stat().st_size / 1e6:.1f} MB)")
+
+    return {"restored": len(restored) > 0, "models": restored}
+
+
+def models_exist() -> bool:
+    """Check if trained models exist locally. Try restoring from Drive first."""
+    if DETECTOR_LOCAL.exists() and CLASSIFIER_LOCAL.exists():
+        return True
+
+    # Try restoring from Google Drive
+    result = restore_from_drive()
+    if result.get("restored"):
+        return DETECTOR_LOCAL.exists() and CLASSIFIER_LOCAL.exists()
+
+    return False
 
 
 def start_training(
@@ -294,7 +365,15 @@ def _run_pipeline(
         with _lock:
             _status.classifier_ready = True
 
-        _update("done", 100.0, f"Training complete! Detector + Classifier ready. Best val acc: {best_acc:.4f}")
+        # ── Phase 5: Save to Google Drive ───────────────────────────
+        drive_result = save_to_drive()
+        drive_msg = ""
+        if drive_result.get("saved"):
+            drive_msg = f" Saved to Google Drive: {', '.join(drive_result['models'])}."
+        else:
+            drive_msg = " (Google Drive not mounted — models will be lost on restart)"
+
+        _update("done", 100.0, f"Training complete! Best val acc: {best_acc:.4f}.{drive_msg}")
 
     except Exception as e:
         with _lock:

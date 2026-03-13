@@ -415,6 +415,7 @@ async def sam_factory_endpoint(
 from broken_contacts.loop import scoring_loop, LoopConfig
 from broken_contacts.auto_train import (
     start_training, get_status as get_train_status, models_exist,
+    save_to_drive, restore_from_drive,
 )
 
 
@@ -434,6 +435,18 @@ async def train_start(config: dict = {}):
 async def train_status():
     """Get current training pipeline status."""
     return JSONResponse(get_train_status())
+
+
+@app.post("/train/save")
+async def train_save():
+    """Save trained models to Google Drive."""
+    return JSONResponse(save_to_drive())
+
+
+@app.post("/train/restore")
+async def train_restore():
+    """Restore trained models from Google Drive."""
+    return JSONResponse(restore_from_drive())
 
 
 @app.post("/loop/start")
