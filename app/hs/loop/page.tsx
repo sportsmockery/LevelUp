@@ -461,7 +461,7 @@ export default function CommandCenterPage() {
                                     <span className="text-zinc-500 text-xs font-mono">{((conf || 0) * 100).toFixed(0)}%</span>
                                   </div>
                                   {morph && <p className="text-zinc-400 text-xs mt-0.5">Morphology: {morph.replace(/_/g, ' ')}</p>}
-                                  {detail.reasoning && <p className="text-zinc-500 text-xs italic mt-0.5">{detail.reasoning as string}</p>}
+                                  {typeof detail.reasoning === 'string' && detail.reasoning && <p className="text-zinc-500 text-xs italic mt-0.5">{detail.reasoning}</p>}
 
                                   {/* Hardware recommendation */}
                                   <div className="mt-1.5 flex flex-wrap gap-1">
