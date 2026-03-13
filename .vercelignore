@@ -1,0 +1,10 @@
+python/venv
+python/data
+python/runs
+python/__pycache__
+python/broken_contacts/__pycache__
+*.pt
+*.pth
+mobile
+LevelUpLogos
+docs
