@@ -506,6 +506,165 @@ async def factory_run(config: dict = {}):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+# =========================================================================
+# Truth Engine & Labeling Endpoints
+# =========================================================================
+
+from broken_contacts.truth_engine import truth_engine, DriftRegion, GeometricSignature
+
+
+@app.post("/truth-engine/override")
+async def truth_override(body: dict = {}):
+    """Clinical override — triggers the Truth Engine back-propagation pipeline.
+
+    Expects:
+        image_path: str
+        drift_region: { tooth_id, surface, pixel_bbox, d_min_mm, ai_prediction, expert_label }
+        signature: { d_min_range, image_angle, hardware_types, modality, quality_flags }
+    """
+    drift = DriftRegion(
+        tooth_id=body.get("drift_region", {}).get("tooth_id", ""),
+        surface=body.get("drift_region", {}).get("surface", ""),
+        pixel_bbox=body.get("drift_region", {}).get("pixel_bbox", []),
+        d_min_mm=body.get("drift_region", {}).get("d_min_mm", 0.0),
+        ai_prediction=body.get("drift_region", {}).get("ai_prediction", ""),
+        expert_label=body.get("drift_region", {}).get("expert_label", ""),
+        confidence_delta=body.get("drift_region", {}).get("confidence_delta", 0.0),
+    )
+    sig_data = body.get("signature", {})
+    sig = GeometricSignature(
+        d_min_range=tuple(sig_data.get("d_min_range", [0.0, 0.0])),
+        image_angle=sig_data.get("image_angle", ""),
+        hardware_types=sig_data.get("hardware_types", []),
+        modality=sig_data.get("modality", ""),
+        quality_flags=sig_data.get("quality_flags", []),
+    )
+
+    event = truth_engine.clinical_override(
+        image_path=body.get("image_path", ""),
+        drift_region=drift,
+        signature=sig,
+    )
+    return JSONResponse(event.to_dict())
+
+
+@app.get("/truth-engine/stats")
+async def truth_stats():
+    """Get Truth Engine statistics — overrides, tier distribution, recent events."""
+    return JSONResponse(truth_engine.get_stats())
+
+
+@app.post("/diagnose")
+async def diagnose_image(body: dict = {}):
+    """Generate ortho diagnosis and hardware recommendation for loop results.
+
+    Takes contact analysis results and returns per-image diagnosis.
+    """
+    contacts = body.get("contacts", [])
+    modality = body.get("modality", "intraoral_photo")
+
+    diagnosis = {
+        "overall_status": "healthy",
+        "flagged_sites": [],
+        "hardware_recommendations": [],
+        "treatment_phase": "pre_treatment",
+        "severity": "none",
+    }
+
+    for contact in contacts:
+        clinical_label = contact.get("clinical_label", contact.get("classifier_label", ""))
+        morphology = contact.get("morphology_label", "")
+        gap_px = contact.get("gap_distance_px", 0)
+        confidence = contact.get("clinical_confidence", contact.get("classifier_confidence", 0))
+        has_restoration = contact.get("has_restoration", False)
+
+        site: dict = {
+            "pair_index": contact.get("pair_index", 0),
+            "clinical_label": clinical_label,
+            "morphology": morphology,
+            "confidence": confidence,
+        }
+
+        # Determine hardware recommendation per contact
+        if clinical_label == "food_trap_risk":
+            diagnosis["overall_status"] = "needs_intervention"
+            if morphology == "open_large":
+                site["diagnosis"] = "Significant diastema — food impaction risk"
+                site["severity"] = "high"
+                site["hardware"] = [
+                    {"device": "bracket", "subtype": "metal twin bracket", "reason": "Close large gap with archwire mechanics"},
+                    {"device": "archwire", "subtype": "NiTi coil spring", "reason": "Active gap closure force"},
+                ]
+                if gap_px > 50:
+                    site["hardware"].append(
+                        {"device": "tad_miniscrew", "subtype": "TAD for anchorage", "reason": "Prevent anchorage loss during space closure"}
+                    )
+            elif morphology == "open_small":
+                site["diagnosis"] = "Minor open contact — potential food trap"
+                site["severity"] = "moderate"
+                site["hardware"] = [
+                    {"device": "elastic", "subtype": "elastic chain", "reason": "Close small interproximal gap"},
+                ]
+                if confidence > 0.8:
+                    site["hardware"].append(
+                        {"device": "clear_aligner", "subtype": "aligner with closing attachment", "reason": "Alternative: close gap with clear aligner"}
+                    )
+            else:
+                site["diagnosis"] = "Open contact detected"
+                site["severity"] = "moderate"
+                site["hardware"] = [
+                    {"device": "bracket", "subtype": "bracket + archwire", "reason": "Standard orthodontic closure"},
+                ]
+            diagnosis["flagged_sites"].append(site)
+
+        elif clinical_label == "restoration_failure":
+            diagnosis["overall_status"] = "needs_intervention"
+            site["diagnosis"] = "Restoration margin defect — restorative referral needed first"
+            site["severity"] = "high"
+            site["hardware"] = [
+                {"device": "crown", "subtype": "restorative referral", "reason": "Fix restoration before ortho"},
+            ]
+            if morphology in ("open_small", "open_large"):
+                site["hardware"].append(
+                    {"device": "archwire", "subtype": "sectional wire", "reason": "Re-establish contact after restoration repair"}
+                )
+            diagnosis["flagged_sites"].append(site)
+
+        elif clinical_label == "monitor":
+            if diagnosis["overall_status"] == "healthy":
+                diagnosis["overall_status"] = "monitor"
+            site["diagnosis"] = "Borderline finding — re-image in 3-6 months"
+            site["severity"] = "low"
+            site["hardware"] = []
+            diagnosis["flagged_sites"].append(site)
+
+        elif clinical_label == "not_assessable":
+            site["diagnosis"] = "Image quality insufficient — re-photograph"
+            site["severity"] = "unknown"
+            site["hardware"] = []
+            diagnosis["flagged_sites"].append(site)
+
+    # Aggregate hardware recommendations (deduplicate)
+    seen_hw = set()
+    for site in diagnosis["flagged_sites"]:
+        for hw in site.get("hardware", []):
+            key = f"{hw['device']}:{hw['subtype']}"
+            if key not in seen_hw:
+                seen_hw.add(key)
+                diagnosis["hardware_recommendations"].append(hw)
+
+    # Determine severity
+    severities = [s.get("severity", "none") for s in diagnosis["flagged_sites"]]
+    if "high" in severities:
+        diagnosis["severity"] = "high"
+    elif "moderate" in severities:
+        diagnosis["severity"] = "moderate"
+    elif "low" in severities:
+        diagnosis["severity"] = "low"
+
+    return JSONResponse(diagnosis)
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8100)

@@ -407,30 +407,107 @@ export default function CommandCenterPage() {
               </div>
             )}
 
-            {/* Results Feed */}
+            {/* Results Feed with Diagnosis & Hardware */}
             {allScores.length > 0 && (
               <div className="bg-zinc-900 rounded-2xl p-6 border border-zinc-800">
-                <h2 className="text-lg font-heading mb-4">Results Feed</h2>
-                <div className="space-y-2 max-h-80 overflow-y-auto">
-                  {[...allScores].reverse().slice(0, 50).map((score, i) => (
-                    <div key={i} className="flex items-center justify-between bg-zinc-800 rounded-xl px-4 py-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-zinc-300 text-sm truncate max-w-40">{score.filename}</span>
-                        {score.augment_results && <span className="text-xs px-1.5 py-0.5 rounded bg-purple-800 text-purple-200">AUG</span>}
-                        {score.consistency_ok === true && <span className="text-emerald-400 text-xs">&#10003;</span>}
-                        {score.consistency_ok === false && <span className="text-yellow-400 text-xs">&#9888;</span>}
+                <h2 className="text-lg font-heading mb-4">Diagnosis & Hardware Feed</h2>
+                <div className="space-y-3 max-h-[600px] overflow-y-auto">
+                  {[...allScores].reverse().slice(0, 50).map((score, i) => {
+                    const hasFlagged = score.flagged_count > 0;
+                    const clinDetails = score.clinical_details || [];
+                    const flaggedDetails = clinDetails.filter((d: Record<string, unknown>) =>
+                      ['food_trap_risk', 'restoration_failure', 'open_contact'].includes(d.clinical_label as string)
+                    );
+                    return (
+                      <div key={i} className={`rounded-xl border ${hasFlagged ? 'border-red-800 bg-red-950/20' : 'border-zinc-700 bg-zinc-800'} px-4 py-3`}>
+                        {/* Image header */}
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-zinc-300 text-sm font-medium truncate max-w-48">{score.filename}</span>
+                            {score.augment_results && <span className="text-xs px-1.5 py-0.5 rounded bg-purple-800 text-purple-200">AUG</span>}
+                            {score.consistency_ok === true && <span className="text-emerald-400 text-xs">&#10003;</span>}
+                            {score.consistency_ok === false && <span className="text-yellow-400 text-xs">&#9888;</span>}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-zinc-500 text-xs">{score.contact_count} contacts</span>
+                            {hasFlagged && <span className="text-red-400 text-xs font-bold">{score.flagged_count} flagged</span>}
+                          </div>
+                        </div>
+
+                        {/* Labels row */}
+                        <div className="flex gap-1 flex-wrap mb-1">
+                          {score.labels.slice(0, 6).map((l: string, j: number) => (
+                            <span key={j} className={`text-xs px-1.5 py-0.5 rounded-full ${LABEL_PILL[l] || 'bg-zinc-600 text-zinc-200'}`}>
+                              {l.replace(/_/g, ' ')}
+                            </span>
+                          ))}
+                        </div>
+
+                        {/* Diagnosis per flagged contact */}
+                        {flaggedDetails.length > 0 && (
+                          <div className="mt-2 space-y-2">
+                            {flaggedDetails.map((detail: Record<string, unknown>, di: number) => {
+                              const cl = detail.clinical_label as string;
+                              const morph = (detail.morphology_label as string) || '';
+                              const conf = detail.clinical_confidence as number;
+                              const isOpen = cl === 'food_trap_risk';
+                              const isResto = cl === 'restoration_failure';
+                              return (
+                                <div key={di} className="bg-zinc-900/60 rounded-lg px-3 py-2 border border-zinc-700">
+                                  <div className="flex items-center justify-between">
+                                    <span className={`text-xs font-bold uppercase ${isOpen ? 'text-red-400' : isResto ? 'text-fuchsia-400' : 'text-yellow-400'}`}>
+                                      {cl.replace(/_/g, ' ')}
+                                    </span>
+                                    <span className="text-zinc-500 text-xs font-mono">{((conf || 0) * 100).toFixed(0)}%</span>
+                                  </div>
+                                  {morph && <p className="text-zinc-400 text-xs mt-0.5">Morphology: {morph.replace(/_/g, ' ')}</p>}
+                                  {detail.reasoning && <p className="text-zinc-500 text-xs italic mt-0.5">{detail.reasoning as string}</p>}
+
+                                  {/* Hardware recommendation */}
+                                  <div className="mt-1.5 flex flex-wrap gap-1">
+                                    {isOpen && morph === 'open_large' && (
+                                      <>
+                                        <span className="text-xs px-2 py-0.5 rounded bg-blue-900/50 text-blue-300 border border-blue-800">Brackets + Coil Spring</span>
+                                        <span className="text-xs px-2 py-0.5 rounded bg-purple-900/50 text-purple-300 border border-purple-800">Consider TADs</span>
+                                      </>
+                                    )}
+                                    {isOpen && morph === 'open_small' && (
+                                      <>
+                                        <span className="text-xs px-2 py-0.5 rounded bg-blue-900/50 text-blue-300 border border-blue-800">Elastic Chain</span>
+                                        <span className="text-xs px-2 py-0.5 rounded bg-cyan-900/50 text-cyan-300 border border-cyan-800">Aligner + Attachment</span>
+                                      </>
+                                    )}
+                                    {isOpen && !morph && (
+                                      <span className="text-xs px-2 py-0.5 rounded bg-blue-900/50 text-blue-300 border border-blue-800">Brackets + Archwire</span>
+                                    )}
+                                    {isResto && (
+                                      <>
+                                        <span className="text-xs px-2 py-0.5 rounded bg-fuchsia-900/50 text-fuchsia-300 border border-fuchsia-800">Restorative Referral</span>
+                                        {morph && morph.includes('open') && (
+                                          <span className="text-xs px-2 py-0.5 rounded bg-blue-900/50 text-blue-300 border border-blue-800">Sectional Wire (post-repair)</span>
+                                        )}
+                                      </>
+                                    )}
+                                    {cl === 'open_contact' && (
+                                      <span className="text-xs px-2 py-0.5 rounded bg-blue-900/50 text-blue-300 border border-blue-800">Brackets + Archwire</span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Healthy status */}
+                        {!hasFlagged && score.contact_count > 0 && (
+                          <p className="text-emerald-500 text-xs mt-1">All contacts healthy — no intervention needed</p>
+                        )}
+                        {score.contact_count === 0 && (
+                          <p className="text-zinc-500 text-xs mt-1">No contacts detected</p>
+                        )}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-zinc-500 text-xs">{score.contact_count}c</span>
-                        {score.flagged_count > 0 && <span className="text-red-400 text-xs">{score.flagged_count}f</span>}
-                        {score.labels.slice(0, 3).map((l, j) => (
-                          <span key={j} className={`text-xs px-1.5 py-0.5 rounded-full ${LABEL_PILL[l] || 'bg-zinc-600 text-zinc-200'}`}>
-                            {l.replace(/_/g, ' ')}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
