@@ -35,7 +35,7 @@ app = FastAPI(title="Healthy Start Teeth Detection")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://levelup-wrestling.vercel.app"],
+    allow_origins=["http://localhost:3000", "https://levelup-wrestling.vercel.app", "https://levelupwrestlingapp.com", "https://*.vercel.app"],
     allow_methods=["POST", "GET"],
     allow_headers=["*"],
 )
