@@ -397,6 +397,62 @@ export default function HealthyStartPage() {
                   </div>
                 </div>
 
+                {/* Overall Diagnosis Summary */}
+                {(() => {
+                  const contacts = result.contacts || [];
+                  const flagged = contacts.filter(c => {
+                    const cl = c.clinical?.label || c.classifier_label;
+                    return ['food_trap_risk', 'restoration_failure'].includes(cl);
+                  });
+                  const hasOpen = flagged.some(c => c.clinical?.label === 'food_trap_risk');
+                  const hasResto = flagged.some(c => c.clinical?.label === 'restoration_failure');
+                  const severity = hasResto ? 'high' : hasOpen ? 'moderate' : flagged.length > 0 ? 'low' : 'none';
+
+                  return flagged.length > 0 ? (
+                    <div className={`rounded-2xl p-5 border ${severity === 'high' ? 'bg-red-950/30 border-red-700' : severity === 'moderate' ? 'bg-yellow-950/30 border-yellow-700' : 'bg-zinc-900 border-zinc-800'}`}>
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className={`text-sm font-bold uppercase ${severity === 'high' ? 'text-red-400' : severity === 'moderate' ? 'text-yellow-400' : 'text-zinc-400'}`}>
+                          Diagnosis: {severity === 'high' ? 'Intervention Required' : severity === 'moderate' ? 'Treatment Recommended' : 'Monitor'}
+                        </h3>
+                        <span className={`text-xs px-2 py-1 rounded-full font-bold ${severity === 'high' ? 'bg-red-900/50 text-red-300' : 'bg-yellow-900/50 text-yellow-300'}`}>
+                          {flagged.length} site{flagged.length !== 1 ? 's' : ''} flagged
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        <h4 className="text-xs text-zinc-500 uppercase tracking-wider">Hardware Recommendations</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {hasOpen && contacts.some(c => c.morphology?.label === 'open_large') && (
+                            <>
+                              <span className="text-xs px-2.5 py-1 rounded-lg bg-blue-900/50 text-blue-300 border border-blue-800">Brackets + Coil Spring</span>
+                              <span className="text-xs px-2.5 py-1 rounded-lg bg-purple-900/50 text-purple-300 border border-purple-800">Consider TADs (anchorage)</span>
+                            </>
+                          )}
+                          {hasOpen && contacts.some(c => c.morphology?.label === 'open_small') && (
+                            <>
+                              <span className="text-xs px-2.5 py-1 rounded-lg bg-blue-900/50 text-blue-300 border border-blue-800">Elastic Chain</span>
+                              <span className="text-xs px-2.5 py-1 rounded-lg bg-cyan-900/50 text-cyan-300 border border-cyan-800">Aligner + Attachment</span>
+                            </>
+                          )}
+                          {hasOpen && !contacts.some(c => c.morphology?.label === 'open_large' || c.morphology?.label === 'open_small') && (
+                            <span className="text-xs px-2.5 py-1 rounded-lg bg-blue-900/50 text-blue-300 border border-blue-800">Brackets + Archwire</span>
+                          )}
+                          {hasResto && (
+                            <>
+                              <span className="text-xs px-2.5 py-1 rounded-lg bg-fuchsia-900/50 text-fuchsia-300 border border-fuchsia-800">Restorative Referral (priority)</span>
+                              <span className="text-xs px-2.5 py-1 rounded-lg bg-blue-900/50 text-blue-300 border border-blue-800">Sectional Wire (post-repair)</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ) : contacts.length > 0 ? (
+                    <div className="rounded-2xl p-5 border bg-emerald-950/20 border-emerald-800">
+                      <h3 className="text-sm font-bold uppercase text-emerald-400">Diagnosis: Healthy</h3>
+                      <p className="text-xs text-emerald-400/70 mt-1">All {contacts.length} contacts are normal. No intervention needed.</p>
+                    </div>
+                  ) : null;
+                })()}
+
                 {/* Per-contact details */}
                 {result.contacts.length > 0 ? (
                   <div className="space-y-3">
@@ -405,6 +461,8 @@ export default function HealthyStartPage() {
                       const clinConf = contact.clinical?.confidence || contact.classifier_confidence;
                       const bgClass = CLINICAL_BG[clinLabel] || LABEL_BG[contact.classifier_label] || 'bg-zinc-800 border-zinc-700';
                       const textClass = CLINICAL_COLORS[clinLabel] || LABEL_COLORS[contact.classifier_label] || 'text-zinc-300';
+                      const isFlagged = ['food_trap_risk', 'restoration_failure'].includes(clinLabel);
+                      const morphLabel = contact.morphology?.label || '';
 
                       return (
                         <div key={i} className={`rounded-xl px-5 py-4 border ${bgClass}`}>
@@ -425,6 +483,53 @@ export default function HealthyStartPage() {
                               {(clinConf * 100).toFixed(1)}%
                             </span>
                           </div>
+
+                          {/* Diagnosis text */}
+                          {isFlagged && (
+                            <div className="mb-2 text-xs">
+                              {clinLabel === 'food_trap_risk' && morphLabel === 'open_large' && (
+                                <p className="text-red-300">Significant diastema — food impaction risk. Active orthodontic closure recommended.</p>
+                              )}
+                              {clinLabel === 'food_trap_risk' && morphLabel === 'open_small' && (
+                                <p className="text-yellow-300">Minor open contact — potential food trap. Elastic chain or aligner closure recommended.</p>
+                              )}
+                              {clinLabel === 'food_trap_risk' && !morphLabel.includes('open') && (
+                                <p className="text-red-300">Open contact detected — standard orthodontic closure recommended.</p>
+                              )}
+                              {clinLabel === 'restoration_failure' && (
+                                <p className="text-fuchsia-300">Restoration margin defect. Restorative referral needed before orthodontic treatment.</p>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Hardware recommendation for this contact */}
+                          {isFlagged && (
+                            <div className="mb-2 flex flex-wrap gap-1">
+                              {clinLabel === 'food_trap_risk' && morphLabel === 'open_large' && (
+                                <>
+                                  <span className="text-xs px-2 py-0.5 rounded bg-blue-900/50 text-blue-300 border border-blue-800">Brackets + Coil Spring</span>
+                                  <span className="text-xs px-2 py-0.5 rounded bg-purple-900/50 text-purple-300 border border-purple-800">Consider TADs</span>
+                                </>
+                              )}
+                              {clinLabel === 'food_trap_risk' && morphLabel === 'open_small' && (
+                                <>
+                                  <span className="text-xs px-2 py-0.5 rounded bg-blue-900/50 text-blue-300 border border-blue-800">Elastic Chain</span>
+                                  <span className="text-xs px-2 py-0.5 rounded bg-cyan-900/50 text-cyan-300 border border-cyan-800">Aligner + Attachment</span>
+                                </>
+                              )}
+                              {clinLabel === 'food_trap_risk' && !morphLabel.includes('open') && (
+                                <span className="text-xs px-2 py-0.5 rounded bg-blue-900/50 text-blue-300 border border-blue-800">Brackets + Archwire</span>
+                              )}
+                              {clinLabel === 'restoration_failure' && (
+                                <>
+                                  <span className="text-xs px-2 py-0.5 rounded bg-fuchsia-900/50 text-fuchsia-300 border border-fuchsia-800">Restorative Referral</span>
+                                  {morphLabel.includes('open') && (
+                                    <span className="text-xs px-2 py-0.5 rounded bg-blue-900/50 text-blue-300 border border-blue-800">Sectional Wire (post-repair)</span>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          )}
 
                           {/* Dual-layer: Morphology + Clinical reasoning */}
                           {contact.morphology && (
