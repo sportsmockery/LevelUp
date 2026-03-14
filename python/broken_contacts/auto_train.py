@@ -183,9 +183,23 @@ def start_training(
     detector_epochs: int = 50,
     classifier_epochs: int = 20,
     batch_size: int = 16,
+    force: bool = False,
 ) -> dict:
-    """Start the auto-training pipeline in a background thread."""
+    """Start the auto-training pipeline in a background thread.
+
+    Will NOT overwrite an existing trained model unless force=True.
+    This protects high-quality models (like v3, 97.6% mAP) from
+    being replaced by synthetic-only training.
+    """
     global _thread
+
+    # Protect existing models from accidental overwrite
+    if models_exist() and not force:
+        return {
+            "status": "skipped",
+            "message": "Trained models already exist. Use force=True to retrain. "
+                       "This protects your best model from being overwritten by synthetic training.",
+        }
 
     with _lock:
         if _status.running:
