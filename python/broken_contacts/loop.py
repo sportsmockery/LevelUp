@@ -165,13 +165,35 @@ class ScoringLoop:
             bc_config = BCConfig()
             bc_config.detector_confidence = config.detector_confidence
 
-            detector_exists = Path(bc_config.detector_model_path).exists()
-            classifier_exists = Path(bc_config.classifier_model_path).exists()
+            # Resolve model paths relative to the python/ directory
+            base_dir = Path(__file__).parent.parent.resolve()
+            det_path = Path(bc_config.detector_model_path)
+            cls_path = Path(bc_config.classifier_model_path)
+            if not det_path.is_absolute():
+                det_path = base_dir / det_path
+                bc_config.detector_model_path = str(det_path)
+            if not cls_path.is_absolute():
+                cls_path = base_dir / cls_path
+                bc_config.classifier_model_path = str(cls_path)
+            base_yolo = Path(bc_config.base_yolo_model)
+            if not base_yolo.is_absolute():
+                bc_config.base_yolo_model = str(base_dir / base_yolo)
+
+            detector_exists = det_path.exists()
+            classifier_exists = cls_path.exists()
+
+            with self._lock:
+                self._state.errors.append(
+                    f"Model check: detector={detector_exists} ({det_path}), "
+                    f"classifier={classifier_exists} ({cls_path})"
+                )
 
             if detector_exists and classifier_exists:
                 try:
                     from broken_contacts.inference import BrokenContactsPipeline
                     pipeline = BrokenContactsPipeline(bc_config)
+                    with self._lock:
+                        self._state.errors.append("Full 3-stage pipeline loaded successfully")
                 except Exception as e:
                     with self._lock:
                         self._state.errors.append(f"Pipeline init failed: {e}")
