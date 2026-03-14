@@ -58,30 +58,91 @@ def _drive_mounted() -> bool:
     return Path("/content/drive/MyDrive").exists()
 
 
-def save_to_drive() -> dict:
-    """Save trained models to Google Drive for persistence across restarts."""
+def _next_version() -> int:
+    """Find the next version number from existing versioned models on Drive."""
+    if not _drive_mounted() or not GDRIVE_MODEL_DIR.exists():
+        return 1
+    versions = []
+    for f in GDRIVE_MODEL_DIR.glob("detector_v*.pt"):
+        try:
+            v = int(f.stem.split("_v")[1])
+            versions.append(v)
+        except (IndexError, ValueError):
+            continue
+    return max(versions, default=0) + 1
+
+
+def _read_best_version() -> dict:
+    """Read the best version info from Drive."""
+    best_file = GDRIVE_MODEL_DIR / "best_version.json"
+    if best_file.exists():
+        try:
+            import json
+            return json.loads(best_file.read_text())
+        except Exception:
+            pass
+    return {"version": 0, "val_acc": 0.0}
+
+
+def save_to_drive(val_acc: float = 0.0) -> dict:
+    """Save trained models to Google Drive with versioning.
+
+    Each training run saves as detector_vN.pt / classifier_vN.pt.
+    Also maintains 'best' copies (detector_best.pt) if this run
+    has higher val_acc than the previous best.
+    """
     if not _drive_mounted():
         return {"saved": False, "reason": "Google Drive not mounted"}
 
     GDRIVE_MODEL_DIR.mkdir(parents=True, exist_ok=True)
     saved = []
+    version = _next_version()
 
+    # Save versioned copies
     if DETECTOR_LOCAL.exists():
-        shutil.copy2(str(DETECTOR_LOCAL), str(DETECTOR_GDRIVE))
-        saved.append(f"detector ({DETECTOR_LOCAL.stat().st_size / 1e6:.1f} MB)")
+        versioned = GDRIVE_MODEL_DIR / f"detector_v{version}.pt"
+        shutil.copy2(str(DETECTOR_LOCAL), str(versioned))
+        saved.append(f"detector_v{version} ({DETECTOR_LOCAL.stat().st_size / 1e6:.1f} MB)")
 
     if CLASSIFIER_LOCAL.exists():
-        shutil.copy2(str(CLASSIFIER_LOCAL), str(CLASSIFIER_GDRIVE))
-        saved.append(f"classifier ({CLASSIFIER_LOCAL.stat().st_size / 1e6:.1f} MB)")
+        versioned = GDRIVE_MODEL_DIR / f"classifier_v{version}.pt"
+        shutil.copy2(str(CLASSIFIER_LOCAL), str(versioned))
+        saved.append(f"classifier_v{version} ({CLASSIFIER_LOCAL.stat().st_size / 1e6:.1f} MB)")
 
-    # Write version info
+    # Check if this is the best version
+    best_info = _read_best_version()
+    is_new_best = val_acc > best_info.get("val_acc", 0.0)
+
+    if is_new_best or best_info.get("version", 0) == 0:
+        # Save as 'best' (used for restore)
+        if DETECTOR_LOCAL.exists():
+            shutil.copy2(str(DETECTOR_LOCAL), str(DETECTOR_GDRIVE))
+        if CLASSIFIER_LOCAL.exists():
+            shutil.copy2(str(CLASSIFIER_LOCAL), str(CLASSIFIER_GDRIVE))
+
+        # Write best version info
+        import json
+        best_file = GDRIVE_MODEL_DIR / "best_version.json"
+        best_file.write_text(json.dumps({
+            "version": version,
+            "val_acc": val_acc,
+            "saved_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        }, indent=2))
+        saved.append(f"NEW BEST (v{version}, acc={val_acc:.4f})")
+    else:
+        saved.append(f"v{version} saved but v{best_info['version']} is still best (acc={best_info['val_acc']:.4f})")
+
+    # Write version log
     TRAIN_VERSION_FILE.write_text(
+        f"latest_version={version}\n"
+        f"val_acc={val_acc}\n"
+        f"is_best={is_new_best}\n"
         f"saved_at={time.strftime('%Y-%m-%dT%H:%M:%S')}\n"
         f"detector={'yes' if DETECTOR_GDRIVE.exists() else 'no'}\n"
         f"classifier={'yes' if CLASSIFIER_GDRIVE.exists() else 'no'}\n"
     )
 
-    return {"saved": True, "models": saved}
+    return {"saved": True, "version": version, "is_best": is_new_best, "models": saved}
 
 
 def restore_from_drive() -> dict:
@@ -432,7 +493,7 @@ names:
             _status.classifier_ready = True
 
         # ── Phase 5: Save to Google Drive ───────────────────────────
-        drive_result = save_to_drive()
+        drive_result = save_to_drive(val_acc=best_acc)
         drive_msg = ""
         if drive_result.get("saved"):
             drive_msg = f" Saved to Google Drive: {', '.join(drive_result['models'])}."
