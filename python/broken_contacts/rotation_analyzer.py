@@ -245,7 +245,7 @@ def compute_tooth_rotation(tooth: dict, coeffs: np.ndarray, all_teeth: Optional[
         method = "pca"
 
     is_rotated = (
-        (angle > ROTATION_THRESHOLD_DEG and angle <= 60) or
+        (angle > ROTATION_THRESHOLD_DEG) or
         is_frontal_rotated
     )
 
