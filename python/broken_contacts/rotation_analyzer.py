@@ -114,10 +114,53 @@ def detect_incisal_line(
 
 # ── Rotation Computation ─────────────────────────────────────────────
 
-def compute_tooth_rotation(tooth: dict, coeffs: np.ndarray) -> dict:
+def _compute_aspect_ratio(contour: np.ndarray) -> float:
+    """Compute width/height aspect ratio of a contour's bounding rect.
+
+    A rotated tooth viewed frontally appears narrower (aspect ratio < expected).
+    A normal anterior tooth has width ~60-80% of height.
+    A rotated tooth may show width ~30-50% of height (showing the edge).
+    """
+    if len(contour) < 5:
+        return 1.0
+    rect = cv2.minAreaRect(contour.reshape(-1, 1, 2).astype(np.float32))
+    w, h = rect[1]
+    if h == 0:
+        return 1.0
+    # Always make the shorter side the width
+    if w > h:
+        w, h = h, w
+    return w / h
+
+
+def _compute_contour_asymmetry(contour: np.ndarray) -> float:
+    """Measure asymmetry of the contour — rotated teeth are asymmetric when viewed frontally.
+
+    Compares left half vs right half area. Symmetric tooth ~ 0.0, asymmetric ~ higher.
+    """
+    pts = contour.reshape(-1, 2)
+    cx = np.mean(pts[:, 0])
+    left = pts[pts[:, 0] <= cx]
+    right = pts[pts[:, 0] > cx]
+    if len(left) < 3 or len(right) < 3:
+        return 0.0
+
+    # Compare vertical spread of left vs right halves
+    left_h = left[:, 1].max() - left[:, 1].min()
+    right_h = right[:, 1].max() - right[:, 1].min()
+    max_h = max(left_h, right_h, 1.0)
+    return abs(left_h - right_h) / max_h
+
+
+def compute_tooth_rotation(tooth: dict, coeffs: np.ndarray, all_teeth: Optional[list] = None) -> dict:
     """Compute rotation angle of a single tooth relative to arch.
 
-    Returns dict with angle_deg, is_rotated, method used.
+    Uses multiple methods and picks the best signal:
+    1. PCA-based orientation (works for occlusal views)
+    2. Incisal edge detection (works for occlusal views)
+    3. Aspect ratio analysis (works for frontal views — rotated teeth appear narrow)
+    4. Contour asymmetry (works for frontal views — rotated teeth are lopsided)
+    5. Overlap detection (works for frontal views — rotated teeth overlap neighbors)
     """
     contour = tooth["contour"]
     centroid = tooth["centroid"]
@@ -130,13 +173,13 @@ def compute_tooth_rotation(tooth: dict, coeffs: np.ndarray) -> dict:
     diff = min(diff, abs(math.pi - diff))
     pca_angle_deg = math.degrees(diff)
 
-    # Method 2: Incisal edge detection (more accurate for anterior teeth)
+    # Method 2: Incisal edge detection
     incisal_center, incisal_vec = detect_incisal_line(contour, theta_arch)
     incisal_angle_deg = None
 
     if incisal_center is not None and incisal_vec is not None:
         vx, vy = incisal_vec
-        lx, ly = -vy, vx  # long axis = perpendicular to incisal
+        lx, ly = -vy, vx
         norm = math.hypot(lx, ly)
         lx, ly = lx / norm, ly / norm
         arch_norm = arch_normal_vector(theta_arch)
@@ -144,23 +187,78 @@ def compute_tooth_rotation(tooth: dict, coeffs: np.ndarray) -> dict:
         dot = max(min(dot, 1.0), -1.0)
         incisal_angle_deg = math.degrees(math.acos(abs(dot)))
 
-    # Use incisal method if available, PCA as fallback
-    if incisal_angle_deg is not None and incisal_angle_deg <= 60:
+    # Method 3: Aspect ratio (frontal view indicator)
+    aspect = _compute_aspect_ratio(contour)
+    # Normal anterior tooth: aspect 0.55-0.80
+    # Rotated tooth: aspect 0.25-0.50 (narrow because showing edge)
+    aspect_rotated = aspect < 0.45
+
+    # Method 4: Contour asymmetry (frontal view indicator)
+    asymmetry = _compute_contour_asymmetry(contour)
+    # Normal: asymmetry < 0.15, Rotated: asymmetry > 0.25
+    asymmetry_rotated = asymmetry > 0.25
+
+    # Method 5: Overlap with neighbors (frontal view indicator)
+    overlap_score = 0.0
+    if all_teeth:
+        pts = contour.reshape(-1, 2)
+        tooth_x_min = pts[:, 0].min()
+        tooth_x_max = pts[:, 0].max()
+        tooth_width = tooth_x_max - tooth_x_min
+
+        for other in all_teeth:
+            if other is tooth:
+                continue
+            other_pts = other["contour"].reshape(-1, 2)
+            other_x_min = other_pts[:, 0].min()
+            other_x_max = other_pts[:, 0].max()
+
+            # Check horizontal overlap
+            overlap = min(tooth_x_max, other_x_max) - max(tooth_x_min, other_x_min)
+            if overlap > 0 and tooth_width > 0:
+                overlap_pct = overlap / tooth_width
+                overlap_score = max(overlap_score, overlap_pct)
+
+    overlap_rotated = overlap_score > 0.3  # 30%+ overlap with neighbor
+
+    # Combine signals — use the strongest rotation indicator
+    # For occlusal views, PCA/incisal work well
+    # For frontal views, aspect ratio + asymmetry + overlap work better
+    frontal_signals = sum([aspect_rotated, asymmetry_rotated, overlap_rotated])
+    is_frontal_rotated = frontal_signals >= 2  # 2 of 3 frontal indicators agree
+
+    # Pick best angle estimate
+    if incisal_angle_deg is not None and incisal_angle_deg <= 60 and incisal_angle_deg > 5:
         angle = incisal_angle_deg
         method = "incisal"
-    elif pca_angle_deg <= 60:
+    elif pca_angle_deg <= 60 and pca_angle_deg > 5:
         angle = pca_angle_deg
         method = "pca"
+    elif is_frontal_rotated:
+        # Estimate angle from aspect ratio: narrower = more rotated
+        # aspect 0.45 ~ 20°, aspect 0.30 ~ 40°, aspect 0.20 ~ 55°
+        estimated_angle = max(0, (0.5 - aspect) / 0.5 * 60)
+        angle = round(min(estimated_angle, 55), 1)
+        method = "frontal"
     else:
-        angle = pca_angle_deg
-        method = "pca_high"
+        angle = max(pca_angle_deg, 0)
+        method = "pca"
+
+    is_rotated = (
+        (angle > ROTATION_THRESHOLD_DEG and angle <= 60) or
+        is_frontal_rotated
+    )
 
     return {
         "angle_deg": round(angle, 1),
-        "is_rotated": angle > ROTATION_THRESHOLD_DEG and angle <= 60,
+        "is_rotated": is_rotated,
         "method": method,
         "pca_angle": round(pca_angle_deg, 1),
         "incisal_angle": round(incisal_angle_deg, 1) if incisal_angle_deg is not None else None,
+        "aspect_ratio": round(aspect, 3),
+        "asymmetry": round(asymmetry, 3),
+        "overlap_score": round(overlap_score, 3),
+        "frontal_signals": frontal_signals,
         "centroid": [float(centroid[0]), float(centroid[1])],
         "class_name": tooth.get("class_name", ""),
     }
@@ -292,7 +390,7 @@ def analyze_rotations(
     rotated_count = 0
 
     for tooth in central_teeth:
-        result = compute_tooth_rotation(tooth, coeffs)
+        result = compute_tooth_rotation(tooth, coeffs, all_teeth=sorted_teeth)
         tooth_results.append(result)
         if result["is_rotated"]:
             rotated_count += 1
