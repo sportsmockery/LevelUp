@@ -14,6 +14,7 @@ from typing import List, Optional
 # Curated dental datasets on Roboflow Universe
 # Each entry: (workspace, project, version, description)
 DENTAL_DATASETS = [
+    # ── Original datasets ──────────────────────────────────────────
     # Teeth detection & labeling
     ("dental-module", "teeth-labeling", 1, "Teeth bounding boxes — intraoral photos"),
     # Dentistry with tooth numbers, crowns, implants, root canals
@@ -26,6 +27,36 @@ DENTAL_DATASETS = [
     ("thesis-0nhc1", "dental-images-hvaic", 1, "1000 dental images — general"),
     # DENTEX challenge
     ("dentex", "dentex-3xe7e", 1, "DENTEX challenge — dental enumeration"),
+
+    # ── New: Orthodontic & brackets ────────────────────────────────
+    # Orthodontic detection — 218 X-rays with ortho features
+    ("orthodontic", "orthodontic-noybl", 1, "218 orthodontic X-rays — brackets, wires"),
+    # Large dental detection — 5989 images
+    ("bitcamp", "dental-j1vge", 1, "5989 dental images — teeth detection"),
+    # Dental dataset level 2 — 2368 images
+    ("dataset-ntw3s", "dental_dataset_level2", 1, "2368 tooth images — advanced detection"),
+    # Teeth labeling by zoro — intraoral focus
+    ("zoro-l3v3w", "teeth-labeling-guo4v", 1, "Teeth labeling — intraoral photos"),
+
+    # ── New: X-ray segmentation & panoramic ────────────────────────
+    # Dental X-ray by Gozdes — 1075 images with defects
+    ("gozdes-projects", "dental-x-ray-1imfs", 1, "1075 dental X-rays — defect detection"),
+    # Large panoramic segmentation — 9982 images
+    ("rakin-mw7ux", "working-dental-x-ray-panoramic-4-2akad", 1, "9982 panoramic X-rays — bone loss, caries, crowns, implants"),
+    # Dental caries X-ray segmentation
+    ("renielaz", "dental-caries-x-ray", 1, "Dental caries X-ray segmentation"),
+    # Tooth segmentation — 1398 images
+    ("teeth-annotate", "toothseg-qgo1s", 1, "1398 tooth segmentation images"),
+    # Panoramic tooth labeling — semantic segmentation
+    ("machine-learning-project-wjp9l", "tooth-label-in-panoramic-x-ray", 1, "113 panoramic X-rays — tooth labeling"),
+
+    # ── New: Implants, crowns, restorations ────────────────────────
+    # Dental implants 2.0 — implant type identification
+    ("yosafat_chandra05-yahoo-com", "dental-implants-2.0", 1, "Dental implant type identification in X-rays"),
+    # Crown detection — 362 images
+    ("dental-mate", "crown-detection-mdfa5", 1, "362 crown detection images"),
+    # Panoramic X-ray by Areeba — additional panoramic set
+    ("areeba-gul-o2vxd", "dental-x-ray-panoramic-dataset-q40sf", 1, "Panoramic X-ray — brackets, retainers, missing teeth"),
 ]
 
 # Focus areas for dental contact system
