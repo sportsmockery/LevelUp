@@ -897,11 +897,29 @@ async def rotation_analysis(
 
     annotated = Image.fromarray(vis)
 
+    # Convert numpy types for JSON serialization
+    import json as _json
+
+    def _convert(obj):
+        if isinstance(obj, (np.integer,)):
+            return int(obj)
+        if isinstance(obj, (np.floating,)):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if isinstance(obj, dict):
+            return {k: _convert(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [_convert(v) for v in obj]
+        return obj
+
+    clean_analysis = _convert({
+        k: v for k, v in analysis.items()
+        if k != "arch_coefficients"
+    })
+
     return JSONResponse({
-        "rotation_analysis": {
-            k: v for k, v in analysis.items()
-            if k != "arch_coefficients"  # skip numpy arrays
-        },
+        "rotation_analysis": clean_analysis,
         "annotated_image": f"data:image/jpeg;base64,{image_to_b64(annotated)}",
     })
 
