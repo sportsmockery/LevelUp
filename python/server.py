@@ -876,6 +876,9 @@ async def rotation_analysis(
 
     # Step 3: Rotation analysis
     analysis = analyze_rotations(teeth_data)
+    analysis["total_detections"] = len(result.boxes)
+    analysis["teeth_with_contours"] = len(teeth_data)
+    analysis["class_names_detected"] = list(set(t["class_name"] for t in teeth_data))
 
     # Step 4: Draw visualization
     vis = image_np.copy()

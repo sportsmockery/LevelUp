@@ -212,20 +212,29 @@ def rotation_recommendation(rotated_count: int) -> dict:
 
 # ── Main Analysis Function ───────────────────────────────────────────
 
+def _map_class_name(name: str) -> str:
+    """Map numeric class IDs back to tooth names if needed."""
+    # The base YOLO model uses these class names:
+    # {0: 'dL', 1: 'centL', 2: 'centR', 3: 'dR', 4: 'canR', 5: 'm3', 6: 'm2', 7: 'canL', 8: 'm1'}
+    numeric_map = {
+        "0": "dL", "1": "centL", "2": "centR", "3": "dR",
+        "4": "canR", "5": "m3", "6": "m2", "7": "canL", "8": "m1",
+    }
+    return numeric_map.get(name, name)
+
+
 def analyze_rotations(
     teeth_data: List[dict],
     class_names: Optional[Dict[int, str]] = None,
 ) -> dict:
     """Analyze tooth rotations from YOLO+SAM detection results.
 
-    Args:
-        teeth_data: List of dicts with 'contour', 'centroid', 'class_name' keys.
-                    contour: np.ndarray shape (N, 2)
-                    centroid: np.ndarray shape (2,)
-                    class_name: str (e.g. 'canL', 'canR', 'm1', etc.)
-
-    Returns:
-        Complete rotation analysis with per-tooth angles and treatment recommendation.
+    Matches the original code.txt logic:
+    1. Detects ALL teeth and maps class names
+    2. Sorts left to right by x-centroid
+    3. Finds canines to define anterior region
+    4. Fits polynomial arch through ALL teeth (not just central)
+    5. Measures rotation of central teeth against arch
     """
     if len(teeth_data) < 3:
         return {
@@ -236,29 +245,15 @@ def analyze_rotations(
             "recommendation": rotation_recommendation(0),
         }
 
+    # Map numeric class names to tooth names
+    for t in teeth_data:
+        t["class_name"] = _map_class_name(t.get("class_name", ""))
+
     # Sort teeth by x-centroid (left to right)
     sorted_teeth = sorted(teeth_data, key=lambda t: t["centroid"][0])
 
-    # Find canines to define the anterior region
-    idx_canL = next((i for i, t in enumerate(sorted_teeth) if t["class_name"] == "canL"), None)
-    idx_canR = next((i for i, t in enumerate(sorted_teeth) if t["class_name"] == "canR"), None)
-
-    if idx_canL is not None and idx_canR is not None:
-        start_idx = min(idx_canL, idx_canR)
-        end_idx = max(idx_canL, idx_canR) + 1
-        central_teeth = sorted_teeth[start_idx + 1:end_idx - 1]
-    else:
-        mid = len(sorted_teeth) // 2
-        half_window = FRONT_MAX_TEETH // 2
-        start = max(0, mid - half_window)
-        end = min(len(sorted_teeth), start + FRONT_MAX_TEETH)
-        central_teeth = sorted_teeth[start + 1:end - 1]
-
-    if len(central_teeth) < 3:
-        central_teeth = sorted_teeth
-
-    # Fit arch polynomial
-    coeffs = fit_polynomial_arch(central_teeth, POLY_DEGREE)
+    # Fit arch polynomial through ALL teeth (like original code)
+    coeffs = fit_polynomial_arch(sorted_teeth, POLY_DEGREE)
     if coeffs is None:
         return {
             "status": "arch_fit_failed",
@@ -268,7 +263,31 @@ def analyze_rotations(
             "recommendation": rotation_recommendation(0),
         }
 
-    # Compute rotation for each central tooth
+    # Find canines to define the anterior region for rotation check
+    idx_canL = next((i for i, t in enumerate(sorted_teeth) if t["class_name"] == "canL"), None)
+    idx_canR = next((i for i, t in enumerate(sorted_teeth) if t["class_name"] == "canR"), None)
+
+    if idx_canL is not None and idx_canR is not None:
+        start_idx = min(idx_canL, idx_canR)
+        end_idx = max(idx_canL, idx_canR) + 1
+        # Include teeth between canines (exclusive of canines themselves)
+        central_teeth = sorted_teeth[start_idx + 1:end_idx - 1]
+        if len(central_teeth) < 2:
+            # If not enough between canines, include canines too
+            central_teeth = sorted_teeth[start_idx:end_idx]
+    else:
+        # No canines found — analyze all teeth
+        # Use middle portion like original code
+        if len(sorted_teeth) <= FRONT_MAX_TEETH:
+            central_teeth = sorted_teeth
+        else:
+            mid = len(sorted_teeth) // 2
+            half_window = FRONT_MAX_TEETH // 2
+            start = max(0, mid - half_window)
+            end = min(len(sorted_teeth), start + FRONT_MAX_TEETH)
+            central_teeth = sorted_teeth[start:end]
+
+    # Compute rotation for ALL central teeth against the full arch curve
     tooth_results = []
     rotated_count = 0
 
@@ -283,6 +302,8 @@ def analyze_rotations(
     return {
         "status": "ok",
         "total_teeth_analyzed": len(central_teeth),
+        "total_teeth_detected": len(sorted_teeth),
+        "canines_found": idx_canL is not None and idx_canR is not None,
         "rotated_count": rotated_count,
         "rotation_threshold_deg": ROTATION_THRESHOLD_DEG,
         "arch_polynomial_degree": POLY_DEGREE,
