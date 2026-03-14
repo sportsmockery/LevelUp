@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
       detect: 'detect',
       segment: 'segment',
       'broken-contacts': 'broken-contacts',
+      rotation: 'rotation',
       enhance: 'enhance',
       'sam-factory': 'sam-factory',
     };

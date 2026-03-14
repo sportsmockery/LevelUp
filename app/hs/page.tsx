@@ -91,7 +91,7 @@ interface AnalysisResult {
   metrics?: Record<string, number | boolean>;
 }
 
-type Mode = 'detect' | 'segment' | 'broken-contacts' | 'enhance' | 'sam-factory';
+type Mode = 'detect' | 'segment' | 'broken-contacts' | 'rotation' | 'enhance' | 'sam-factory';
 
 // Clinical label colors (dual-layer system)
 const CLINICAL_COLORS: Record<string, string> = {
@@ -122,6 +122,66 @@ const LABEL_BG: Record<string, string> = {
   open_contact: 'bg-red-900/30 border-red-700',
   unclear_contact: 'bg-yellow-900/30 border-yellow-700',
 };
+
+interface RotationData {
+  rotated_count: number;
+  total_teeth_analyzed: number;
+  rotation_threshold_deg: number;
+  recommendation: { category: string; severity: string; description: string; hardware: { device: string; subtype?: string; reason: string }[] };
+  teeth: { angle_deg: number; is_rotated: boolean; method: string; class_name: string; centroid: number[] }[];
+}
+
+function RotationResults({ data }: { data: RotationData }) {
+  const rec = data.recommendation;
+  const severity = rec.severity;
+  const borderColor = severity === 'severe' ? 'border-red-700' : severity === 'moderate' ? 'border-orange-700' : severity === 'mild' ? 'border-yellow-700' : 'border-emerald-700';
+  const bgColor = severity === 'severe' ? 'bg-red-950/30' : severity === 'moderate' ? 'bg-orange-950/30' : severity === 'mild' ? 'bg-yellow-950/30' : 'bg-emerald-950/20';
+  const textColor = severity === 'severe' ? 'text-red-400' : severity === 'moderate' ? 'text-orange-400' : severity === 'mild' ? 'text-yellow-400' : 'text-emerald-400';
+
+  return (
+    <div className="space-y-4">
+      <div className={`rounded-2xl p-5 border ${borderColor} ${bgColor}`}>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className={`text-lg font-bold ${textColor}`}>{rec.category}</h3>
+          <span className="text-2xl font-mono font-bold text-white">{data.rotated_count} rotated</span>
+        </div>
+        <p className="text-zinc-300 text-sm">{rec.description}</p>
+        {rec.hardware.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {rec.hardware.map((hw, i) => (
+              <span key={i} className="text-xs px-2.5 py-1 rounded-lg bg-blue-900/50 text-blue-300 border border-blue-800">
+                {hw.device}{hw.subtype ? `: ${hw.subtype}` : ''}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+      {data.teeth.length > 0 && (
+        <div className="bg-zinc-900 rounded-2xl p-6 border border-zinc-800">
+          <h2 className="text-lg font-heading mb-4">Tooth Rotation Details ({data.total_teeth_analyzed} analyzed)</h2>
+          <div className="space-y-2">
+            {data.teeth.map((t, i) => (
+              <div key={i} className={`flex items-center justify-between rounded-xl px-4 py-3 ${t.is_rotated ? 'bg-red-900/20 border border-red-800' : 'bg-zinc-800'}`}>
+                <div className="flex items-center gap-3">
+                  <span className={`w-3 h-3 rounded-full ${t.is_rotated ? 'bg-red-500' : 'bg-emerald-500'}`} />
+                  <span className="text-zinc-300 text-sm">{t.class_name || `Tooth ${i + 1}`}</span>
+                  <span className="text-zinc-500 text-xs">({t.method})</span>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className={`font-mono text-lg ${t.is_rotated ? 'text-red-400' : 'text-emerald-400'}`}>
+                    {t.angle_deg}&deg;
+                  </span>
+                  {t.is_rotated && <span className="text-xs px-2 py-0.5 rounded bg-red-900/50 text-red-300">ROTATED</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-zinc-600 mt-3">Threshold: &gt;{data.rotation_threshold_deg}&deg; = rotated</p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function HealthyStartPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -187,6 +247,7 @@ export default function HealthyStartPage() {
     switch (mode) {
       case 'segment': return 'Detect & Segment';
       case 'broken-contacts': return 'Analyze Contacts';
+      case 'rotation': return 'Analyze Rotations';
       case 'enhance': return 'Enhance Image';
       case 'sam-factory': return 'Run SAM Factory';
       default: return 'Detect Teeth';
@@ -273,6 +334,16 @@ export default function HealthyStartPage() {
                 }`}
               >
                 Broken Contacts
+              </button>
+              <button
+                onClick={() => setMode('rotation')}
+                className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                  mode === 'rotation'
+                    ? 'bg-orange-500 text-white'
+                    : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                }`}
+              >
+                Rotation Analysis
               </button>
               <button
                 onClick={() => setMode('enhance')}
@@ -584,6 +655,11 @@ export default function HealthyStartPage() {
                   </div>
                 )}
               </div>
+            )}
+
+            {/* Rotation Analysis Results */}
+            {mode === 'rotation' && result && (result as unknown as {rotation_analysis?: {rotated_count: number; total_teeth_analyzed: number; rotation_threshold_deg: number; recommendation: {category: string; severity: string; description: string; hardware: {device: string; subtype?: string; reason: string}[]}; teeth: {angle_deg: number; is_rotated: boolean; method: string; class_name: string; centroid: number[]}[]}}).rotation_analysis && (
+              <RotationResults data={(result as unknown as {rotation_analysis: {rotated_count: number; total_teeth_analyzed: number; rotation_threshold_deg: number; recommendation: {category: string; severity: string; description: string; hardware: {device: string; subtype?: string; reason: string}[]}; teeth: {angle_deg: number; is_rotated: boolean; method: string; class_name: string; centroid: number[]}[]}}).rotation_analysis} />
             )}
 
             {/* SAM Factory Results */}

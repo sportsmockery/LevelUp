@@ -800,6 +800,104 @@ async def audit_progression():
     return JSONResponse(audit_history.get_progression())
 
 
+# =========================================================================
+# Rotation Analysis Endpoint
+# =========================================================================
+
+@app.post("/rotation")
+async def rotation_analysis(
+    file: UploadFile = File(...),
+    confidence: float = 0.45,
+):
+    """Analyze tooth rotations using YOLO+SAM detection.
+
+    Detects teeth, segments with SAM, fits arch polynomial,
+    measures rotation of each anterior tooth, and recommends treatment.
+    """
+    from broken_contacts.rotation_analyzer import analyze_rotations
+
+    contents = await file.read()
+    image = Image.open(io.BytesIO(contents)).convert("RGB")
+    image_np = np.array(image)
+
+    # Step 1: YOLO detection
+    yolo = get_yolo()
+    results = yolo.predict(source=image, conf=confidence, verbose=False)
+    result = results[0]
+
+    if len(result.boxes) < 2:
+        return JSONResponse({
+            "rotation_analysis": {
+                "status": "insufficient_detections",
+                "message": f"Only {len(result.boxes)} teeth detected. Need at least 3.",
+                "rotated_count": 0,
+                "teeth": [],
+                "recommendation": {"category": "NoTreatment", "severity": "none",
+                                   "description": "Insufficient data", "hardware": []},
+            },
+            "annotated_image": f"data:image/jpeg;base64,{image_to_b64(image)}",
+        })
+
+    # Step 2: SAM segmentation + contour extraction
+    sam_pred = get_sam()
+    sam_pred.set_image(image_np)
+
+    teeth_data = []
+    import cv2 as _cv2
+    from broken_contacts.rotation_analyzer import contour_centroid as _centroid
+
+    for box, cls in zip(result.boxes.xyxy.cpu().numpy(), result.boxes.cls.cpu().numpy()):
+        masks, _, _ = sam_pred.predict(box=box, multimask_output=False)
+        if masks is None or len(masks) == 0:
+            continue
+        mask = masks[0].astype(np.uint8)
+        if mask.sum() == 0:
+            continue
+
+        contours, _ = _cv2.findContours(mask, _cv2.RETR_EXTERNAL, _cv2.CHAIN_APPROX_SIMPLE)
+        contours = [c for c in contours if len(c) >= 5]
+        if not contours:
+            continue
+        contour = max(contours, key=_cv2.contourArea)
+        centroid = _centroid(contour)
+        if centroid is None:
+            continue
+
+        teeth_data.append({
+            "contour": contour.reshape(-1, 2),
+            "centroid": centroid,
+            "class_name": result.names[int(cls)],
+        })
+
+    # Step 3: Rotation analysis
+    analysis = analyze_rotations(teeth_data)
+
+    # Step 4: Draw visualization
+    vis = image_np.copy()
+    if analysis["status"] == "ok":
+        for tooth_result in analysis["teeth"]:
+            cx, cy = int(tooth_result["centroid"][0]), int(tooth_result["centroid"][1])
+            color = (0, 0, 255) if tooth_result["is_rotated"] else (0, 255, 0)
+            _cv2.circle(vis, (cx, cy), 8, color, -1)
+            _cv2.putText(vis, f'{tooth_result["angle_deg"]}°', (cx + 10, cy - 5),
+                        _cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+        # Draw recommendation
+        rec = analysis["recommendation"]
+        _cv2.putText(vis, f'{rec["category"]} ({analysis["rotated_count"]} rotated)',
+                    (20, 40), _cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 2)
+
+    annotated = Image.fromarray(vis)
+
+    return JSONResponse({
+        "rotation_analysis": {
+            k: v for k, v in analysis.items()
+            if k != "arch_coefficients"  # skip numpy arrays
+        },
+        "annotated_image": f"data:image/jpeg;base64,{image_to_b64(annotated)}",
+    })
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8100)
