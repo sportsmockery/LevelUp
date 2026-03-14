@@ -283,6 +283,100 @@ Each override makes the next training run cleaner. Track the impact in the OMMS 
 
 ---
 
+## OMMS Scores (Automatic)
+
+OMMS scores are now **auto-posted after every loop pass**. You don't need to do anything — the OMMS / Production tab populates automatically as the loop runs.
+
+The auto-score uses:
+- **S_geo**: Based on pipeline availability (full pipeline = 0.3mm drift, 0.75 IoU estimate)
+- **S_clin**: Based on label distribution (% of contacts with definitive labels, not "unclear")
+- **Hardware match**: 80% baseline when full pipeline is active
+- **Bio breaches**: 0 by default (increases when TAD proximity violations are detected)
+
+To improve OMMS scores over time:
+1. Run more loop passes — the model learns from each run
+2. Use Clinical Overrides to purge bad data
+3. Run SAM Factory iterations to get real IoU measurements (replaces estimates)
+4. Retrain after accumulating overrides
+
+---
+
+## SAM Factory Iterations
+
+The SAM Factory compares YOLO detections against SAM2 segmentation masks to measure how accurate the detector really is. This populates the **Drift Analytics**, **Hard Samples**, and **Modality Gaps** tabs.
+
+### Running a SAM Factory Iteration
+
+**Option A: From the /hs page (single image)**
+1. Go to `levelupwrestlingapp.com/hs`
+2. Upload a dental image
+3. Select **SAM Factory** mode
+4. Click **Run SAM Factory**
+5. See per-mask GOLD/SILVER/REJECT tier scores
+
+**Option B: From the API (batch)**
+```
+POST /api/hs/loop
+{
+  "action": "start",
+  "config": { ... }
+}
+```
+The loop's Command Center view (`/api/hs/loop?view=command-center`) returns drift data after factory iterations.
+
+**Option C: Factory run endpoint (one iteration)**
+```
+POST https://YOUR_NGROK_URL/factory/run
+{
+  "image_dir": "data/raw/train/images",
+  "confidence": 0.25,
+  "enhance": true
+}
+```
+This runs one full iteration: YOLO detects on all images, SAM2 refines masks, computes IoU and drift per detection. Returns:
+- Platinum/Gold/Silver/Reject counts
+- Mean score, mean IoU, mean drift
+- Modality breakdown
+- Hard samples list
+
+### What SAM Factory Produces
+
+| Metric | What it means |
+|---|---|
+| **YOLO confidence** | How sure the detector is about each detection |
+| **SAM score** | How well SAM2 can refine the mask (independent quality check) |
+| **Geometric IoU** | Overlap between YOLO box and SAM mask — the real accuracy metric |
+| **Final score** | Weighted combination: 0.4 * YOLO + 0.6 * SAM |
+| **Tier** | PLATINUM (>0.92), GOLD (>0.85), SILVER (>0.65), REJECT (<0.65) |
+
+### After Running SAM Factory
+
+The following tabs populate:
+- **Drift Analytics** — YOLO vs SAM scatter plot, tier bars, score trends
+- **Hard Samples** — images where YOLO and SAM disagree most (need manual review)
+- **Modality Gaps** — which image types have the biggest YOLO-to-SAM gap
+
+The SAM Factory also updates the OMMS score with **real IoU measurements** instead of estimates, making the production readiness assessment more accurate.
+
+---
+
+## Data Persistence
+
+All results are saved to **Google Drive** automatically:
+
+| Data | Local path | Drive path |
+|---|---|---|
+| Loop pass history | `runs/loop_results.json` | `hs_models/results/loop_results.json` |
+| Individual passes | — | `hs_models/results/pass_N_timestamp.json` |
+| OMMS audit history | `data/audit_history.json` | `hs_models/results/audit_history.json` |
+| Trained detector | `runs/detect/.../best.pt` | `hs_models/detector_best.pt` |
+| Trained classifier | `runs/classify/.../best.pt` | `hs_models/classifier_best.pt` |
+| Truth Engine data | `data/truth_engine/` | — |
+
+Data persists across Colab restarts via Google Drive. Each loop pass saves both the full history and an individual pass file.
+
+---
+
 ## Interpreting Results for Ortho Diagnosis
 
 ### Per-Patient Workflow

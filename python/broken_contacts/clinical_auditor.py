@@ -289,10 +289,17 @@ class AuditHistory:
     def _save(self) -> None:
         path = Path(self.HISTORY_FILE)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(
+        data = json.dumps(
             {"runs": [r.to_dict() for r in self._runs[-self.MAX_RUNS:]]},
             indent=2,
-        ))
+        )
+        path.write_text(data)
+
+        # Also save to Google Drive if mounted
+        gdrive_audit = Path("/content/drive/MyDrive/hs_models/results")
+        if gdrive_audit.parent.exists():
+            gdrive_audit.mkdir(parents=True, exist_ok=True)
+            (gdrive_audit / "audit_history.json").write_text(data)
 
     def record_run(self, score: OMMSScore) -> None:
         """Record a new run and compute deltas."""
