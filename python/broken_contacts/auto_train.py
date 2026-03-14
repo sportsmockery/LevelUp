@@ -175,17 +175,16 @@ def _run_pipeline(
         from broken_contacts.synth_generator import generate_dataset
         synth_out = base_dir / "data" / "synth_detector"
 
-        # Generate balanced dataset: 60% with gaps, 30% with restorations
-        # This fixes the open_contact accuracy problem — the model needs
-        # to see many more examples of gaps to learn to detect them
+        # Generate balanced dataset: 40% with gaps, 20% with restorations
+        # Balanced to produce ~40% normal, ~40% open, ~20% unclear
         summary = generate_dataset(
             output_dir=str(synth_out),
             num_images=num_synth,
             train_split=0.8,
             img_w=640,
             img_h=480,
-            gap_probability=0.6,
-            restoration_probability=0.3,
+            gap_probability=0.4,
+            restoration_probability=0.2,
         )
         _update("synth_gen", 15.0, f"Generated {summary['total_images']} images ({summary['total_gaps']} gaps)")
 
@@ -333,12 +332,7 @@ names:
                         continue
                     if ci in gap_pairs:
                         label = "open_contact"
-                        # Duplicate open contacts 3x for class balancing
-                        for dup in range(3):
-                            dup_out = cls_dir / split / label / f"{img_path.stem}_p{ci}_d{dup}.jpg"
-                            crop_img.save(str(dup_out))
-                            crop_count[label] += 1
-                    elif random.random() < 0.15:
+                    elif random.random() < 0.10:
                         label = "unclear_contact"
                     else:
                         label = "normal_contact"
