@@ -162,7 +162,7 @@ export default function CommandCenterPage() {
   const [ccData, setCcData] = useState<CommandCenterData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [configOpen, setConfigOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'loop' | 'drift' | 'hard' | 'modality' | 'omms'>('loop');
+  const [activeTab, setActiveTab] = useState<'loop' | 'omms' | 'results' | 'drift' | 'hard' | 'modality' | 'definitions' | 'guide'>('loop');
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [auditData, setAuditData] = useState<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -342,16 +342,24 @@ export default function CommandCenterPage() {
 
         {/* Tab Navigation */}
         <div className="max-w-6xl mx-auto mt-4 flex gap-2">
-          {(['loop', 'omms', 'drift', 'hard', 'modality'] as const).map(tab => (
-            <button key={tab} onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-                activeTab === tab
-                  ? tab === 'omms' ? 'bg-gradient-to-r from-blue-600 to-green-500 text-white' : 'bg-[#2563EB] text-white'
-                  : 'bg-zinc-800 text-zinc-400 hover:text-white'
-              }`}>
-              {tab === 'loop' ? 'Scoring Loop' : tab === 'omms' ? 'OMMS / Production' : tab === 'drift' ? 'Drift Analytics' : tab === 'hard' ? 'Hard Samples' : 'Modality Gaps'}
-            </button>
-          ))}
+          {(['loop', 'omms', 'results', 'drift', 'hard', 'modality', 'definitions', 'guide'] as const).map(tab => {
+            const labels: Record<string, string> = {
+              loop: 'Scoring Loop', omms: 'OMMS / Production', results: 'Results BI',
+              drift: 'Drift Analytics', hard: 'Hard Samples', modality: 'Modality Gaps',
+              definitions: 'Definitions', guide: 'User Guide',
+            };
+            const activeBg = tab === 'omms' ? 'bg-gradient-to-r from-blue-600 to-green-500 text-white'
+              : tab === 'results' ? 'bg-gradient-to-r from-purple-600 to-blue-500 text-white'
+              : 'bg-[#2563EB] text-white';
+            return (
+              <button key={tab} onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                  activeTab === tab ? activeBg : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                }`}>
+                {labels[tab]}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -1003,6 +1011,411 @@ export default function CommandCenterPage() {
               </div>
             )}
           </>
+        )}
+
+        {/* ==================== TAB: RESULTS BI ==================== */}
+        {activeTab === 'results' && (
+          <>
+            {latestPass ? (() => {
+              const ld = latestPass.label_distribution || {};
+              const totalC = latestPass.total_contacts || 0;
+              const normal = ld['normal_contact'] || 0;
+              const open = ld['open_contact'] || 0;
+              const unclear = ld['unclear_contact'] || 0;
+              const healthPct = totalC > 0 ? ((normal / totalC) * 100).toFixed(1) : '0';
+              const flagPct = totalC > 0 ? ((open / totalC) * 100).toFixed(1) : '0';
+              const unclearPct = totalC > 0 ? ((unclear / totalC) * 100).toFixed(1) : '0';
+              const passHistory = passes.slice(-20);
+              const maxContacts = Math.max(1, ...passHistory.map(p => p.total_contacts || 1));
+
+              return (
+                <>
+                  {/* KPI Cards */}
+                  <div className="grid grid-cols-4 gap-4">
+                    <div className="bg-gradient-to-br from-emerald-900/40 to-emerald-950/20 rounded-2xl p-5 border border-emerald-800">
+                      <div className="text-3xl font-mono font-bold text-emerald-400">{healthPct}%</div>
+                      <div className="text-xs text-emerald-400/70 mt-1">Healthy Contacts</div>
+                      <div className="text-lg text-zinc-400 mt-2">{normal} / {totalC}</div>
+                    </div>
+                    <div className="bg-gradient-to-br from-red-900/40 to-red-950/20 rounded-2xl p-5 border border-red-800">
+                      <div className="text-3xl font-mono font-bold text-red-400">{flagPct}%</div>
+                      <div className="text-xs text-red-400/70 mt-1">Flagged (Open)</div>
+                      <div className="text-lg text-zinc-400 mt-2">{open} / {totalC}</div>
+                    </div>
+                    <div className="bg-gradient-to-br from-yellow-900/40 to-yellow-950/20 rounded-2xl p-5 border border-yellow-800">
+                      <div className="text-3xl font-mono font-bold text-yellow-400">{unclearPct}%</div>
+                      <div className="text-xs text-yellow-400/70 mt-1">Unclear (Review)</div>
+                      <div className="text-lg text-zinc-400 mt-2">{unclear} / {totalC}</div>
+                    </div>
+                    <div className="bg-gradient-to-br from-blue-900/40 to-blue-950/20 rounded-2xl p-5 border border-blue-800">
+                      <div className="text-3xl font-mono font-bold text-blue-400">{latestPass.image_count}</div>
+                      <div className="text-xs text-blue-400/70 mt-1">Images Scanned</div>
+                      <div className="text-lg text-zinc-400 mt-2">{passes.length} passes</div>
+                    </div>
+                  </div>
+
+                  {/* Contact Classification Donut (horizontal bar representation) */}
+                  <div className="bg-zinc-900 rounded-2xl p-6 border border-zinc-800">
+                    <h2 className="text-lg font-heading mb-4">Contact Classification Breakdown</h2>
+                    <div className="flex h-8 rounded-full overflow-hidden border border-zinc-700">
+                      {normal > 0 && <div className="bg-emerald-500 transition-all" style={{ width: `${(normal / totalC) * 100}%` }} />}
+                      {open > 0 && <div className="bg-red-500 transition-all" style={{ width: `${(open / totalC) * 100}%` }} />}
+                      {unclear > 0 && <div className="bg-yellow-500 transition-all" style={{ width: `${(unclear / totalC) * 100}%` }} />}
+                    </div>
+                    <div className="flex justify-between mt-3 text-xs">
+                      <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-emerald-500 inline-block" /> Normal {healthPct}%</span>
+                      <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-red-500 inline-block" /> Flagged {flagPct}%</span>
+                      <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-yellow-500 inline-block" /> Unclear {unclearPct}%</span>
+                    </div>
+                  </div>
+
+                  {/* Pass-over-Pass Trend */}
+                  <div className="bg-zinc-900 rounded-2xl p-6 border border-zinc-800">
+                    <h2 className="text-lg font-heading mb-4">Contacts per Pass (Last {passHistory.length})</h2>
+                    <div className="flex items-end gap-1 h-40">
+                      {passHistory.map((p, i) => {
+                        const nc = (p.label_distribution?.['normal_contact'] || 0);
+                        const oc = (p.label_distribution?.['open_contact'] || 0);
+                        const uc = (p.label_distribution?.['unclear_contact'] || 0);
+                        const tot = nc + oc + uc || 1;
+                        const barH = Math.max(8, (p.total_contacts / maxContacts) * 140);
+                        return (
+                          <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                            <span className="text-xs text-zinc-600">{p.total_contacts}</span>
+                            <div className="w-full flex flex-col rounded-t overflow-hidden" style={{ height: `${barH}px` }}>
+                              <div className="bg-emerald-500" style={{ height: `${(nc / tot) * 100}%` }} />
+                              <div className="bg-red-500" style={{ height: `${(oc / tot) * 100}%` }} />
+                              <div className="bg-yellow-500" style={{ height: `${(uc / tot) * 100}%` }} />
+                            </div>
+                            <span className="text-xs text-zinc-600">#{p.pass_index}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="flex gap-4 mt-3 text-xs text-zinc-500">
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Normal</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" /> Flagged</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500 inline-block" /> Unclear</span>
+                    </div>
+                  </div>
+
+                  {/* Flag Rate Trend */}
+                  <div className="bg-zinc-900 rounded-2xl p-6 border border-zinc-800">
+                    <h2 className="text-lg font-heading mb-4">Flag Rate Trend (%)</h2>
+                    <div className="flex items-end gap-1 h-32">
+                      {passHistory.map((p, i) => {
+                        const rate = p.total_contacts > 0 ? (p.flagged_count / p.total_contacts) * 100 : 0;
+                        const barH = Math.max(4, rate * 3);
+                        return (
+                          <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                            <span className="text-xs text-zinc-500">{rate.toFixed(1)}%</span>
+                            <div className={`w-full rounded-t ${rate > 10 ? 'bg-red-500' : rate > 5 ? 'bg-yellow-500' : 'bg-emerald-500'}`}
+                              style={{ height: `${barH}px` }} />
+                            <span className="text-xs text-zinc-600">#{p.pass_index}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-zinc-600 mt-2">Lower is better. Above 10% = concern. Above 30% = critical.</p>
+                  </div>
+
+                  {/* Duration Trend */}
+                  <div className="bg-zinc-900 rounded-2xl p-6 border border-zinc-800">
+                    <h2 className="text-lg font-heading mb-4">Processing Speed (seconds per pass)</h2>
+                    <div className="flex items-end gap-1 h-24">
+                      {passHistory.map((p, i) => {
+                        const maxDur = Math.max(1, ...passHistory.map(pp => pp.duration_seconds || 1));
+                        const barH = Math.max(4, ((p.duration_seconds || 0) / maxDur) * 80);
+                        return (
+                          <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                            <span className="text-xs text-zinc-500">{p.duration_seconds}s</span>
+                            <div className="w-full bg-blue-500 rounded-t" style={{ height: `${barH}px` }} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Per-Label Detail Table */}
+                  <div className="bg-zinc-900 rounded-2xl p-6 border border-zinc-800">
+                    <h2 className="text-lg font-heading mb-4">Label Detail (Latest Pass)</h2>
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-zinc-700">
+                          <th className="text-left py-2 text-zinc-500 font-normal">Label</th>
+                          <th className="text-right py-2 text-zinc-500 font-normal">Count</th>
+                          <th className="text-right py-2 text-zinc-500 font-normal">% of Total</th>
+                          <th className="text-left py-2 pl-4 text-zinc-500 font-normal">Distribution</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(ld).sort(([,a],[,b]) => (b as number) - (a as number)).map(([label, count]) => {
+                          const pct = totalC > 0 ? ((count as number) / totalC * 100) : 0;
+                          const color = label === 'normal_contact' ? 'bg-emerald-500' : label === 'open_contact' ? 'bg-red-500' : label === 'unclear_contact' ? 'bg-yellow-500' : 'bg-blue-500';
+                          return (
+                            <tr key={label} className="border-b border-zinc-800">
+                              <td className="py-2 text-zinc-300">{label.replace(/_/g, ' ')}</td>
+                              <td className="py-2 text-right font-mono text-zinc-400">{count as number}</td>
+                              <td className="py-2 text-right font-mono text-zinc-400">{pct.toFixed(1)}%</td>
+                              <td className="py-2 pl-4">
+                                <div className="w-full bg-zinc-800 rounded-full h-2">
+                                  <div className={`h-2 rounded-full ${color}`} style={{ width: `${pct}%` }} />
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Top Flagged Images */}
+                  {allScores.filter(s => s.flagged_count > 0).length > 0 && (
+                    <div className="bg-zinc-900 rounded-2xl p-6 border border-zinc-800">
+                      <h2 className="text-lg font-heading mb-4">Top Flagged Images</h2>
+                      <div className="space-y-2">
+                        {allScores.filter(s => s.flagged_count > 0)
+                          .sort((a, b) => b.flagged_count - a.flagged_count)
+                          .slice(0, 15)
+                          .map((s, i) => {
+                            const details = (s.clinical_details || []).filter((d: Record<string, unknown>) =>
+                              ['food_trap_risk', 'restoration_failure', 'open_contact'].includes(d.clinical_label as string));
+                            return (
+                              <div key={i} className="flex items-center justify-between bg-zinc-800 rounded-xl px-4 py-3 border border-red-900/30">
+                                <div className="flex items-center gap-3">
+                                  <span className="text-red-400 font-mono text-xs">#{i + 1}</span>
+                                  <span className="text-zinc-300 text-sm truncate max-w-48">{s.filename}</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <span className="text-red-400 text-xs font-bold">{s.flagged_count} flagged</span>
+                                  <span className="text-zinc-500 text-xs">{s.contact_count} total</span>
+                                  {details.slice(0, 2).map((d: Record<string, unknown>, di: number) => (
+                                    <span key={di} className="text-xs px-1.5 py-0.5 rounded bg-red-900/50 text-red-300">
+                                      {(d.morphology_label as string || d.clinical_label as string || '').replace(/_/g, ' ')}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })() : (
+              <div className="bg-zinc-900 rounded-2xl p-12 border border-zinc-800 text-center">
+                <p className="text-zinc-400 text-lg">No Results Yet</p>
+                <p className="text-zinc-600 text-sm mt-2">Start the scoring loop to generate BI data.</p>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ==================== TAB: DEFINITIONS ==================== */}
+        {activeTab === 'definitions' && (
+          <div className="space-y-6">
+            {[
+              { category: 'Scoring & Metrics', items: [
+                { term: 'OMMS', def: 'Orthodontic Model Maturity Score. Composite score (0-100) measuring how ready the AI model is for production. Formula: OMMS = (0.3 x S_geo) + (0.7 x S_clin) - (10 x B_crit). Target: 92+ for 3 consecutive runs.' },
+                { term: 'S_geo (Geometric Score)', def: 'Measures detection accuracy: how closely YOLO bounding boxes match SAM2 segmentation masks. Based on d_min drift (target <= 0.15mm) and mask IoU (target >= 0.85). Worth 30% of OMMS.' },
+                { term: 'S_clin (Clinical Score)', def: 'Measures diagnostic accuracy: what percentage of the AI diagnoses and hardware suggestions match expert orthodontist assessments. Worth 70% of OMMS.' },
+                { term: 'B_crit (Biological Breach)', def: 'Critical safety violation. Occurs when hardware is placed within 1.0mm of a root apex. Each breach deducts 10 points from OMMS and automatically sets status to RED.' },
+                { term: 'IoU (Intersection over Union)', def: 'Overlap between predicted detection box and ground truth mask. 1.0 = perfect overlap, 0.0 = no overlap. Above 0.70 is acceptable, above 0.85 is good.' },
+                { term: 'Mean Drift', def: 'Average pixel distance between YOLO detection boundaries and SAM2 refined masks. Lower is better. Target: <= 0.15mm. Above 15px indicates detection issues.' },
+                { term: 'Flag Rate', def: 'Percentage of contacts flagged as problematic (open, restoration failure). Above 10% warrants investigation, above 30% is critical.' },
+                { term: 'Logic Match', def: 'Percentage of AI diagnoses that align with the hard clinical logic rules (sagittal, vertical, transverse classification). Target: >= 95%.' },
+                { term: 'Learning Velocity', def: 'Rate of OMMS improvement per run. Positive = model improving. Negative = model regressing. Plateau = needs new data or purge.' },
+                { term: 'Confidence', def: 'How certain the model is about a detection or classification. 0-100%. Above 80% = trustworthy. 50-80% = cross-reference. Below 50% = discard.' },
+              ]},
+              { category: 'Clinical Labels', items: [
+                { term: 'Normal Contact', def: 'Tight, healthy interproximal contact between adjacent teeth. No gap, no food trap risk. No intervention needed.' },
+                { term: 'Open Contact', def: 'Visible gap between teeth. Food impaction risk. May require brackets, elastic chain, or aligners to close.' },
+                { term: 'Food Trap Risk', def: 'Clinical diagnosis: open contact likely to trap food between teeth, causing decay or periodontal issues. Requires closure.' },
+                { term: 'Restoration Failure', def: 'Filling or crown margin is defective, causing a step or overhang at the contact point. Needs restorative referral before orthodontic treatment.' },
+                { term: 'Monitor', def: 'Borderline finding — not clearly pathological but could progress. Re-image in 3-6 months. No hardware yet.' },
+                { term: 'Not Assessable', def: 'Image quality too low to make a diagnosis. Re-photograph the patient with better positioning/lighting.' },
+                { term: 'Unclear Contact', def: 'Model confidence too low to classify definitively. Needs manual expert review or better imaging.' },
+              ]},
+              { category: 'Morphology (What the AI Sees)', items: [
+                { term: 'Closed Contact', def: 'Physically tight contact — no visible gap between tooth surfaces. Healthy.' },
+                { term: 'Open Small (< 0.5mm)', def: 'Minor gap between teeth. May or may not cause food impaction depending on location and patient anatomy.' },
+                { term: 'Open Large (> 1.0mm)', def: 'Significant diastema. Almost always causes food impaction. Requires active orthodontic closure.' },
+                { term: 'Restoration Step', def: 'Step or overhang at a filling/crown margin creating an artificial gap or ledge at the contact point.' },
+                { term: 'Marginal Ridge Mismatch', def: 'Adjacent teeth have different marginal ridge heights, disrupting the contact point and food deflection.' },
+              ]},
+              { category: 'Hardware Recommendations', items: [
+                { term: 'Brackets + Archwire', def: 'Standard fixed orthodontic appliance. Metal or ceramic brackets bonded to teeth, connected by an archwire that applies force to move teeth. Used for most alignment and space closure cases.' },
+                { term: 'Elastic Chain', def: 'Continuous elastic band connecting multiple brackets. Applies gentle closing force between teeth. Used for small gaps (< 0.5mm) and minor space closure.' },
+                { term: 'Aligner + Attachment', def: 'Clear plastic aligner (like Invisalign) with composite attachments bonded to teeth. Attachments provide grip for the aligner to apply precise force. Used for closing small to moderate gaps.' },
+                { term: 'Brackets + Coil Spring', def: 'Fixed brackets with a NiTi coil spring compressed between them. Applies strong continuous force for closing large gaps (> 1.0mm). More force than elastic chain.' },
+                { term: 'TADs (Temporary Anchorage Devices)', def: 'Titanium mini-screws placed in the jawbone to provide absolute anchorage. Used when overjet > 6mm with high anchorage need, or to prevent unwanted tooth movement during space closure. CRITICAL: must be > 1mm from root apex.' },
+                { term: 'RPE (Rapid Palatal Expander)', def: 'Appliance cemented to upper molars that widens the palate. Used when crowding > 5mm due to narrow maxilla. Alternative to extractions in growing patients.' },
+                { term: 'Power Chain', def: 'Elastic chain connecting 3+ brackets for bulk space closure. Used when d_min > 1.0mm across multiple contacts.' },
+                { term: 'Sectional Wire', def: 'Short segment of archwire spanning 2-3 teeth. Used after restoration repair to re-establish contact without full braces.' },
+                { term: 'Restorative Referral', def: 'Not hardware — a recommendation to fix a defective filling or crown before starting orthodontic treatment. The restoration must be corrected first or it will interfere with tooth movement.' },
+              ]},
+              { category: 'Sagittal Classification', items: [
+                { term: 'Class I', def: 'Normal molar relationship. Upper first molar fits into the groove of the lower first molar. May still have crowding or spacing.' },
+                { term: 'Class II Division 1', def: 'Lower jaw is positioned behind upper jaw. Molar relation = distal, overjet > 4mm. "Buck teeth" appearance. Often needs retraction with TADs.' },
+                { term: 'Class II Division 2', def: 'Similar to Div 1 but upper incisors tilt backward (lingual). Molar = distal, overjet < 2mm, incisors = lingual. Often missed by AI — top failure mode.' },
+                { term: 'Class III', def: 'Lower jaw protrudes past upper jaw. Molar = mesial, overjet < 0mm (underbite). May require surgical intervention if skeletal.' },
+                { term: 'Skeletal Class III', def: 'Class III caused by bone structure (ANB angle < 0), not just tooth position. Flagged as surgical risk — may need orthognathic surgery.' },
+              ]},
+              { category: 'Vertical & Transverse', items: [
+                { term: 'Anterior Open Bite', def: 'Front teeth do not overlap — overbite < 0mm. Gap between upper and lower incisors when biting. Often caused by tongue thrust or thumb sucking.' },
+                { term: 'Deep Bite', def: 'Excessive vertical overlap — overbite > 40%. Lower incisors may bite into the palate. Needs intrusion mechanics.' },
+                { term: 'Posterior Crossbite', def: 'Upper arch narrower than lower arch. Upper teeth bite inside lower teeth on one or both sides. Needs palatal expansion (RPE).' },
+                { term: 'Overjet', def: 'Horizontal distance (mm) between upper and lower front teeth. Normal: 2-4mm. > 4mm = Class II risk. < 0mm = underbite/Class III.' },
+                { term: 'Overbite', def: 'Vertical overlap of upper front teeth over lower. Normal: 2-4mm or ~25%. < 0mm = open bite. > 40% = deep bite.' },
+              ]},
+              { category: 'Detection Classes (YOLO 9-Class)', items: [
+                { term: 'Tooth Crown', def: 'The visible part of the tooth above the gum line. Primary anchor for all pair calculations.' },
+                { term: 'Mesial Surface', def: 'The side of the tooth facing toward the front (midline) of the mouth. The anterior-facing proximal wall.' },
+                { term: 'Distal Surface', def: 'The side of the tooth facing toward the back of the mouth. Used with mesial of the next tooth to compute contact distance.' },
+                { term: 'Occlusal Surface', def: 'The biting/chewing surface of the tooth. Where articulating marks appear.' },
+                { term: 'Restoration Margin', def: 'The interface between natural tooth and a filling or crown. Defects here cause restoration_step morphology.' },
+                { term: 'Contact Gap Candidate', def: 'A visible dark space between teeth detected by YOLO. Primary indicator for open contacts.' },
+                { term: 'Articulating Mark', def: 'Ink marks on the biting surface from bite paper. Indicates occlusion has been checked.' },
+                { term: 'Ortho Hardware', def: 'Brackets, wires, bands detected in the image. Excluded from contact distance calculations. Indicates active treatment.' },
+                { term: 'Gingival Margin', def: 'The gum line around each tooth. Used to assess vertical food impaction depth.' },
+              ]},
+              { category: 'Tier System (SAM Factory)', items: [
+                { term: 'PLATINUM', def: 'Highest quality auto-label. Score > 0.92 and IoU > 0.75. Trusted for training without review.' },
+                { term: 'GOLD', def: 'High quality. Score > 0.85 and IoU > 0.70. Auto-approved for training.' },
+                { term: 'SILVER', def: 'Moderate quality. Score > 0.65. Needs human review before use in training.' },
+                { term: 'REJECT', def: 'Low quality. Score <= 0.65. Excluded from training. May indicate bad image or detection failure.' },
+                { term: 'SCRAP', def: 'Demoted by Truth Engine after a Clinical Override. Was Silver/Gold but found to be unreliable. Excluded from training permanently until relabeled.' },
+              ]},
+              { category: 'Production Readiness', items: [
+                { term: 'RED', def: 'OMMS < 85 or any biological breach detected. Model is not safe for clinical use. Needs more training and data cleaning.' },
+                { term: 'YELLOW', def: 'OMMS 85-91. Model is close but has specific weak areas. Needs targeted training on failing clusters.' },
+                { term: 'GREEN', def: 'OMMS >= 92. Model meets clinical accuracy threshold. 3 consecutive GREEN runs = ready for Level 3 Autopilot (production).' },
+                { term: 'Green Streak', def: 'Number of consecutive runs with GREEN status. Need 3 in a row for production clearance.' },
+              ]},
+              { category: 'Truth Engine', items: [
+                { term: 'Clinical Override', def: 'When an orthodontist disagrees with the AI diagnosis and manually corrects it. Triggers the Truth Engine back-propagation pipeline.' },
+                { term: 'Recursive Purge', def: 'Mass operation that finds all images similar to an overridden case and demotes them from training data. Prevents the same mistake from repeating.' },
+                { term: 'Geometric Signature', def: 'A searchable fingerprint for each image based on d_min range, image angle, hardware types, modality, and quality flags. Used for vector search during purges.' },
+                { term: 'Labeling Hint', def: 'Auto-generated note attached to purged images explaining what the AI got wrong and how to label correctly.' },
+                { term: 'Biological Breach Alert', def: 'Critical safety flag. Hardware placement within 1.0mm of a root apex. Blocks inference immediately. -10 OMMS penalty.' },
+              ]},
+              { category: 'Image Modalities', items: [
+                { term: 'Intraoral Photo', def: 'Direct photograph taken inside the mouth. Weight: 30%. Most common but affected by saliva glare and angle variation.' },
+                { term: 'Bitewing X-ray', def: 'X-ray showing crowns and contact areas of upper and lower teeth. Weight: 40% (highest confidence). Best for confirming contact status.' },
+                { term: 'Periapical X-ray', def: 'X-ray showing full tooth including root tip and surrounding bone. Weight: 20%. Good for root proximity checks.' },
+                { term: 'CBCT', def: 'Cone Beam Computed Tomography. 3D X-ray scan of the skull. Used for surgical planning, impacted teeth, and TAD placement. Metal artifacts from brackets can degrade quality.' },
+              ]},
+            ].map((section, si) => (
+              <div key={si} className="bg-zinc-900 rounded-2xl p-6 border border-zinc-800">
+                <h2 className="text-lg font-heading mb-4 text-blue-400">{section.category}</h2>
+                <div className="space-y-3">
+                  {section.items.map((item, ii) => (
+                    <div key={ii} className="border-b border-zinc-800 pb-3 last:border-0 last:pb-0">
+                      <dt className="text-sm font-medium text-zinc-200">{item.term}</dt>
+                      <dd className="text-xs text-zinc-400 mt-1">{item.def}</dd>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ==================== TAB: USER GUIDE ==================== */}
+        {activeTab === 'guide' && (
+          <div className="space-y-6">
+            {[
+              { title: 'Quick Start', content: [
+                '1. Start the Colab server (Cells 1-5 in the notebook)',
+                '2. Go to levelupwrestlingapp.com/hs/loop',
+                '3. Click Start — auto-trains if models are missing (~20 min first time)',
+                '4. Once trained, the loop scores images and shows diagnoses',
+                '5. Check the Results BI tab for graphical analysis',
+                '6. Check OMMS / Production tab for model maturity',
+              ]},
+              { title: 'Colab Server Setup', content: [
+                'Cell 1: Mount Google Drive, clone repo, install dependencies',
+                'Cell 2: Download SAM model, restore trained models from Drive',
+                'Cell 3: Set ROBOFLOW_API_KEY (paste your key)',
+                'Cell 4: Start ngrok tunnel (paste your ngrok token)',
+                'Cell 5: Start FastAPI server',
+                '',
+                'IMPORTANT: Restart ngrok (Cell 4) BEFORE restarting server (Cell 5)',
+                'If ngrok URL changes, update HS_DETECTION_URL in Vercel env vars',
+              ]},
+              { title: 'Reading the Scoring Loop Tab', content: [
+                'Stats Row: Images scanned, contacts found, flagged count, flag rate, duration',
+                'Label Distribution: Bar chart of how contacts are classified',
+                'Diagnosis & Hardware Feed: Per-image clinical labels with hardware suggestions',
+                '  - Red border = flagged contacts detected',
+                '  - Blue pills = hardware recommendations',
+                '  - Green text = all contacts healthy',
+              ]},
+              { title: 'Reading the Results BI Tab', content: [
+                'KPI Cards: Healthy %, Flagged %, Unclear %, Images scanned',
+                'Classification Bar: Visual ratio of normal/flagged/unclear',
+                'Contacts per Pass: Stacked bar chart showing composition over time',
+                'Flag Rate Trend: Is the flag rate increasing or decreasing?',
+                'Processing Speed: How long each pass takes (monitors for slowdowns)',
+                'Top Flagged Images: Ranked list of most problematic images',
+              ]},
+              { title: 'Understanding OMMS Scores', content: [
+                'OMMS = (0.3 x Geometric) + (0.7 x Clinical) - (10 x Bio Breaches)',
+                'RED (< 85): Model not safe. Needs more training.',
+                'YELLOW (85-91): Close but has weak areas. Targeted training needed.',
+                'GREEN (92+): Meets clinical standard. 3 consecutive GREEN = production ready.',
+                '',
+                'OMMS auto-posts after every loop pass. No manual action needed.',
+              ]},
+              { title: 'Hardware Recommendation Logic', content: [
+                'Open Small (< 0.5mm): Elastic Chain or Aligner + Attachment',
+                'Open Large (> 1.0mm): Brackets + Coil Spring, consider TADs',
+                'Restoration Failure: Restorative Referral first, then Sectional Wire',
+                'Crowding > 5mm: RPE (Rapid Palatal Expander)',
+                'Overjet > 6mm + High Anchorage: TADs',
+                'd_min > 1.0mm across 3+ contacts: Power Chain',
+                '',
+                'CRITICAL: TADs within 1mm of root = Biological Breach Alert',
+              ]},
+              { title: 'Improving the Model', content: [
+                '1. Run loop passes — the model learns from each scoring run',
+                '2. Use Clinical Overrides when the AI gets it wrong',
+                '3. Truth Engine auto-purges similar bad data from training',
+                '4. Retrain (POST /api/hs/train) after accumulating overrides',
+                '5. Run SAM Factory iterations for real IoU measurements',
+                '6. Track OMMS trend — target steady upward climb to 92+',
+              ]},
+              { title: 'Data Persistence', content: [
+                'Trained models: Saved to Google Drive (hs_models/) — survive restarts',
+                'Loop results: Saved to Drive (hs_models/results/) after each pass',
+                'OMMS history: Saved to Drive (hs_models/results/audit_history.json)',
+                'Truth Engine: Saved to Colab disk (data/truth_engine/)',
+                '',
+                'To manually save models: Run "Save to Drive" utility cell in Colab',
+              ]},
+              { title: 'Production Readiness Checklist', content: [
+                '[ ] OMMS >= 92 for 3 consecutive runs',
+                '[ ] Zero biological breaches in last 10 runs',
+                '[ ] Logic Match >= 95%',
+                '[ ] Hardware Accuracy >= 90%',
+                '[ ] Mean Drift <= 0.15mm',
+                '[ ] All modality gaps < 10%',
+                '[ ] Top failure mode accuracy > 85%',
+              ]},
+            ].map((section, si) => (
+              <div key={si} className="bg-zinc-900 rounded-2xl p-6 border border-zinc-800">
+                <h2 className="text-lg font-heading mb-3">{section.title}</h2>
+                <div className="space-y-1">
+                  {section.content.map((line, li) => (
+                    <p key={li} className={`text-sm ${line === '' ? 'h-2' : line.startsWith('IMPORTANT') || line.startsWith('CRITICAL') ? 'text-red-400 font-medium' : line.startsWith('[ ]') ? 'text-zinc-400 font-mono text-xs' : 'text-zinc-400'}`}>
+                      {line || '\u00A0'}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         )}
 
         {/* Empty state */}
