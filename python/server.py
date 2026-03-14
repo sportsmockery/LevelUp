@@ -897,31 +897,30 @@ async def rotation_analysis(
 
     annotated = Image.fromarray(vis)
 
-    # Convert numpy types for JSON serialization
+    # Convert entire response to JSON-safe types
     import json as _json
 
-    def _convert(obj):
-        if isinstance(obj, (np.integer,)):
-            return int(obj)
-        if isinstance(obj, (np.floating,)):
-            return float(obj)
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        if isinstance(obj, dict):
-            return {k: _convert(v) for k, v in obj.items()}
-        if isinstance(obj, list):
-            return [_convert(v) for v in obj]
-        return obj
+    class _NumpyEncoder(_json.JSONEncoder):
+        def default(self, obj):
+            if isinstance(obj, (np.integer,)):
+                return int(obj)
+            if isinstance(obj, (np.floating, np.float32, np.float64)):
+                return float(obj)
+            if isinstance(obj, (np.bool_,)):
+                return bool(obj)
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+            return super().default(obj)
 
-    clean_analysis = _convert({
-        k: v for k, v in analysis.items()
-        if k != "arch_coefficients"
-    })
-
-    return JSONResponse({
-        "rotation_analysis": clean_analysis,
+    raw = {
+        "rotation_analysis": {
+            k: v for k, v in analysis.items()
+            if k != "arch_coefficients"
+        },
         "annotated_image": f"data:image/jpeg;base64,{image_to_b64(annotated)}",
-    })
+    }
+    safe_json = _json.loads(_json.dumps(raw, cls=_NumpyEncoder))
+    return JSONResponse(safe_json)
 
 
 if __name__ == "__main__":
