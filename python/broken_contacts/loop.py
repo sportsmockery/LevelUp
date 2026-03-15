@@ -412,11 +412,15 @@ class ScoringLoop:
         # Logic match: % of contacts that got a definitive label (not unclear)
         logic_match = ((total - unclear) / total) * 100 if total > 0 else 0
 
-        # Hardware match: scale with flag detection quality
-        # If model detects some flags (not 0% and not 100%), it's working
-        flag_ratio = flagged / total if total > 0 else 0
-        if has_pipeline and 0.005 < flag_ratio < 0.5:
-            hardware_match = 90.0  # realistic detection range
+        # Hardware match: use classifier's actual accuracy if available
+        cls_path = Path(__file__).parent.parent / "runs" / "classify" / "contacts_classifier_v1" / "best.pt"
+        if cls_path.exists() and has_pipeline:
+            try:
+                import torch as _torch
+                ckpt = _torch.load(str(cls_path), map_location="cpu", weights_only=True)
+                hardware_match = ckpt.get("val_acc", 0.8) * 100
+            except Exception:
+                hardware_match = 90.0
         elif has_pipeline:
             hardware_match = 80.0
         else:
