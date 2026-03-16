@@ -229,8 +229,15 @@ export default function HealthyStartPage() {
       });
 
       if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.details || err.error || 'Analysis failed');
+        const text = await response.text();
+        let message = 'Analysis failed';
+        try {
+          const err = JSON.parse(text);
+          message = err.details || err.error || message;
+        } catch {
+          message = text || `Server returned ${response.status}`;
+        }
+        throw new Error(message);
       }
 
       const data: AnalysisResult = await response.json();

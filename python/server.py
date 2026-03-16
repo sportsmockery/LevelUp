@@ -807,7 +807,7 @@ async def audit_progression():
 @app.post("/rotation")
 async def rotation_analysis(
     file: UploadFile = File(...),
-    confidence: float = 0.45,
+    confidence: float = 0.25,
 ):
     """Analyze tooth rotations using YOLO+SAM detection.
 
@@ -820,13 +820,8 @@ async def rotation_analysis(
     image = Image.open(io.BytesIO(contents)).convert("RGB")
     image_np = np.array(image)
 
-    # Step 1: YOLO detection — use trained model if available, else base
-    trained_path = Path(__file__).parent / "runs" / "detect" / "contacts_detector_v1" / "weights" / "best.pt"
-    if trained_path.exists():
-        from ultralytics import YOLO as _YOLO
-        det_model = _YOLO(str(trained_path))
-    else:
-        det_model = get_yolo()
+    # Step 1: YOLO detection — always use base model (teeth_v3_real)
+    det_model = get_yolo()
     results = det_model.predict(source=image, conf=confidence, verbose=False)
     result = results[0]
 
