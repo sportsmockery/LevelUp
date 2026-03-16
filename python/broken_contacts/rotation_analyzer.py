@@ -361,13 +361,18 @@ def analyze_rotations(
             "recommendation": rotation_recommendation(0),
         }
 
-    # Find canines to define the anterior region for rotation check
-    idx_canL = next((i for i, t in enumerate(sorted_teeth) if t["class_name"] == "canL"), None)
-    idx_canR = next((i for i, t in enumerate(sorted_teeth) if t["class_name"] == "canR"), None)
+    # Find canines to define the anterior region for rotation check.
+    # Use the leftmost canL and rightmost canR to handle duplicate detections.
+    canL_indices = [i for i, t in enumerate(sorted_teeth) if t["class_name"] == "canL"]
+    canR_indices = [i for i, t in enumerate(sorted_teeth) if t["class_name"] == "canR"]
 
-    if idx_canL is not None and idx_canR is not None:
-        start_idx = min(idx_canL, idx_canR)
-        end_idx = max(idx_canL, idx_canR) + 1
+    # Pick the leftmost canL (smallest x) and rightmost canR (largest x)
+    idx_canL = canL_indices[0] if canL_indices else None   # leftmost
+    idx_canR = canR_indices[-1] if canR_indices else None   # rightmost
+
+    if idx_canL is not None and idx_canR is not None and idx_canR > idx_canL:
+        start_idx = idx_canL
+        end_idx = idx_canR + 1
         # Include teeth between canines (exclusive of canines themselves)
         central_teeth = sorted_teeth[start_idx + 1:end_idx - 1]
         if len(central_teeth) < 2:
