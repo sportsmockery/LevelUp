@@ -101,15 +101,105 @@ Browser -> levelupwrestlingapp.com/hs/loop (Vercel)
       -> YOLO + SAM + ResNet18 inference on Colab GPU
 ```
 
-### Colab Setup Process
+### Colab Setup Process (HS Process)
 
-The Python server runs on Colab because it needs GPU for YOLO/SAM inference. The notebook is at `python/colab_server.ipynb`. Steps:
+When the user says "do the HS process" or "start HS", follow these exact steps. The notebook at `python/colab_server.ipynb` may not load from GitHub — if so, use a blank Colab notebook and run these cells manually.
 
-1. **Cell 1** — Clone repo + install deps (`ultralytics`, `fastapi`, `segment-anything`, `pyngrok`)
-2. **Cell 2** — Download SAM model (auto from Meta), check for YOLO model (`yolov12s_010826.pt` — must be uploaded manually, 18MB)
-3. **Cell 3** — Set `ROBOFLOW_API_KEY` (writes `.env.local` so server reads it) + fetch datasets
-4. **Cell 4** — Start ngrok tunnel (requires `NGROK_AUTH_TOKEN`) — outputs a public URL
-5. **Cell 5** — Start FastAPI server on port 8100
+**IMPORTANT**: Tell the user to open https://colab.research.google.com/#create=true and run these cells one at a time. Give them the code blocks to copy-paste.
+
+**Cell 1 — Clone + Install:**
+```python
+from google.colab import drive
+drive.mount('/content/drive')
+
+import os
+if os.path.exists('/content/levelup'):
+    !cd /content/levelup && git pull origin main
+else:
+    !git clone https://github.com/sportsmockery/LevelUp.git /content/levelup
+
+%cd /content/levelup/python
+
+!pip install -q ultralytics fastapi uvicorn python-multipart Pillow pyngrok torch torchvision opencv-python-headless roboflow
+!pip install -q git+https://github.com/facebookresearch/segment-anything.git
+
+print('Done — Dependencies installed, Drive mounted')
+```
+
+**Cell 2 — Restore Models from Drive:**
+```python
+import os, pathlib, shutil
+
+MODEL_DIR = pathlib.Path('/content/levelup/python')
+GDRIVE_HS = pathlib.Path('/content/drive/MyDrive/hs_models')
+
+for src_name, dst_name in [('sam_vit_b_01ec64.pth', 'sam_vit_b_01ec64.pth'), ('yolov12s_010826.pt', 'yolov12s_010826.pt'), ('detector_best.pt', 'runs/detect/contacts_detector_v1/weights/best.pt'), ('classifier_best.pt', 'runs/classify/contacts_classifier_v1/best.pt')]:
+    src = GDRIVE_HS / src_name
+    dst = MODEL_DIR / dst_name
+    if src.exists() and not dst.exists():
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(str(src), str(dst))
+        print(f'Restored: {dst_name} ({src.stat().st_size / 1e6:.1f} MB)')
+    elif dst.exists():
+        print(f'Already exists: {dst_name}')
+    else:
+        print(f'Not found on Drive: {src_name}')
+
+for d in ['data/raw/train/images', 'data/labeling_queue', 'data/truth_engine', 'runs']:
+    pathlib.Path(f'/content/levelup/python/{d}').mkdir(parents=True, exist_ok=True)
+print('Data directories created')
+```
+
+**Cell 3 — API Key:**
+```python
+import os, pathlib
+os.environ['ROBOFLOW_API_KEY'] = 'jrDusJN0hjbLzL1G5SrW'
+pathlib.Path('/content/levelup/.env.local').write_text('ROBOFLOW_API_KEY=jrDusJN0hjbLzL1G5SrW\n')
+print('Key set')
+```
+
+**Cell 4 — Ngrok Tunnel:**
+```python
+from pyngrok import ngrok
+ngrok.set_auth_token('USER_NGROK_TOKEN')  # Ask user for their token
+public_url = ngrok.connect(8100, 'http')
+print(f'URL: {public_url}')
+```
+After this cell runs, check if the ngrok URL changed. If it did, update Vercel:
+```bash
+vercel env rm HS_DETECTION_URL production --yes
+echo "NEW_URL" | vercel env add HS_DETECTION_URL production
+npm run build-deploy
+```
+
+**Cell 5 — Start Server:**
+```python
+import os
+os.environ['PYTHONPATH'] = '/content/levelup/python'
+!cd /content/levelup/python && python -m uvicorn server:app --host 0.0.0.0 --port 8100
+```
+
+After server starts, go to `levelupwrestlingapp.com/hs/loop` and click Start. Or start loop from a new Colab cell:
+```python
+import requests
+requests.post('http://localhost:8100/loop/start', json={"source_dir":"data/raw/train/images","interval_seconds":120,"detector_confidence":0.25,"auto_fetch_datasets":False})
+```
+
+### Restarting the Server (Code Updates)
+
+When code is pushed to GitHub and needs to take effect on Colab:
+1. Stop server cell (Cell 5)
+2. Run: `!cd /content/levelup && git pull origin main`
+3. Restart Cell 4 (ngrok) — **MUST restart ngrok BEFORE server**
+4. Restart Cell 5 (server)
+5. If ngrok URL changed, update Vercel env var and redeploy
+
+### Key Rule: Cells stall when server is running
+
+Colab can only run one cell at a time. The server cell (Cell 5) blocks. To run other code:
+- Stop the server cell first, OR
+- Use `!python /content/some_script.py` in a cell BEFORE starting the server, OR
+- Use `requests.post('http://localhost:8100/...')` from a new cell (this works because it talks to the server over HTTP, not the Python kernel)
 
 ### Ngrok Tunnel Management (CRITICAL)
 
