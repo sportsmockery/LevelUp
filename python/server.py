@@ -847,21 +847,31 @@ async def rotation_analysis(
     from broken_contacts.rotation_analyzer import contour_centroid as _centroid
 
     for box, cls in zip(result.boxes.xyxy.cpu().numpy(), result.boxes.cls.cpu().numpy()):
-        masks, _, _ = sam_pred.predict(box=box, multimask_output=False)
-        if masks is None or len(masks) == 0:
-            continue
-        mask = masks[0].astype(np.uint8)
-        if mask.sum() == 0:
-            continue
+        contour = None
+        centroid = None
 
-        contours, _ = _cv2.findContours(mask, _cv2.RETR_EXTERNAL, _cv2.CHAIN_APPROX_SIMPLE)
-        contours = [c for c in contours if len(c) >= 5]
-        if not contours:
-            continue
-        contour = max(contours, key=_cv2.contourArea)
-        centroid = _centroid(contour)
-        if centroid is None:
-            continue
+        # Try SAM segmentation first
+        try:
+            masks, _, _ = sam_pred.predict(box=box, multimask_output=False)
+            if masks is not None and len(masks) > 0:
+                mask = masks[0].astype(np.uint8)
+                if mask.sum() > 0:
+                    contours_found, _ = _cv2.findContours(mask, _cv2.RETR_EXTERNAL, _cv2.CHAIN_APPROX_SIMPLE)
+                    contours_found = [c for c in contours_found if len(c) >= 5]
+                    if contours_found:
+                        contour = max(contours_found, key=_cv2.contourArea)
+                        centroid = _centroid(contour)
+        except Exception:
+            pass
+
+        # Fallback: use bounding box as contour if SAM failed
+        if contour is None or centroid is None:
+            x1, y1, x2, y2 = box
+            contour = np.array([
+                [x1, y1], [x2, y1], [x2, y2], [x1, y2],
+                [x1, y1],  # close the contour
+            ], dtype=np.float32)
+            centroid = np.array([(x1 + x2) / 2, (y1 + y2) / 2], dtype=np.float32)
 
         teeth_data.append({
             "contour": contour.reshape(-1, 2),

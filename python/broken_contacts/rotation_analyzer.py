@@ -228,10 +228,10 @@ def compute_tooth_rotation(tooth: dict, coeffs: np.ndarray, all_teeth: Optional[
     is_frontal_rotated = frontal_signals >= 2  # 2 of 3 frontal indicators agree
 
     # Pick best angle estimate
-    if incisal_angle_deg is not None and incisal_angle_deg <= 60 and incisal_angle_deg > 5:
+    if incisal_angle_deg is not None and 5 < incisal_angle_deg <= 90:
         angle = incisal_angle_deg
         method = "incisal"
-    elif pca_angle_deg <= 60 and pca_angle_deg > 5:
+    elif 5 < pca_angle_deg <= 90:
         angle = pca_angle_deg
         method = "pca"
     elif is_frontal_rotated:
