@@ -62,7 +62,14 @@ export default function Home() {
         <p>He's on fire! The ultimate arcade basketball classic</p>
 
         <div style={styles.gameContainer}>
-          <EmulatorGame gameUrl={NBA_JAM_URL} core="snes" extraConfig={NBA_JAM_CONFIG} />
+          <iframe
+            src="https://www.retrogames.cc/embed/23562-nba-jam-usa.html"
+            width="100%"
+            height="700"
+            frameBorder="0"
+            allowFullScreen
+            style={{ border: "none" }}
+          ></iframe>
         </div>
 
         <div style={styles.controls}>
@@ -121,7 +128,14 @@ export default function Home() {
         <p>The classic NES football game — play it right here</p>
 
         <div style={styles.gameContainer}>
-          <EmulatorGame gameUrl="https://www.free80sarcade.com/vnes_roms/Tecmo%20Super%20Bowl.nes" core="nes" />
+          <iframe
+            src="https://www.retrogames.cc/embed/17639-tecmo-super-bowl-usa.html"
+            width="100%"
+            height="700"
+            frameBorder="0"
+            allowFullScreen
+            style={{ border: "none" }}
+          ></iframe>
         </div>
 
         <div style={styles.controls}>
