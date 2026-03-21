@@ -28,16 +28,7 @@ function EmulatorGame({ gameUrl, core, extraConfig }: { gameUrl: string; core: s
   );
 }
 
-// NBA Jam SNES ROM URL
-const NBA_JAM_URL = "https://arcadespot.com/wp-content/uploads/2026/03/nba-jam.smc";
-// Auto-turbo: R shoulder = turbo toggle (tap once to lock on, tap to release)
-// Bigger virtual gamepad buttons for easier mobile play
 const NBA_JAM_CONFIG = `
-  EJS_defaultOptions = {
-    "shader": "disabled",
-    "button-a-turbo": true,
-    "button-b-turbo": false
-  };
   EJS_color = "#1e40af";
   EJS_VirtualGamepadSettings = [
     {"type":"zone","location":"left","inputValues":[16,17,18,19]},
@@ -45,6 +36,17 @@ const NBA_JAM_CONFIG = `
     {"type":"button","location":"right","inputValues":[8],"label":"PASS","fontSize":10},
     {"type":"button","location":"right","inputValues":[9],"label":"TURBO","fontSize":9},
     {"type":"button","location":"center","inputValues":[3],"label":"START","fontSize":9}
+  ];
+`;
+
+const TECMO_CONFIG = `
+  EJS_color = "#065f46";
+  EJS_VirtualGamepadSettings = [
+    {"type":"zone","location":"left","inputValues":[16,17,18,19]},
+    {"type":"button","location":"right","inputValues":[0],"label":"A","fontSize":12},
+    {"type":"button","location":"right","inputValues":[8],"label":"B","fontSize":12},
+    {"type":"button","location":"center","inputValues":[3],"label":"START","fontSize":9},
+    {"type":"button","location":"center","inputValues":[2],"label":"SELECT","fontSize":8}
   ];
 `;
 
@@ -61,17 +63,6 @@ export default function Home() {
         <h2>🏀 NBA Jam</h2>
         <p>He's on fire! The ultimate arcade basketball classic</p>
 
-        <div style={styles.gameContainer}>
-          <iframe
-            src="https://www.retrogames.cc/embed/23562-nba-jam-usa.html"
-            width="100%"
-            height="700"
-            frameBorder="0"
-            allowFullScreen
-            style={{ border: "none" }}
-          ></iframe>
-        </div>
-
         <div style={styles.controls}>
           <h3 style={styles.controlsTitle}>📱 Touch Controls</h3>
           <div style={styles.controlsGrid}>
@@ -81,19 +72,19 @@ export default function Home() {
             </div>
             <div style={styles.controlGroup}>
               <span style={styles.controlLabel}>SHOOT</span>
-              <span style={styles.controlKey}>Tap SHOOT button</span>
+              <span style={styles.controlKey}>Tap SHOOT</span>
             </div>
             <div style={styles.controlGroup}>
               <span style={styles.controlLabel}>PASS</span>
-              <span style={styles.controlKey}>Tap PASS button</span>
+              <span style={styles.controlKey}>Tap PASS</span>
             </div>
             <div style={styles.controlGroup}>
               <span style={styles.controlLabel}>TURBO</span>
-              <span style={styles.controlKey}>Tap to toggle on/off</span>
+              <span style={styles.controlKey}>Tap TURBO</span>
             </div>
           </div>
           <p style={styles.mobileNote}>
-            Turbo is a toggle — tap once to activate, tap again to turn off. No need to hold it! Rotate to landscape.
+            Rotate to landscape for best experience.
           </p>
 
           <h3 style={{ ...styles.controlsTitle, marginTop: "12px" }}>🖥️ Keyboard Controls</h3>
@@ -112,13 +103,17 @@ export default function Home() {
             </div>
             <div style={styles.controlGroup}>
               <span style={styles.controlLabel}>Turbo</span>
-              <span style={styles.controlKey}>A (auto-turbo)</span>
+              <span style={styles.controlKey}>A</span>
             </div>
             <div style={styles.controlGroup}>
               <span style={styles.controlLabel}>Start</span>
               <span style={styles.controlKey}>Enter</span>
             </div>
           </div>
+        </div>
+
+        <div style={styles.gameContainer}>
+          <EmulatorGame gameUrl="/api/games/rom?game=nba-jam" core="snes" extraConfig={NBA_JAM_CONFIG} />
         </div>
       </section>
 
@@ -127,35 +122,28 @@ export default function Home() {
         <h2>🏈 Tecmo Super Bowl</h2>
         <p>The classic NES football game — play it right here</p>
 
-        <div style={styles.gameContainer}>
-          <iframe
-            src="https://www.retrogames.cc/embed/17639-tecmo-super-bowl-usa.html"
-            width="100%"
-            height="700"
-            frameBorder="0"
-            allowFullScreen
-            style={{ border: "none" }}
-          ></iframe>
-        </div>
-
         <div style={styles.controls}>
           <h3 style={styles.controlsTitle}>📱 Touch Controls</h3>
           <div style={styles.controlsGrid}>
             <div style={styles.controlGroup}>
               <span style={styles.controlLabel}>D-Pad</span>
-              <span style={styles.controlKey}>On-screen D-Pad</span>
+              <span style={styles.controlKey}>Left joystick zone</span>
             </div>
             <div style={styles.controlGroup}>
-              <span style={styles.controlLabel}>A / B</span>
-              <span style={styles.controlKey}>On-screen buttons</span>
+              <span style={styles.controlLabel}>A</span>
+              <span style={styles.controlKey}>Tap A button</span>
+            </div>
+            <div style={styles.controlGroup}>
+              <span style={styles.controlLabel}>B</span>
+              <span style={styles.controlKey}>Tap B button</span>
             </div>
             <div style={styles.controlGroup}>
               <span style={styles.controlLabel}>Start</span>
-              <span style={styles.controlKey}>On-screen Start</span>
+              <span style={styles.controlKey}>Tap START</span>
             </div>
           </div>
           <p style={styles.mobileNote}>
-            Virtual gamepad appears automatically on touch devices. Rotate to landscape for best experience.
+            Rotate to landscape for best experience.
           </p>
 
           <h3 style={{ ...styles.controlsTitle, marginTop: "12px" }}>🖥️ Keyboard Controls</h3>
@@ -182,22 +170,16 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        <div style={styles.gameContainer}>
+          <EmulatorGame gameUrl="/api/games/rom?game=tecmo-super-bowl" core="nes" extraConfig={TECMO_CONFIG} />
+        </div>
       </section>
 
       {/* Game Section — Drive Mad */}
       <section style={styles.section}>
         <h2>🚗 Drive Mad</h2>
         <p>Navigate crazy tracks without flipping your ride</p>
-
-        <div style={styles.gameContainer}>
-          <iframe
-            src="https://ubg77.github.io/game131022/drive-mad/"
-            width="100%"
-            height="700"
-            frameBorder="0"
-            allowFullScreen
-          ></iframe>
-        </div>
 
         <div style={styles.controls}>
           <h3 style={styles.controlsTitle}>📱 Touch Controls</h3>
@@ -212,7 +194,7 @@ export default function Home() {
             </div>
           </div>
           <p style={styles.mobileNote}>
-            Built for touch — just tap the game and play. Works great on iPhone.
+            Built for touch — just tap the game and play.
           </p>
 
           <h3 style={{ ...styles.controlsTitle, marginTop: "12px" }}>🖥️ Keyboard Controls</h3>
@@ -235,12 +217,26 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        <div style={styles.gameContainer}>
+          <iframe
+            src="https://ubg77.github.io/game131022/drive-mad/"
+            width="100%"
+            height="700"
+            frameBorder="0"
+            allowFullScreen
+          ></iframe>
+        </div>
       </section>
 
       {/* Game Section 1 */}
       <section style={styles.section}>
         <h2>⚡ Reaction Trainer</h2>
         <p>Boost your reflexes and focus speed</p>
+
+        <div style={styles.controls}>
+          <p style={styles.mobileNote}>📱 Tap to play — fully touch compatible</p>
+        </div>
 
         <div style={styles.gameContainer}>
           <iframe
@@ -251,16 +247,16 @@ export default function Home() {
             allowFullScreen
           ></iframe>
         </div>
-
-        <div style={styles.controls}>
-          <p style={styles.mobileNote}>📱 Tap to play — fully touch compatible</p>
-        </div>
       </section>
 
       {/* Game Section 2 */}
       <section style={styles.section}>
         <h2>🚀 Physics Launcher Lab</h2>
         <p>Learn motion and timing through gameplay</p>
+
+        <div style={styles.controls}>
+          <p style={styles.mobileNote}>📱 Tap to play — fully touch compatible</p>
+        </div>
 
         <div style={styles.gameContainer}>
           <iframe
@@ -271,16 +267,16 @@ export default function Home() {
             allowFullScreen
           ></iframe>
         </div>
-
-        <div style={styles.controls}>
-          <p style={styles.mobileNote}>📱 Tap to play — fully touch compatible</p>
-        </div>
       </section>
 
       {/* Game Section 3 */}
       <section style={styles.section}>
         <h2>🧠 Strategy Builder</h2>
         <p>Practice decision making and upgrades</p>
+
+        <div style={styles.controls}>
+          <p style={styles.mobileNote}>📱 Tap to play — fully touch compatible</p>
+        </div>
 
         <div style={styles.gameContainer}>
           <iframe
@@ -290,10 +286,6 @@ export default function Home() {
             frameBorder="0"
             allowFullScreen
           ></iframe>
-        </div>
-
-        <div style={styles.controls}>
-          <p style={styles.mobileNote}>📱 Tap to play — fully touch compatible</p>
         </div>
       </section>
 
