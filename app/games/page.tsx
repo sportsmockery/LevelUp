@@ -1,5 +1,32 @@
 "use client";
 
+function EmulatorGame({ gameUrl, core }: { gameUrl: string; core: string }) {
+  const html = `<!DOCTYPE html>
+<html><head><style>body{margin:0;overflow:hidden;background:#000}#game{width:100%;height:100%}</style></head>
+<body><div id="game"></div>
+<script>
+  EJS_player="#game";
+  EJS_gameUrl="${gameUrl}";
+  EJS_core="${core}";
+  EJS_pathtodata="https://cdn.emulatorjs.org/stable/data/";
+  EJS_startOnLoaded=true;
+</script>
+<script src="https://cdn.emulatorjs.org/stable/data/loader.js"></script>
+</body></html>`;
+
+  return (
+    <iframe
+      srcDoc={html}
+      width="100%"
+      height="700"
+      frameBorder="0"
+      allowFullScreen
+      style={{ border: "none" }}
+      allow="cross-origin-isolated"
+    />
+  );
+}
+
 export default function Home() {
   return (
     <main style={styles.main}>
@@ -14,13 +41,7 @@ export default function Home() {
         <p>He's on fire! The ultimate arcade basketball classic</p>
 
         <div style={styles.gameContainer}>
-          <iframe
-            src="https://arcadespot.com/game/nba-jam/"
-            width="100%"
-            height="700"
-            frameBorder="0"
-            allowFullScreen
-          ></iframe>
+          <EmulatorGame gameUrl="https://arcadespot.com/wp-content/uploads/2026/03/nba-jam.smc" core="snes" />
         </div>
 
         <div style={styles.controls}>
@@ -28,15 +49,15 @@ export default function Home() {
           <div style={styles.controlsGrid}>
             <div style={styles.controlGroup}>
               <span style={styles.controlLabel}>Move</span>
-              <span style={styles.controlKey}>Swipe / on-screen D-Pad</span>
+              <span style={styles.controlKey}>On-screen D-Pad</span>
             </div>
             <div style={styles.controlGroup}>
               <span style={styles.controlLabel}>Shoot / Block</span>
-              <span style={styles.controlKey}>Tap on-screen buttons</span>
+              <span style={styles.controlKey}>On-screen buttons</span>
             </div>
             <div style={styles.controlGroup}>
               <span style={styles.controlLabel}>Pass / Steal</span>
-              <span style={styles.controlKey}>Tap on-screen buttons</span>
+              <span style={styles.controlKey}>On-screen buttons</span>
             </div>
             <div style={styles.controlGroup}>
               <span style={styles.controlLabel}>Turbo</span>
@@ -44,7 +65,7 @@ export default function Home() {
             </div>
           </div>
           <p style={styles.mobileNote}>
-            Tap the game area first to activate. Rotate phone to landscape for best experience.
+            Virtual gamepad appears automatically on touch devices. Rotate to landscape for best experience.
           </p>
 
           <h3 style={{ ...styles.controlsTitle, marginTop: "12px" }}>🖥️ Keyboard Controls</h3>
@@ -83,13 +104,7 @@ export default function Home() {
         <p>The classic NES football game — play it right here</p>
 
         <div style={styles.gameContainer}>
-          <iframe
-            src="https://www.free80sarcade.com/nesonline_TecmoSuperBowl.php"
-            width="100%"
-            height="700"
-            frameBorder="0"
-            allowFullScreen
-          ></iframe>
+          <EmulatorGame gameUrl="https://www.free80sarcade.com/vnes_roms/Tecmo%20Super%20Bowl.nes" core="nes" />
         </div>
 
         <div style={styles.controls}>
@@ -97,19 +112,19 @@ export default function Home() {
           <div style={styles.controlsGrid}>
             <div style={styles.controlGroup}>
               <span style={styles.controlLabel}>D-Pad</span>
-              <span style={styles.controlKey}>Swipe to move</span>
+              <span style={styles.controlKey}>On-screen D-Pad</span>
             </div>
             <div style={styles.controlGroup}>
               <span style={styles.controlLabel}>A / B</span>
-              <span style={styles.controlKey}>Tap on-screen buttons</span>
+              <span style={styles.controlKey}>On-screen buttons</span>
             </div>
             <div style={styles.controlGroup}>
               <span style={styles.controlLabel}>Start</span>
-              <span style={styles.controlKey}>Tap START on screen</span>
+              <span style={styles.controlKey}>On-screen Start</span>
             </div>
           </div>
           <p style={styles.mobileNote}>
-            Tap the game area first to activate controls. Rotate phone to landscape for best experience.
+            Virtual gamepad appears automatically on touch devices. Rotate to landscape for best experience.
           </p>
 
           <h3 style={{ ...styles.controlsTitle, marginTop: "12px" }}>🖥️ Keyboard Controls</h3>
@@ -145,7 +160,7 @@ export default function Home() {
 
         <div style={styles.gameContainer}>
           <iframe
-            src="https://play.fancade.com/63B7EE5E6FE50B8E3Fkeyy8valuedefault/"
+            src="https://ubg77.github.io/game131022/drive-mad/"
             width="100%"
             height="700"
             frameBorder="0"
