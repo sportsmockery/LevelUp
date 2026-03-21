@@ -6,6 +6,38 @@ export default function Home() {
         Improve your skills while having fun
       </p>
 
+      {/* Game Section 0 — Tecmo Super Bowl */}
+      <section style={styles.section}>
+        <h2>🏈 Tecmo Super Bowl</h2>
+        <p>The classic NES football game — play it right here</p>
+
+        <div style={styles.gameContainer}>
+          <iframe
+            src="https://www.free80sarcade.com/tecmosuperbowl.php"
+            width="100%"
+            height="700"
+            frameBorder="0"
+            allowFullScreen
+          ></iframe>
+        </div>
+      </section>
+
+      {/* Game Section — Drive Mad */}
+      <section style={styles.section}>
+        <h2>🚗 Drive Mad</h2>
+        <p>Navigate crazy tracks without flipping your ride</p>
+
+        <div style={styles.gameContainer}>
+          <iframe
+            src="https://www.y8.com/embed/drive-mad"
+            width="100%"
+            height="700"
+            frameBorder="0"
+            allowFullScreen
+          ></iframe>
+        </div>
+      </section>
+
       {/* Game Section 1 */}
       <section style={styles.section}>
         <h2>⚡ Reaction Trainer</h2>
