@@ -30,7 +30,7 @@ function EmulatorGame({ gameUrl, core }: { gameUrl: string; core: string }) {
 export default function Home() {
   return (
     <main style={styles.main}>
-      <h1 style={styles.title}>🎮 Brain Arcade</h1>
+      <h1 style={styles.title}>🎮 Carter's Brain Arcade</h1>
       <p style={styles.subtitle}>
         Improve your skills while having fun
       </p>
@@ -41,7 +41,14 @@ export default function Home() {
         <p>He's on fire! The ultimate arcade basketball classic</p>
 
         <div style={styles.gameContainer}>
-          <EmulatorGame gameUrl="https://arcadespot.com/wp-content/uploads/2026/03/nba-jam.smc" core="snes" />
+          <iframe
+            src="https://www.retrogames.cc/embed/23562-nba-jam-usa.html"
+            width="100%"
+            height="700"
+            frameBorder="0"
+            allowFullScreen
+            style={{ border: "none" }}
+          ></iframe>
         </div>
 
         <div style={styles.controls}>
