@@ -8,6 +8,75 @@ export default function Home() {
         Improve your skills while having fun
       </p>
 
+      {/* Game Section — NBA Jam */}
+      <section style={styles.section}>
+        <h2>🏀 NBA Jam</h2>
+        <p>He's on fire! The ultimate arcade basketball classic</p>
+
+        <div style={styles.gameContainer}>
+          <iframe
+            src="https://arcadespot.com/game/nba-jam/"
+            width="100%"
+            height="700"
+            frameBorder="0"
+            allowFullScreen
+          ></iframe>
+        </div>
+
+        <div style={styles.controls}>
+          <h3 style={styles.controlsTitle}>📱 Touch Controls</h3>
+          <div style={styles.controlsGrid}>
+            <div style={styles.controlGroup}>
+              <span style={styles.controlLabel}>Move</span>
+              <span style={styles.controlKey}>Swipe / on-screen D-Pad</span>
+            </div>
+            <div style={styles.controlGroup}>
+              <span style={styles.controlLabel}>Shoot / Block</span>
+              <span style={styles.controlKey}>Tap on-screen buttons</span>
+            </div>
+            <div style={styles.controlGroup}>
+              <span style={styles.controlLabel}>Pass / Steal</span>
+              <span style={styles.controlKey}>Tap on-screen buttons</span>
+            </div>
+            <div style={styles.controlGroup}>
+              <span style={styles.controlLabel}>Turbo</span>
+              <span style={styles.controlKey}>Hold turbo button</span>
+            </div>
+          </div>
+          <p style={styles.mobileNote}>
+            Tap the game area first to activate. Rotate phone to landscape for best experience.
+          </p>
+
+          <h3 style={{ ...styles.controlsTitle, marginTop: "12px" }}>🖥️ Keyboard Controls</h3>
+          <div style={styles.controlsGrid}>
+            <div style={styles.controlGroup}>
+              <span style={styles.controlLabel}>Move</span>
+              <span style={styles.controlKey}>Arrow Keys</span>
+            </div>
+            <div style={styles.controlGroup}>
+              <span style={styles.controlLabel}>Shoot / Block</span>
+              <span style={styles.controlKey}>Z</span>
+            </div>
+            <div style={styles.controlGroup}>
+              <span style={styles.controlLabel}>Pass / Steal</span>
+              <span style={styles.controlKey}>X</span>
+            </div>
+            <div style={styles.controlGroup}>
+              <span style={styles.controlLabel}>Turbo</span>
+              <span style={styles.controlKey}>C</span>
+            </div>
+            <div style={styles.controlGroup}>
+              <span style={styles.controlLabel}>Start</span>
+              <span style={styles.controlKey}>Enter</span>
+            </div>
+            <div style={styles.controlGroup}>
+              <span style={styles.controlLabel}>Insert Coin</span>
+              <span style={styles.controlKey}>5</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Game Section 0 — Tecmo Super Bowl */}
       <section style={styles.section}>
         <h2>🏈 Tecmo Super Bowl</h2>
