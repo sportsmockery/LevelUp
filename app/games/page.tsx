@@ -1,6 +1,6 @@
 "use client";
 
-function EmulatorGame({ gameUrl, core }: { gameUrl: string; core: string }) {
+function EmulatorGame({ gameUrl, core, extraConfig }: { gameUrl: string; core: string; extraConfig?: string }) {
   const html = `<!DOCTYPE html>
 <html><head><style>body{margin:0;overflow:hidden;background:#000}#game{width:100%;height:100%}</style></head>
 <body><div id="game"></div>
@@ -10,6 +10,7 @@ function EmulatorGame({ gameUrl, core }: { gameUrl: string; core: string }) {
   EJS_core="${core}";
   EJS_pathtodata="https://cdn.emulatorjs.org/stable/data/";
   EJS_startOnLoaded=true;
+  ${extraConfig || ""}
 </script>
 <script src="https://cdn.emulatorjs.org/stable/data/loader.js"></script>
 </body></html>`;
@@ -27,6 +28,26 @@ function EmulatorGame({ gameUrl, core }: { gameUrl: string; core: string }) {
   );
 }
 
+// NBA Jam SNES ROM URL
+const NBA_JAM_URL = "https://arcadespot.com/wp-content/uploads/2026/03/nba-jam.smc";
+// Auto-turbo: R shoulder = turbo toggle (tap once to lock on, tap to release)
+// Bigger virtual gamepad buttons for easier mobile play
+const NBA_JAM_CONFIG = `
+  EJS_defaultOptions = {
+    "shader": "disabled",
+    "button-a-turbo": true,
+    "button-b-turbo": false
+  };
+  EJS_color = "#1e40af";
+  EJS_VirtualGamepadSettings = [
+    {"type":"zone","location":"left","inputValues":[16,17,18,19]},
+    {"type":"button","location":"right","inputValues":[0],"label":"SHOOT","fontSize":10},
+    {"type":"button","location":"right","inputValues":[8],"label":"PASS","fontSize":10},
+    {"type":"button","location":"right","inputValues":[9],"label":"TURBO","fontSize":9},
+    {"type":"button","location":"center","inputValues":[3],"label":"START","fontSize":9}
+  ];
+`;
+
 export default function Home() {
   return (
     <main style={styles.main}>
@@ -41,14 +62,7 @@ export default function Home() {
         <p>He's on fire! The ultimate arcade basketball classic</p>
 
         <div style={styles.gameContainer}>
-          <iframe
-            src="https://www.retrogames.cc/embed/23562-nba-jam-usa.html"
-            width="100%"
-            height="700"
-            frameBorder="0"
-            allowFullScreen
-            style={{ border: "none" }}
-          ></iframe>
+          <EmulatorGame gameUrl={NBA_JAM_URL} core="snes" extraConfig={NBA_JAM_CONFIG} />
         </div>
 
         <div style={styles.controls}>
@@ -56,23 +70,23 @@ export default function Home() {
           <div style={styles.controlsGrid}>
             <div style={styles.controlGroup}>
               <span style={styles.controlLabel}>Move</span>
-              <span style={styles.controlKey}>On-screen D-Pad</span>
+              <span style={styles.controlKey}>Left joystick zone</span>
             </div>
             <div style={styles.controlGroup}>
-              <span style={styles.controlLabel}>Shoot / Block</span>
-              <span style={styles.controlKey}>On-screen buttons</span>
+              <span style={styles.controlLabel}>SHOOT</span>
+              <span style={styles.controlKey}>Tap SHOOT button</span>
             </div>
             <div style={styles.controlGroup}>
-              <span style={styles.controlLabel}>Pass / Steal</span>
-              <span style={styles.controlKey}>On-screen buttons</span>
+              <span style={styles.controlLabel}>PASS</span>
+              <span style={styles.controlKey}>Tap PASS button</span>
             </div>
             <div style={styles.controlGroup}>
-              <span style={styles.controlLabel}>Turbo</span>
-              <span style={styles.controlKey}>Hold turbo button</span>
+              <span style={styles.controlLabel}>TURBO</span>
+              <span style={styles.controlKey}>Tap to toggle on/off</span>
             </div>
           </div>
           <p style={styles.mobileNote}>
-            Virtual gamepad appears automatically on touch devices. Rotate to landscape for best experience.
+            Turbo is a toggle — tap once to activate, tap again to turn off. No need to hold it! Rotate to landscape.
           </p>
 
           <h3 style={{ ...styles.controlsTitle, marginTop: "12px" }}>🖥️ Keyboard Controls</h3>
@@ -91,15 +105,11 @@ export default function Home() {
             </div>
             <div style={styles.controlGroup}>
               <span style={styles.controlLabel}>Turbo</span>
-              <span style={styles.controlKey}>C</span>
+              <span style={styles.controlKey}>A (auto-turbo)</span>
             </div>
             <div style={styles.controlGroup}>
               <span style={styles.controlLabel}>Start</span>
               <span style={styles.controlKey}>Enter</span>
-            </div>
-            <div style={styles.controlGroup}>
-              <span style={styles.controlLabel}>Insert Coin</span>
-              <span style={styles.controlKey}>5</span>
             </div>
           </div>
         </div>
