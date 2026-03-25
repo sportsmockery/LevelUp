@@ -1,8 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 type ControlEntry = { label: string; key: string };
+
+type EmulatorConfig = {
+  romParam: string;
+  core: string;
+  color: string;
+  virtualGamepad: Record<string, unknown>[];
+};
 
 type Game = {
   id: string;
@@ -12,8 +19,9 @@ type Game = {
   touchControls: ControlEntry[];
   keyboardControls: ControlEntry[];
   touchNote: string;
-  iframeType: 'srcDoc' | 'src';
+  iframeType: 'src' | 'emulator';
   iframeSrc: string;
+  emulatorConfig?: EmulatorConfig;
   iframeHeight: { mobile: number; desktop: number };
 };
 
@@ -37,27 +45,20 @@ const games: Game[] = [
       { label: 'Start', key: 'Enter' },
     ],
     touchNote: 'Rotate to landscape for best experience.',
-    iframeType: 'srcDoc',
-    iframeSrc: `<!DOCTYPE html>
-<html><head><style>body{margin:0;overflow:hidden;background:#000}#game{width:100%;height:100%}</style></head>
-<body><div id="game"></div>
-<script>
-  EJS_player="#game";
-  EJS_gameUrl="/api/games/rom?game=nba-jam";
-  EJS_core="snes";
-  EJS_pathtodata="https://cdn.emulatorjs.org/stable/data/";
-  EJS_startOnLoaded=true;
-  EJS_color = "#1e40af";
-  EJS_VirtualGamepadSettings = [
-    {"type":"zone","location":"left","inputValues":[16,17,18,19]},
-    {"type":"button","location":"right","inputValues":[0],"label":"SHOOT","fontSize":10},
-    {"type":"button","location":"right","inputValues":[8],"label":"PASS","fontSize":10},
-    {"type":"button","location":"right","inputValues":[9],"label":"TURBO","fontSize":9},
-    {"type":"button","location":"center","inputValues":[3],"label":"START","fontSize":9}
-  ];
-<\/script>
-<script src="https://cdn.emulatorjs.org/stable/data/loader.js"><\/script>
-</body></html>`,
+    iframeType: 'emulator',
+    iframeSrc: '',
+    emulatorConfig: {
+      romParam: 'nba-jam',
+      core: 'snes',
+      color: '#1e40af',
+      virtualGamepad: [
+        { type: 'zone', location: 'left', inputValues: [16, 17, 18, 19] },
+        { type: 'button', location: 'right', inputValues: [0], label: 'SHOOT', fontSize: 10 },
+        { type: 'button', location: 'right', inputValues: [8], label: 'PASS', fontSize: 10 },
+        { type: 'button', location: 'right', inputValues: [9], label: 'TURBO', fontSize: 9 },
+        { type: 'button', location: 'center', inputValues: [3], label: 'START', fontSize: 9 },
+      ],
+    },
     iframeHeight: { mobile: 350, desktop: 700 },
   },
   {
@@ -79,27 +80,20 @@ const games: Game[] = [
       { label: 'Select', key: 'Shift' },
     ],
     touchNote: 'Rotate to landscape for best experience.',
-    iframeType: 'srcDoc',
-    iframeSrc: `<!DOCTYPE html>
-<html><head><style>body{margin:0;overflow:hidden;background:#000}#game{width:100%;height:100%}</style></head>
-<body><div id="game"></div>
-<script>
-  EJS_player="#game";
-  EJS_gameUrl="/api/games/rom?game=tecmo-super-bowl";
-  EJS_core="nes";
-  EJS_pathtodata="https://cdn.emulatorjs.org/stable/data/";
-  EJS_startOnLoaded=true;
-  EJS_color = "#065f46";
-  EJS_VirtualGamepadSettings = [
-    {"type":"zone","location":"left","inputValues":[16,17,18,19]},
-    {"type":"button","location":"right","inputValues":[0],"label":"A","fontSize":12},
-    {"type":"button","location":"right","inputValues":[8],"label":"B","fontSize":12},
-    {"type":"button","location":"center","inputValues":[3],"label":"START","fontSize":9},
-    {"type":"button","location":"center","inputValues":[2],"label":"SELECT","fontSize":8}
-  ];
-<\/script>
-<script src="https://cdn.emulatorjs.org/stable/data/loader.js"><\/script>
-</body></html>`,
+    iframeType: 'emulator',
+    iframeSrc: '',
+    emulatorConfig: {
+      romParam: 'tecmo-super-bowl',
+      core: 'nes',
+      color: '#065f46',
+      virtualGamepad: [
+        { type: 'zone', location: 'left', inputValues: [16, 17, 18, 19] },
+        { type: 'button', location: 'right', inputValues: [0], label: 'A', fontSize: 12 },
+        { type: 'button', location: 'right', inputValues: [8], label: 'B', fontSize: 12 },
+        { type: 'button', location: 'center', inputValues: [3], label: 'START', fontSize: 9 },
+        { type: 'button', location: 'center', inputValues: [2], label: 'SELECT', fontSize: 8 },
+      ],
+    },
     iframeHeight: { mobile: 350, desktop: 700 },
   },
   {
@@ -160,6 +154,64 @@ const games: Game[] = [
   },
 ];
 
+function buildEmulatorSrcDoc(config: EmulatorConfig, romUrl: string): string {
+  return `<!DOCTYPE html>
+<html><head><style>body{margin:0;overflow:hidden;background:#000}#game{width:100%;height:100%}</style></head>
+<body><div id="game"></div>
+<script>
+  EJS_player="#game";
+  EJS_gameUrl="${romUrl}";
+  EJS_core="${config.core}";
+  EJS_pathtodata="https://cdn.emulatorjs.org/stable/data/";
+  EJS_startOnLoaded=true;
+  EJS_color="${config.color}";
+  EJS_VirtualGamepadSettings=${JSON.stringify(config.virtualGamepad)};
+<\/script>
+<script src="https://cdn.emulatorjs.org/stable/data/loader.js"><\/script>
+</body></html>`;
+}
+
+function EmulatorFrame({ config, height }: { config: EmulatorConfig; height: string }) {
+  const [status, setStatus] = useState<'checking' | 'ready' | 'unavailable'>('checking');
+  const romUrl = `/api/games/rom?game=${config.romParam}`;
+
+  useEffect(() => {
+    fetch(romUrl, { method: 'HEAD' }).then(res => {
+      setStatus(res.ok ? 'ready' : 'unavailable');
+    }).catch(() => setStatus('unavailable'));
+  }, [romUrl]);
+
+  if (status === 'checking') {
+    return (
+      <div className="w-full flex items-center justify-center bg-black text-slate-400 text-sm" style={{ height }}>
+        Loading game...
+      </div>
+    );
+  }
+
+  if (status === 'unavailable') {
+    return (
+      <div className="w-full flex flex-col items-center justify-center gap-2 bg-black text-center px-4" style={{ height }}>
+        <span className="text-2xl">🎮</span>
+        <p className="text-slate-400 text-sm">Game ROM not available right now.</p>
+        <p className="text-slate-500 text-xs">Check back soon — the ROM server may be offline.</p>
+      </div>
+    );
+  }
+
+  return (
+    <iframe
+      srcDoc={buildEmulatorSrcDoc(config, romUrl)}
+      className="w-full border-none"
+      style={{ height }}
+      frameBorder={0}
+      allowFullScreen
+      sandbox="allow-scripts allow-same-origin allow-popups"
+      allow="cross-origin-isolated; gamepad"
+    />
+  );
+}
+
 function ControlBadge({ label, keyName }: { label: string; keyName: string }) {
   return (
     <div className="flex items-center gap-1.5 bg-slate-800 px-2.5 py-1.5 rounded-md text-xs sm:text-sm sm:gap-2 sm:px-3">
@@ -199,7 +251,7 @@ function GameCard({ game, isExpanded, onToggle }: { game: Game; isExpanded: bool
       {/* Expanded content */}
       {isExpanded && (
         <div className="px-4 pb-4 sm:px-5 sm:pb-5 space-y-3">
-          {/* Controls - collapsible on mobile */}
+          {/* Controls */}
           {hasControls && (
             <div className="bg-slate-900 rounded-lg p-3 space-y-3 overflow-x-auto">
               {game.touchControls.length > 0 && (
@@ -241,22 +293,20 @@ function GameCard({ game, isExpanded, onToggle }: { game: Game; isExpanded: bool
 
           {/* Game iframe */}
           <div className="rounded-lg overflow-hidden border-2 border-slate-700">
-            {game.iframeType === 'srcDoc' ? (
-              <iframe
-                srcDoc={game.iframeSrc}
-                className="w-full border-none"
-                style={{ height: `min(${game.iframeHeight.mobile}px, 60vh)` }}
-                frameBorder={0}
-                allowFullScreen
-                allow="cross-origin-isolated"
+            {game.iframeType === 'emulator' && game.emulatorConfig ? (
+              <EmulatorFrame
+                config={game.emulatorConfig}
+                height={`clamp(280px, 55vh, ${game.iframeHeight.desktop}px)`}
               />
             ) : (
               <iframe
                 src={game.iframeSrc}
                 className="w-full border-none"
-                style={{ height: `min(${game.iframeHeight.mobile}px, 60vh)` }}
+                style={{ height: `clamp(280px, 55vh, ${game.iframeHeight.desktop}px)` }}
                 frameBorder={0}
                 allowFullScreen
+                sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+                allow="gamepad; autoplay"
               />
             )}
           </div>
@@ -267,7 +317,7 @@ function GameCard({ game, isExpanded, onToggle }: { game: Game; isExpanded: bool
 }
 
 export default function GamesPage() {
-  const [expandedGame, setExpandedGame] = useState<string | null>(null);
+  const [expandedGame, setExpandedGame] = useState<string | null>('nba-jam');
 
   return (
     <main className="min-h-screen bg-[#0f172a] text-white">
