@@ -68,3 +68,4 @@ next-env.d.ts
 /mobile/ios/build
 /mobile/android/.gradle
 /mobile/android/app/build
+qqq_history.json
