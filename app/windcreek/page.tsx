@@ -19,7 +19,7 @@ function Comets() {
     for (let j = 0; j < 8; j++) {
       const a = -20 - 140 * Math.random(), r = (a * Math.PI) / 180, t = 100 + 100 * Math.random();
       const el = document.createElement('div');
-      el.className = 'wc-comet wc-gold';
+      el.className = 'wc-comet wc-comet-gold';
       el.style.cssText = `--dur:${10+12*Math.random()}s;--del:${35*Math.random()}s;--sx:${80*Math.random()}%;--sy:${100*Math.random()}%;--a:${a}deg;--tx:${Math.cos(r)*t}vw;--ty:${Math.sin(r)*t}vh`;
       c.appendChild(el);
     }
@@ -69,203 +69,231 @@ export default function WindCreekPage() {
         <span className="wc-sub">Championship Experience Proposal</span>
       </div>
 
-      {/* ── STORY CONTENT (single column, centered) ──────── */}
+      {/* ── STORY ─────────────────────────────────────────── */}
       <main className="relative z-[1]">
 
         {/* HERO */}
         <section className="wc-hero">
-          <R>
-            <div className="wc-eyebrow">Wind Creek Chicago Southland &middot; Partnership Proposal</div>
-          </R>
-          <R>
-            <h1 className="wc-h1 mt-6 md:mt-8">
-              Turn 3-Night Guests Into Predictable Revenue&mdash;Without&nbsp;Guesswork
-            </h1>
-          </R>
-          <R>
-            <p className="wc-lead mt-5 md:mt-6">
-              We deliver qualified guests worth <strong className="text-white">$900&ndash;$1,200 per stay</strong>, while giving your team the data, automation, and clarity to execute with confidence.
-            </p>
-          </R>
-          <R>
-            <p className="wc-muted mt-3">
-              No more fragmented campaigns. No more unclear ROI. Just measurable, repeatable performance.
-            </p>
-          </R>
+          <R><div className="wc-eyebrow">Wind Creek Chicago Southland &middot; Partnership Proposal</div></R>
+          <R><h1 className="wc-h1 mt-6 md:mt-8">Turn Culture Into Crowds. Turn Crowds Into&nbsp;Revenue.</h1></R>
+          <R><p className="wc-lead mt-5 md:mt-6">A 3-night DJ competition produced by <strong className="text-white">Brand Breakers</strong>, bringing <strong className="text-white">900&ndash;1,200 high-energy attendees</strong> to Wind Creek&mdash;driven by real Chicago demand.</p></R>
+          <R><p className="wc-muted mt-3">Built for turnout. Designed for spend. Measured for results.</p></R>
           <R>
             <div className="flex flex-wrap gap-3 mt-8 md:mt-10 justify-center">
               <a href="#investment" className="wc-cta">See the investment case</a>
-              <a href="#value" className="wc-ghost">Walk the math</a>
+              <a href="#event" className="wc-ghost">Walk the event</a>
             </div>
           </R>
         </section>
 
-        {/* ── SECTION 2: VALUE PER GUEST ──────────────────── */}
-        <section id="value" className="wc-s">
-          <R><div className="wc-pill">Revenue model</div></R>
-          <R><h2 className="wc-h2">Each Guest Is a Revenue Event</h2></R>
+        {/* ── GILES TRAVIS — FEATURED ─────────────────────── */}
+        <section className="wc-s">
+          <R><div className="wc-pill">Produced by</div></R>
+          <R><h2 className="wc-h2">Produced by Giles Travis &mdash; Brand Breakers</h2></R>
+          <R><p className="wc-body mt-1" style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>Founder, Brand Breakers &bull; Chicago Market Operator &bull; Viral Distribution Architect</p></R>
           <R>
-            <p className="wc-body mt-4">
-              Our model focuses on <strong className="text-white">3-night stay guests</strong>, with a proven value range of:
-            </p>
-          </R>
-          <R>
-            <div className="wc-card mt-6 md:mt-8 text-center">
-              <div className="wc-big">$900 &ndash; $1,200</div>
-              <div className="wc-muted mt-2">total value per guest</div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6">
-                <div className="wc-stat-mini">Gaming activity</div>
-                <div className="wc-stat-mini">Food &amp; beverage spend</div>
-                <div className="wc-stat-mini">On-property engagement</div>
+            <div className="grid grid-cols-1 sm:grid-cols-[180px_1fr] gap-5 md:gap-7 mt-6 md:mt-8 items-start">
+              {/* Photo */}
+              <div className="wc-giles-img mx-auto sm:mx-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/giles-travis.jpg" alt="Giles Travis" className="w-full h-full object-cover" />
+                <div className="wc-giles-overlay" />
+              </div>
+              {/* Bio */}
+              <div>
+                <p className="wc-body">Giles Travis, founder of Brand Breakers, specializes in turning cultural momentum into real-world turnout.</p>
+                <p className="wc-body mt-3">Through the rise of &ldquo;Go Home Trav&rdquo; and viral Chicago fan content, he has already proven one thing: <strong className="text-white">he knows how to move people.</strong></p>
+                <p className="wc-body mt-3">This event applies that same system: build attention organically, convert it into attendance, sustain it across multiple nights.</p>
+                <p className="wc-body mt-3">This doesn&rsquo;t start with promotion. <strong className="text-white">It starts with an audience.</strong></p>
               </div>
             </div>
           </R>
           <R>
+            <blockquote className="wc-quote mt-6 md:mt-8" style={{ fontSize: 16 }}>
+              &ldquo;When culture is already moving, the smartest brands don&rsquo;t chase it&mdash;they attach to the people creating it.&rdquo;
+            </blockquote>
+          </R>
+          <R>
+            <div className="wc-card wc-card-accent mt-6 text-center">
+              <p className="text-white font-semibold text-[15px]">This isn&rsquo;t an event being promoted. It&rsquo;s momentum being activated.</p>
+            </div>
+          </R>
+        </section>
+
+        {/* ── THE EVENT ────────────────────────────────────── */}
+        <section id="event" className="wc-s">
+          <R><div className="wc-pill">The event</div></R>
+          <R><h2 className="wc-h2">3 Nights. The City&rsquo;s Best DJs. One Winner.</h2></R>
+          <R><p className="wc-body mt-4">Brand Breakers presents a 3-night DJ competition featuring some of the most talented DJs across Chicago.</p></R>
+          <R><p className="wc-body mt-3">Each night builds momentum&mdash;leading to a final showdown where one DJ wins the grand prize.</p></R>
+          <R><p className="wc-body mt-3">This isn&rsquo;t just entertainment. It&rsquo;s a structured, competitive experience designed to:</p></R>
+          <R>
+            <div className="space-y-3 mt-5">
+              {[
+                ['Drive repeat attendance', 'Fans come back each night to support their DJ.'],
+                ['Keep energy high across all three nights', 'Competition format sustains momentum.'],
+                ['Create a reason to stay, spend, and come back', 'Dwell time drives revenue.'],
+              ].map(([t, d], i) => (
+                <div key={i} className="wc-row"><strong>{t}</strong><span className="wc-muted">{d}</span></div>
+              ))}
+            </div>
+          </R>
+        </section>
+
+        {/* ── ATTENDANCE ──────────────────────────────────── */}
+        <section id="value" className="wc-s">
+          <R><div className="wc-pill">Attendance</div></R>
+          <R><h2 className="wc-h2">900&ndash;1,200 Attendees. Already Within Reach.</h2></R>
+          <R><p className="wc-body mt-4">This event is built to deliver <strong className="text-white">900&ndash;1,200 attendees across three nights</strong>, fueled by:</p></R>
+          <R>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5">
+              <div className="wc-stat-mini">Existing Chicago nightlife demand</div>
+              <div className="wc-stat-mini">Viral cultural momentum</div>
+              <div className="wc-stat-mini">Competitive event structure</div>
+            </div>
+          </R>
+          <R>
             <blockquote className="wc-quote mt-6 md:mt-8">
-              This is not theoretical value&mdash;it aligns with real casino benchmarks for multi-day guests, where extended stays consistently outperform single-day traffic in total yield.
+              This isn&rsquo;t traffic being chased. It&rsquo;s demand being activated.
             </blockquote>
           </R>
         </section>
 
-        {/* ── SECTION 3: SIMPLE MATH ─────────────────────── */}
+        {/* ── REVENUE MODEL ───────────────────────────────── */}
         <section className="wc-s">
-          <R><div className="wc-pill">The math</div></R>
-          <R><h2 className="wc-h2">The Math Is Straightforward</h2></R>
+          <R><div className="wc-pill">Revenue model</div></R>
+          <R><h2 className="wc-h2">Every Attendee Drives Value</h2></R>
+          <R><p className="wc-body mt-4">Casino revenue doesn&rsquo;t come from entry&mdash;it comes from dwell time and spend. Each attendee represents:</p></R>
+          <R>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5">
+              <div className="wc-stat-mini">Food &amp; beverage revenue</div>
+              <div className="wc-stat-mini">Gaming participation</div>
+              <div className="wc-stat-mini">Extended time on property</div>
+            </div>
+          </R>
           <R>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6 md:mt-8">
               <div className="wc-card text-center">
-                <div className="wc-big-sm">200 guests</div>
-                <div className="wc-accent text-xl md:text-2xl font-bold mt-2">$180K &ndash; $240K</div>
+                <div className="wc-big-sm">900 attendees</div>
+                <div className="wc-accent text-xl md:text-2xl font-bold mt-2">$67,500 &ndash; $135,000</div>
                 <div className="wc-muted text-sm mt-1">total value</div>
               </div>
               <div className="wc-card text-center">
-                <div className="wc-big-sm">300 guests</div>
-                <div className="wc-gold-text text-xl md:text-2xl font-bold mt-2">$270K &ndash; $360K</div>
+                <div className="wc-big-sm">1,200 attendees</div>
+                <div className="wc-gold-text text-xl md:text-2xl font-bold mt-2">$90,000 &ndash; $180,000</div>
                 <div className="wc-muted text-sm mt-1">total value</div>
               </div>
             </div>
           </R>
+          <R><p className="wc-muted text-center text-sm mt-3">Based on $75&ndash;$150 per attendee total spend</p></R>
           <R>
             <blockquote className="wc-quote mt-6 md:mt-8">
-              At scale, this becomes a predictable revenue channel&mdash;not a campaign.
+              This is baseline event revenue&mdash;before sponsorship and long-term customer value.
             </blockquote>
           </R>
         </section>
 
-        {/* ── SECTION 4: JOB EASIER ──────────────────────── */}
+        {/* ── WHY THIS WORKS ──────────────────────────────── */}
+        <section className="wc-s">
+          <R><div className="wc-pill">Casino mechanics</div></R>
+          <R><h2 className="wc-h2">Built for How Casinos Actually Make Money</h2></R>
+          <R><p className="wc-body mt-4">This event is engineered around:</p></R>
+          <R>
+            <div className="space-y-3 mt-5">
+              {[
+                ['Energy', 'Keeps people engaged longer.'],
+                ['Competition', 'Creates repeat visits.'],
+                ['Crowd density', 'Increases spend behavior.'],
+              ].map(([t, d], i) => (
+                <div key={i} className="wc-row"><strong>{t}</strong><span className="wc-muted">{d}</span></div>
+              ))}
+            </div>
+          </R>
+          <R>
+            <blockquote className="wc-quote mt-6 md:mt-8">
+              The longer they stay, the more they spend. This is designed for both.
+            </blockquote>
+          </R>
+        </section>
+
+        {/* ── MAKES THEIR JOB EASY ────────────────────────── */}
         <section className="wc-s">
           <R><div className="wc-pill">Operational clarity</div></R>
-          <R><h2 className="wc-h2">Built to Make Marketing Easier&mdash;Not More Complex</h2></R>
+          <R><h2 className="wc-h2">A Campaign You Don&rsquo;t Have to Defend</h2></R>
+          <R><p className="wc-body mt-4">Marketing leaders are expected to deliver results&mdash;but rarely get clean ones. This changes that.</p></R>
           <R>
-            <div className="space-y-4 mt-6 md:mt-8">
+            <div className="space-y-3 mt-5">
               {[
-                ['Pre-qualified guests', 'No wasted spend chasing low-value traffic.'],
-                ['Clear value per guest', 'Every campaign ties directly to revenue.'],
-                ['Reduced reporting friction', 'Simple, defensible ROI for leadership.'],
-                ['Less dependency on fragmented channels', 'Replace guesswork with structured inflow.'],
-                ['Operational clarity', "Know what's working without digging through dashboards."],
+                ['Clear attendance targets', 'Not vague impressions.'],
+                ['Real, physical turnout', 'People in the building.'],
+                ['Simple revenue math', 'Attendees times spend.'],
+                ['Easy internal reporting', 'A strong story to leadership.'],
               ].map(([t, d], i) => (
-                <R key={i}>
-                  <div className="wc-row">
-                    <strong>{t}</strong>
-                    <span className="wc-muted">{d}</span>
-                  </div>
-                </R>
-              ))}
-            </div>
-          </R>
-        </section>
-
-        {/* ── SECTION 5: PAIN POINT ──────────────────────── */}
-        <section className="wc-s">
-          <R><div className="wc-pill">Current reality</div></R>
-          <R><h2 className="wc-h2">What This Replaces</h2></R>
-          <R>
-            <p className="wc-body mt-4">Today&rsquo;s casino marketing teams deal with:</p>
-          </R>
-          <R>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5">
-              {['Disconnected campaigns', 'Unclear attribution', 'Pressure to justify spend', 'Constant optimization cycles'].map((t, i) => (
-                <div key={i} className="wc-card-sm">{t}</div>
+                <div key={i} className="wc-row"><strong>{t}</strong><span className="wc-muted">{d}</span></div>
               ))}
             </div>
           </R>
           <R>
             <blockquote className="wc-quote mt-6 md:mt-8">
-              This replaces complexity with clarity&mdash;and turns your role from reactive to strategic.
+              No inflated metrics. No guesswork. Just results you can point to.
             </blockquote>
           </R>
         </section>
 
-        {/* ── SECTION 6: $200K INVESTMENT ─────────────────── */}
+        {/* ── $200K INVESTMENT ─────────────────────────────── */}
         <section id="investment" className="wc-s">
           <R><div className="wc-pill">Investment case</div></R>
-          <R><h2 className="wc-h2">Why $200K Is a Strategic Investment</h2></R>
-          <R>
-            <p className="wc-body mt-4">Casino operators routinely invest in:</p>
-          </R>
+          <R><h2 className="wc-h2">Why $200K Is the Right Move</h2></R>
+          <R><p className="wc-body mt-4">Casinos already spend heavily on:</p></R>
           <R>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5">
-              <div className="wc-card text-center">
-                <div className="wc-muted text-xs uppercase tracking-widest mb-2">Slot machines</div>
-                <div className="text-white text-lg md:text-xl font-bold">$15K&ndash;$25K</div>
-                <div className="wc-muted text-sm mt-1">per unit</div>
-              </div>
-              <div className="wc-card text-center">
-                <div className="wc-muted text-xs uppercase tracking-widest mb-2">Software &amp; data</div>
-                <div className="text-white text-lg md:text-xl font-bold">$250K&ndash;$1M+</div>
-                <div className="wc-muted text-sm mt-1">annually</div>
-              </div>
-              <div className="wc-card text-center">
-                <div className="wc-muted text-xs uppercase tracking-widest mb-2">Promotions &amp; comps</div>
-                <div className="text-white text-lg md:text-xl font-bold">Unclear</div>
-                <div className="wc-muted text-sm mt-1">ROI</div>
+              <div className="wc-card-sm">Promotions with unclear return</div>
+              <div className="wc-card-sm">Media that doesn&rsquo;t guarantee turnout</div>
+              <div className="wc-card-sm">Events that rely on hope instead of demand</div>
+            </div>
+          </R>
+          <R>
+            <div className="wc-card wc-card-accent mt-6 md:mt-8">
+              <div className="wc-muted text-xs uppercase tracking-widest mb-3 text-center">This is different</div>
+              <div className="space-y-3">
+                {[
+                  'Known attendance range (900–1,200)',
+                  'Built-in energy and competition',
+                  'Measurable outcomes',
+                ].map((t, i) => (
+                  <div key={i} className="wc-row-simple wc-row-accent text-center">{t}</div>
+                ))}
               </div>
             </div>
           </R>
           <R>
-            <blockquote className="wc-quote mt-6">
-              The difference: those investments don&rsquo;t guarantee outcomes.
-            </blockquote>
-          </R>
-          <R>
-            <div className="wc-card wc-card-accent mt-6 md:mt-8 text-center">
-              <div className="wc-muted text-xs uppercase tracking-widest mb-3">This investment is tied to</div>
-              <div className="space-y-2">
-                <p className="text-white font-semibold">Guest acquisition with known value ($900&ndash;$1,200 each)</p>
-                <p className="text-white font-semibold">Predictable revenue modeling</p>
-                <p className="text-white font-semibold">Reduced inefficiency in marketing spend</p>
-              </div>
+            <div className="wc-card wc-card-final mt-6 md:mt-8 text-center">
+              <p className="wc-body mb-2">You&rsquo;re not paying $200K for a DJ event.</p>
+              <p className="text-white text-lg md:text-xl font-bold leading-tight">You&rsquo;re investing in a controlled, high-energy crowd that drives revenue.</p>
             </div>
-          </R>
-          <R>
-            <blockquote className="wc-quote mt-6 md:mt-8">
-              At just ~200&ndash;250 incremental guests, this initiative can fully return its cost&mdash;while continuing to generate value beyond that threshold.
-            </blockquote>
           </R>
         </section>
 
-        {/* ── SECTION 7: MEASURABLE ──────────────────────── */}
+        {/* ── TOTAL VALUE ─────────────────────────────────── */}
         <section className="wc-s">
-          <R><div className="wc-pill">Accountability</div></R>
-          <R><h2 className="wc-h2">Designed for Measurable Performance</h2></R>
+          <R><div className="wc-pill">Long-term value</div></R>
+          <R><h2 className="wc-h2">More Than One Weekend</h2></R>
+          <R><p className="wc-body mt-4">The value doesn&rsquo;t stop when the event ends. This creates:</p></R>
           <R>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 md:mt-8">
-              {['Every guest tracked', 'Every outcome tied to value', 'Every campaign measurable'].map((t, i) => (
-                <div key={i} className="wc-card text-center">
-                  <div className="text-white font-semibold">{t}</div>
-                </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-5">
+              {['New customer acquisition', 'Future visit potential', 'Brand association with high-energy experience'].map((t, i) => (
+                <div key={i} className="wc-card text-center"><div className="text-white font-semibold text-[14px]">{t}</div></div>
               ))}
             </div>
           </R>
           <R>
             <blockquote className="wc-quote mt-6 md:mt-8">
-              No black box. No ambiguity. Just performance you can stand behind.
+              The event is the start. The value continues.
             </blockquote>
           </R>
         </section>
 
-        {/* ── SECTION 8: COMPETITIVE EDGE ────────────────── */}
+        {/* ── COMPETITIVE EDGE ────────────────────────────── */}
         <section className="wc-s">
           <R><div className="wc-pill">Competitive advantage</div></R>
           <R><h2 className="wc-h2">Most Casinos Are Still Guessing</h2></R>
@@ -274,51 +302,43 @@ export default function WindCreekPage() {
               <div className="wc-card">
                 <div className="wc-muted text-xs uppercase tracking-widest mb-4">Others rely on</div>
                 <div className="space-y-2">
-                  <div className="wc-row-simple">Broad targeting</div>
-                  <div className="wc-row-simple">Legacy marketing channels</div>
-                  <div className="wc-row-simple">Delayed reporting</div>
+                  <div className="wc-row-simple">Discounts</div>
+                  <div className="wc-row-simple">Generic promotions</div>
+                  <div className="wc-row-simple">Low-energy traffic</div>
                 </div>
               </div>
               <div className="wc-card wc-card-accent">
-                <div className="wc-accent text-xs uppercase tracking-widest mb-4 font-semibold">This system delivers</div>
+                <div className="wc-accent text-xs uppercase tracking-widest mb-4 font-semibold">This delivers</div>
                 <div className="space-y-2">
-                  <div className="wc-row-simple wc-row-accent">Structured inflow</div>
-                  <div className="wc-row-simple wc-row-accent">Real-time visibility</div>
-                  <div className="wc-row-simple wc-row-accent">Higher-value guests</div>
+                  <div className="wc-row-simple wc-row-accent">Real demand</div>
+                  <div className="wc-row-simple wc-row-accent">High engagement</div>
+                  <div className="wc-row-simple wc-row-accent">Repeatable model</div>
                 </div>
               </div>
             </div>
           </R>
           <R>
             <blockquote className="wc-quote mt-6 md:mt-8">
-              This isn&rsquo;t incremental improvement&mdash;it&rsquo;s a shift in how demand is created.
+              This is how you stand out in a crowded market.
             </blockquote>
           </R>
         </section>
 
-        {/* ── SECTION 9: CLOSE ───────────────────────────── */}
+        {/* ── CLOSE ───────────────────────────────────────── */}
         <section className="wc-s wc-s-final">
           <R><div className="wc-pill" style={{ justifyContent: 'center' }}>Next step</div></R>
-          <R><h2 className="wc-h2 text-center">A Smarter Way to Drive Revenue</h2></R>
-          <R>
-            <p className="wc-body mt-4 text-center max-w-[48ch] mx-auto">
-              You&rsquo;re not being asked to spend more. You&rsquo;re being given a way to:
-            </p>
-          </R>
+          <R><h2 className="wc-h2 text-center">Own the Crowd. Own the Moment.</h2></R>
           <R>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 md:mt-8">
-              {['Make your results predictable', 'Make your reporting easier', 'Make your impact undeniable'].map((t, i) => (
-                <div key={i} className="wc-card text-center">
-                  <div className="text-white font-semibold text-[15px]">{t}</div>
-                </div>
+              {['900–1,200 attendees', '3 nights of sustained energy', 'Clear revenue opportunity'].map((t, i) => (
+                <div key={i} className="wc-card text-center"><div className="text-white font-semibold text-[15px]">{t}</div></div>
               ))}
             </div>
           </R>
           <R>
             <div className="wc-card wc-card-final mt-8 md:mt-10 text-center">
-              <p className="text-white text-lg md:text-xl font-bold leading-tight">
-                $200K isn&rsquo;t the cost&mdash;it&rsquo;s the entry point to a repeatable revenue system.
-              </p>
+              <p className="wc-body mb-2">$200K isn&rsquo;t the cost of the event.</p>
+              <p className="text-white text-lg md:text-xl font-bold leading-tight">It&rsquo;s the cost of controlling a moment your competitors don&rsquo;t have.</p>
             </div>
           </R>
           <R>
@@ -376,67 +396,43 @@ export default function WindCreekPage() {
           opacity: 0.3;
         }
 
-        /* Logo glow */
         .wc-logo-glow { animation: wc-glow 4s ease-in-out infinite; }
         @keyframes wc-glow {
           0%, 100% { filter: brightness(0) invert(1) drop-shadow(0 0 20px rgba(163,43,41,0.3)) drop-shadow(0 0 40px rgba(163,43,41,0.15)); }
           50% { filter: brightness(0) invert(1) drop-shadow(0 0 30px rgba(163,43,41,0.45)) drop-shadow(0 0 60px rgba(163,43,41,0.25)); }
         }
 
-        /* Subtitle under logos */
         .wc-sub {
           font-family: 'Inter', system-ui, sans-serif;
-          font-size: 11px;
-          font-weight: 600;
-          letter-spacing: 0.22em;
-          text-transform: uppercase;
-          color: rgba(255,255,255,0.42);
-          white-space: nowrap;
-          margin-top: 6px;
+          font-size: 11px; font-weight: 600;
+          letter-spacing: 0.22em; text-transform: uppercase;
+          color: rgba(255,255,255,0.42); white-space: nowrap; margin-top: 6px;
         }
         @media (min-width: 768px) { .wc-sub { font-size: 14px; } }
 
-        /* Hero — single column centered, pushed below fixed logo */
         .wc-hero {
           min-height: 100vh;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: flex-start;
-          text-align: center;
-          padding: 160px 20px 60px;
-          max-width: 760px;
-          margin: 0 auto;
+          display: flex; flex-direction: column; align-items: center;
+          justify-content: flex-start; text-align: center;
+          padding: 160px 20px 60px; max-width: 760px; margin: 0 auto;
         }
         @media (min-width: 768px) { .wc-hero { padding-top: 220px; } }
 
-        /* Sections — single column centered */
-        .wc-s {
-          max-width: 680px;
-          margin: 0 auto;
-          padding: 48px 20px;
-        }
+        .wc-s { max-width: 680px; margin: 0 auto; padding: 48px 20px; }
         @media (min-width: 768px) { .wc-s { padding: 72px 20px; } }
         .wc-s-final { padding-bottom: 80px; }
         @media (min-width: 768px) { .wc-s-final { padding-bottom: 120px; } }
 
-        /* Typography */
         .wc-h1 {
           font-family: 'General Sans', 'Inter', system-ui, sans-serif;
           font-size: clamp(2rem, 1.4rem + 3vw, 3.6rem);
-          line-height: 0.95;
-          letter-spacing: -0.03em;
-          font-weight: 700;
-          color: #fff;
-          max-width: 16ch;
+          line-height: 0.95; letter-spacing: -0.03em; font-weight: 700;
+          color: #fff; max-width: 16ch;
         }
         .wc-h2 {
           font-family: 'General Sans', 'Inter', system-ui, sans-serif;
           font-size: clamp(1.5rem, 1.1rem + 1.6vw, 2.4rem);
-          line-height: 1.05;
-          letter-spacing: -0.02em;
-          font-weight: 700;
-          color: #fff;
+          line-height: 1.05; letter-spacing: -0.02em; font-weight: 700; color: #fff;
         }
         .wc-lead { color: rgba(255,255,255,0.55); font-size: clamp(1rem, 0.9rem + 0.5vw, 1.2rem); line-height: 1.6; max-width: 52ch; }
         .wc-body { color: rgba(255,255,255,0.50); line-height: 1.65; }
@@ -444,7 +440,6 @@ export default function WindCreekPage() {
         .wc-accent { color: #e8503e; }
         .wc-gold-text { color: #ffb43c; }
 
-        /* Eyebrow */
         .wc-eyebrow {
           display: inline-flex; align-items: center; gap: 8px;
           padding: 7px 16px; border-radius: 999px;
@@ -453,29 +448,19 @@ export default function WindCreekPage() {
           background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
           font-weight: 500;
         }
-
-        /* Pill label */
         .wc-pill {
           display: flex; align-items: center; gap: 6px;
           font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
           color: #e8503e; margin-bottom: 12px; font-weight: 600;
         }
 
-        /* Cards */
         .wc-card {
-          padding: 20px 22px;
-          border-radius: 16px;
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.07);
-          backdrop-filter: blur(12px);
-          -webkit-backdrop-filter: blur(12px);
+          padding: 20px 22px; border-radius: 16px;
+          background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+          backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
         }
         @media (min-width: 768px) { .wc-card { padding: 24px 28px; border-radius: 20px; } }
-
-        .wc-card-accent {
-          border-color: rgba(163,43,41,0.2);
-          background: rgba(163,43,41,0.06);
-        }
+        .wc-card-accent { border-color: rgba(163,43,41,0.2); background: rgba(163,43,41,0.06); }
         .wc-card-final {
           border-color: rgba(163,43,41,0.25);
           background: linear-gradient(135deg, rgba(163,43,41,0.12), rgba(255,180,60,0.06));
@@ -484,73 +469,65 @@ export default function WindCreekPage() {
         @media (min-width: 768px) { .wc-card-final { padding: 36px; } }
 
         .wc-card-sm {
-          padding: 14px 18px;
-          border-radius: 12px;
-          background: rgba(255,255,255,0.03);
-          border: 1px solid rgba(255,255,255,0.06);
-          color: rgba(255,255,255,0.55);
-          font-size: 14px;
+          padding: 14px 18px; border-radius: 12px;
+          background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+          color: rgba(255,255,255,0.55); font-size: 14px;
         }
         .wc-stat-mini {
-          padding: 10px 14px;
-          border-radius: 10px;
-          background: rgba(255,255,255,0.03);
-          border: 1px solid rgba(255,255,255,0.06);
-          color: rgba(255,255,255,0.50);
-          font-size: 13px;
-          font-weight: 500;
+          padding: 10px 14px; border-radius: 10px;
+          background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+          color: rgba(255,255,255,0.50); font-size: 13px; font-weight: 500;
         }
 
-        /* Big numbers */
-        .wc-big {
-          font-family: 'General Sans', 'Inter', system-ui, sans-serif;
-          font-size: clamp(2rem, 1.4rem + 2.5vw, 3.2rem);
-          font-weight: 800;
-          color: #e8503e;
-          letter-spacing: -0.02em;
-        }
         .wc-big-sm {
           font-family: 'General Sans', 'Inter', system-ui, sans-serif;
-          font-size: 1.1rem;
-          font-weight: 700;
-          color: rgba(255,255,255,0.55);
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
+          font-size: 1.1rem; font-weight: 700;
+          color: rgba(255,255,255,0.55); text-transform: uppercase; letter-spacing: 0.06em;
         }
 
-        /* Quote */
         .wc-quote {
           padding: 18px 22px;
           border-left: 2px solid rgba(163,43,41,0.4);
           border-radius: 0 12px 12px 0;
           background: rgba(163,43,41,0.04);
-          color: rgba(255,255,255,0.55);
-          font-size: 14px;
-          line-height: 1.6;
-          font-style: italic;
+          color: rgba(255,255,255,0.55); font-size: 14px; line-height: 1.6; font-style: italic;
         }
 
-        /* Rows */
         .wc-row {
           display: flex; flex-direction: column; gap: 4px;
-          padding: 16px 20px;
-          border-radius: 14px;
-          background: rgba(255,255,255,0.03);
-          border: 1px solid rgba(255,255,255,0.06);
-          font-size: 14px;
+          padding: 16px 20px; border-radius: 14px;
+          background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); font-size: 14px;
         }
         .wc-row strong { color: #fff; }
         .wc-row-simple {
-          padding: 10px 14px;
-          border-radius: 10px;
-          background: rgba(255,255,255,0.03);
-          border: 1px solid rgba(255,255,255,0.05);
-          color: rgba(255,255,255,0.45);
-          font-size: 14px;
+          padding: 10px 14px; border-radius: 10px;
+          background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05);
+          color: rgba(255,255,255,0.45); font-size: 14px;
         }
-        .wc-row-accent {
-          border-color: rgba(163,43,41,0.15);
-          color: rgba(255,255,255,0.65);
+        .wc-row-accent { border-color: rgba(163,43,41,0.15); color: rgba(255,255,255,0.65); }
+
+        /* Giles photo */
+        .wc-giles-img {
+          width: 160px; height: 160px; border-radius: 18px; overflow: hidden; position: relative;
+          box-shadow:
+            -4px 0 20px rgba(0,212,255,0.10),
+            4px 0 20px rgba(188,0,0,0.08),
+            0 8px 30px rgba(0,0,0,0.3);
+          transition: transform 0.3s ease, box-shadow 0.3s ease;
+          flex-shrink: 0;
+        }
+        @media (min-width: 640px) { .wc-giles-img { width: 180px; height: 180px; border-radius: 20px; } }
+        .wc-giles-img:hover {
+          transform: scale(1.02);
+          box-shadow:
+            -6px 0 28px rgba(0,212,255,0.15),
+            6px 0 28px rgba(188,0,0,0.12),
+            0 12px 40px rgba(0,0,0,0.35);
+        }
+        .wc-giles-overlay {
+          position: absolute; inset: 0;
+          background: linear-gradient(to bottom, transparent 50%, rgba(5,5,5,0.5));
+          pointer-events: none;
         }
 
         /* Buttons */
@@ -562,8 +539,7 @@ export default function WindCreekPage() {
           background: linear-gradient(135deg, rgba(163,43,41,0.22), rgba(232,80,62,0.10));
           box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 8px 30px rgba(0,0,0,0.2);
           backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-          transition: transform 0.2s, border-color 0.2s, background 0.2s;
-          text-decoration: none;
+          transition: transform 0.2s, border-color 0.2s, background 0.2s; text-decoration: none;
         }
         .wc-cta:hover { transform: translateY(-1px); border-color: rgba(163,43,41,0.55); }
         .wc-ghost {
@@ -573,8 +549,7 @@ export default function WindCreekPage() {
           color: #fff; font-size: 14px; font-weight: 600; cursor: pointer;
           background: rgba(255,255,255,0.03);
           backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-          transition: transform 0.2s, border-color 0.2s;
-          text-decoration: none;
+          transition: transform 0.2s, border-color 0.2s; text-decoration: none;
         }
         .wc-ghost:hover { transform: translateY(-1px); border-color: rgba(255,255,255,0.18); }
 
@@ -592,8 +567,8 @@ export default function WindCreekPage() {
           width: 50px; height: 1px;
           background: linear-gradient(to left, hsla(4,60%,40%,0.4), transparent);
         }
-        .wc-gold { background: hsl(38 100% 55%); box-shadow: 0 0 4px 1px hsla(38,100%,55%,0.5), 0 0 12px 2px hsla(38,100%,55%,0.2); }
-        .wc-gold::after { background: linear-gradient(to left, hsla(38,100%,55%,0.35), transparent); }
+        .wc-comet-gold { background: hsl(38 100% 55%); box-shadow: 0 0 4px 1px hsla(38,100%,55%,0.5), 0 0 12px 2px hsla(38,100%,55%,0.2); }
+        .wc-comet-gold::after { background: linear-gradient(to left, hsla(38,100%,55%,0.35), transparent); }
         @keyframes wc-fly {
           0% { opacity: 0; transform: translate(0,0); }
           5% { opacity: 0.7; }
