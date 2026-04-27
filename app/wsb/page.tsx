@@ -210,7 +210,7 @@ function BuilderAccessFlow({ onClose }: { onClose: () => void }) {
       `What excites you about becoming a builder: ${answers.q2}\n\n` +
       `Current situation: ${answers.q3}`
     );
-    window.location.href = `mailto:jason@example.com?subject=${subject}&body=${body}`;
+    window.location.href = `mailto:cbur22@gmail.com?subject=${subject}&body=${body}`;
   };
 
   const progressPct = (step / TOTAL_STEPS) * 100;
@@ -468,8 +468,117 @@ function BuilderAccessFlow({ onClose }: { onClose: () => void }) {
 
 /* ── PAGE ──────────────────────────────────────────────────────────── */
 
+function QuestionPanel({ onClose }: { onClose: () => void }) {
+  const [question, setQuestion] = useState('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [sent, setSent] = useState(false);
+
+  const canSend = question.trim() !== '' && name.trim() !== '' && email.trim() !== '';
+
+  const handleSend = () => {
+    setSent(true);
+    const subject = encodeURIComponent('Question About WSB');
+    const body = encodeURIComponent(
+      `Name: ${name}\nEmail: ${email}\n\nQuestion:\n${question}`
+    );
+    window.location.href = `mailto:cbur22@gmail.com?subject=${subject}&body=${body}`;
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <motion.div
+        initial={{ x: '100%' }}
+        animate={{ x: 0 }}
+        exit={{ x: '100%' }}
+        transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+        className="absolute right-0 top-0 bottom-0 w-full max-w-md border-l border-white/10 bg-[#0B0F1A]/98 backdrop-blur-xl shadow-2xl flex flex-col"
+      >
+        <div className="flex items-center justify-between p-6 border-b border-white/10">
+          <h3 className="text-lg font-bold">Ask a Question</h3>
+          <button
+            onClick={onClose}
+            className="text-white/40 hover:text-white/80 transition-colors text-xl leading-none"
+          >
+            &#10005;
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6">
+          {sent ? (
+            <div className="text-center py-12">
+              <div className="text-4xl mb-4">&#10003;</div>
+              <h4 className="text-lg font-bold mb-2">Question Sent</h4>
+              <p className="text-white/60 text-sm leading-relaxed">
+                Your email client should open with your question. Jason will get back to you.
+              </p>
+              <button
+                onClick={onClose}
+                className="mt-6 rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-white/80 hover:bg-white/5 transition-all"
+              >
+                Close
+              </button>
+            </div>
+          ) : (
+            <>
+              <p className="text-white/50 text-sm mb-6">
+                Have a question about the builder path, licensing, or mentorship? Ask here and Jason
+                will follow up directly.
+              </p>
+              <label className="block mb-4">
+                <span className="text-sm text-white/70 mb-1 block">Your Name *</span>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-white/30 focus:border-[#D4AF37]/50 focus:outline-none transition-colors"
+                  placeholder="Full name"
+                />
+              </label>
+              <label className="block mb-4">
+                <span className="text-sm text-white/70 mb-1 block">Your Email *</span>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-white/30 focus:border-[#D4AF37]/50 focus:outline-none transition-colors"
+                  placeholder="you@email.com"
+                />
+              </label>
+              <label className="block mb-6">
+                <span className="text-sm text-white/70 mb-1 block">Your Question *</span>
+                <textarea
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  rows={5}
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-white/30 focus:border-[#D4AF37]/50 focus:outline-none transition-colors resize-none"
+                  placeholder="What would you like to know?"
+                />
+              </label>
+              <button
+                onClick={handleSend}
+                disabled={!canSend}
+                className="w-full rounded-full bg-gradient-to-r from-[#D4AF37] to-[#B8941F] px-7 py-3 text-sm font-bold uppercase tracking-wider text-black shadow-lg shadow-[#D4AF37]/20 hover:shadow-[#D4AF37]/40 transition-all duration-300 hover:scale-[1.02] disabled:opacity-30 disabled:hover:scale-100 disabled:cursor-not-allowed"
+              >
+                Send Question
+              </button>
+            </>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 export default function WSBPage() {
   const [flowOpen, setFlowOpen] = useState(false);
+  const [questionOpen, setQuestionOpen] = useState(false);
 
   const openFlow = () => setFlowOpen(true);
   const closeFlow = () => setFlowOpen(false);
@@ -479,6 +588,9 @@ export default function WSBPage() {
       {/* ── BUILDER ACCESS FLOW MODAL ──────────────────────────────── */}
       <AnimatePresence>
         {flowOpen && <BuilderAccessFlow onClose={closeFlow} />}
+      </AnimatePresence>
+      <AnimatePresence>
+        {questionOpen && <QuestionPanel onClose={() => setQuestionOpen(false)} />}
       </AnimatePresence>
 
       {/* ── HERO ───────────────────────────────────────────────────── */}
@@ -844,12 +956,12 @@ export default function WSBPage() {
             >
               Request Builder Access
             </button>
-            <a
-              href="mailto:jason@example.com?subject=Question%20About%20WSB"
+            <button
+              onClick={() => setQuestionOpen(true)}
               className="inline-block rounded-full border border-white/20 px-10 py-4 text-sm font-semibold uppercase tracking-wider text-white/80 hover:bg-white/5 transition-all duration-300"
             >
               Ask a Question
-            </a>
+            </button>
           </motion.div>
         </div>
       </Section>
