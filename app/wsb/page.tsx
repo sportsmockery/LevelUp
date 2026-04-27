@@ -1,8 +1,173 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
+
+/* ── INTERACTIVE PARTICLE CANVAS ────────────────────────────────────── */
+
+function ParticleHero() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const mouseRef = useRef({ x: -9999, y: -9999 });
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    let animId: number;
+    let particles: {
+      x: number; y: number; vx: number; vy: number;
+      baseX: number; baseY: number; size: number; alpha: number;
+    }[] = [];
+
+    const GREEN = { r: 0, g: 200, b: 83 }; // #00C853
+    const PARTICLE_COUNT = 120;
+    const CONNECTION_DIST = 140;
+    const MOUSE_RADIUS = 180;
+
+    const resize = () => {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.parentElement!.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      canvas.style.width = `${rect.width}px`;
+      canvas.style.height = `${rect.height}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      initParticles(rect.width, rect.height);
+    };
+
+    const initParticles = (w: number, h: number) => {
+      particles = [];
+      for (let i = 0; i < PARTICLE_COUNT; i++) {
+        const x = Math.random() * w;
+        const y = Math.random() * h;
+        particles.push({
+          x, y, baseX: x, baseY: y,
+          vx: (Math.random() - 0.5) * 0.4,
+          vy: (Math.random() - 0.5) * 0.4,
+          size: Math.random() * 2.5 + 1,
+          alpha: Math.random() * 0.5 + 0.3,
+        });
+      }
+    };
+
+    const draw = () => {
+      const w = canvas.width / (window.devicePixelRatio || 1);
+      const h = canvas.height / (window.devicePixelRatio || 1);
+      ctx.clearRect(0, 0, w, h);
+
+      const mx = mouseRef.current.x;
+      const my = mouseRef.current.y;
+
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+
+        // Drift
+        p.x += p.vx;
+        p.y += p.vy;
+
+        // Wrap around
+        if (p.x < -10) p.x = w + 10;
+        if (p.x > w + 10) p.x = -10;
+        if (p.y < -10) p.y = h + 10;
+        if (p.y > h + 10) p.y = -10;
+
+        // Mouse repulsion
+        const dx = p.x - mx;
+        const dy = p.y - my;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < MOUSE_RADIUS && dist > 0) {
+          const force = (MOUSE_RADIUS - dist) / MOUSE_RADIUS;
+          p.x += (dx / dist) * force * 3;
+          p.y += (dy / dist) * force * 3;
+        }
+
+        // Draw glow
+        const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 4);
+        grd.addColorStop(0, `rgba(${GREEN.r},${GREEN.g},${GREEN.b},${p.alpha * 0.6})`);
+        grd.addColorStop(1, `rgba(${GREEN.r},${GREEN.g},${GREEN.b},0)`);
+        ctx.fillStyle = grd;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Draw core
+        ctx.fillStyle = `rgba(${GREEN.r},${GREEN.g},${GREEN.b},${p.alpha})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Connections
+        for (let j = i + 1; j < particles.length; j++) {
+          const q = particles[j];
+          const cdx = p.x - q.x;
+          const cdy = p.y - q.y;
+          const cdist = Math.sqrt(cdx * cdx + cdy * cdy);
+          if (cdist < CONNECTION_DIST) {
+            const lineAlpha = (1 - cdist / CONNECTION_DIST) * 0.15;
+            ctx.strokeStyle = `rgba(${GREEN.r},${GREEN.g},${GREEN.b},${lineAlpha})`;
+            ctx.lineWidth = 0.8;
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(q.x, q.y);
+            ctx.stroke();
+          }
+        }
+      }
+
+      animId = requestAnimationFrame(draw);
+    };
+
+    const handleMouse = (e: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      mouseRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    };
+
+    const handleMouseLeave = () => {
+      mouseRef.current = { x: -9999, y: -9999 };
+    };
+
+    const handleTouch = (e: TouchEvent) => {
+      if (e.touches.length > 0) {
+        const rect = canvas.getBoundingClientRect();
+        mouseRef.current = { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+      }
+    };
+
+    const handleTouchEnd = () => {
+      mouseRef.current = { x: -9999, y: -9999 };
+    };
+
+    resize();
+    draw();
+
+    window.addEventListener('resize', resize);
+    canvas.addEventListener('mousemove', handleMouse);
+    canvas.addEventListener('mouseleave', handleMouseLeave);
+    canvas.addEventListener('touchmove', handleTouch, { passive: true });
+    canvas.addEventListener('touchend', handleTouchEnd);
+
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener('resize', resize);
+      canvas.removeEventListener('mousemove', handleMouse);
+      canvas.removeEventListener('mouseleave', handleMouseLeave);
+      canvas.removeEventListener('touchmove', handleTouch);
+      canvas.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="absolute inset-0 w-full h-full"
+      style={{ zIndex: 0 }}
+    />
+  );
+}
 
 /* ── ANIMATION HELPERS ─────────────────────────────────────────────── */
 
@@ -595,7 +760,8 @@ export default function WSBPage() {
 
       {/* ── HERO ───────────────────────────────────────────────────── */}
       <Section className="min-h-[90vh] flex items-center">
-        <div className="mx-auto max-w-7xl w-full grid md:grid-cols-2 gap-12 items-center">
+        <ParticleHero />
+        <div className="relative z-10 mx-auto max-w-7xl w-full grid md:grid-cols-2 gap-12 items-center">
           <motion.div variants={fadeUp}>
             <p className="text-[#D4AF37] font-semibold tracking-widest uppercase text-sm mb-4">
               World System Builders
