@@ -21,6 +21,12 @@
 
 ---
 
+## Git Workflow Rules
+
+- **Do NOT use git worktrees.** Never run `git worktree add` and never spawn sub-agents with `isolation: "worktree"`. Work directly in the main checkout at `/Users/christopherburhans/Documents/projects/levelup`.
+
+---
+
 ## Protected Accounts (DO NOT MODIFY)
 
 - **cbur22@gmail.com** — Role: `athlete`. This account MUST remain `athlete`. Do NOT change the role in Supabase, in code, or via any API call. Do NOT write any migration, seed, or script that could alter this account's role.
