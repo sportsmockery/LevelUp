@@ -449,7 +449,7 @@ export default function WSBPage() {
       <Section className="min-h-[85vh] md:min-h-[90vh] flex items-center">
         <ParticleHero />
         <div className="relative z-10 mx-auto max-w-7xl w-full grid md:grid-cols-2 gap-10 md:gap-12 items-center">
-          <Reveal>
+          <Reveal className="order-2 md:order-1">
             <p className="text-[#D4AF37] font-semibold tracking-widest uppercase text-xs sm:text-sm mb-3 sm:mb-4">World System Builders</p>
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.08] tracking-tight">
               From Customer<br />
@@ -462,7 +462,7 @@ export default function WSBPage() {
               <a href="#blueprint" className="rounded-full border border-white/20 px-6 sm:px-8 py-3.5 sm:py-4 text-sm font-semibold uppercase tracking-wider text-white/80 hover:bg-white/5 transition-all duration-300 text-center">See the Builder Blueprint</a>
             </div>
           </Reveal>
-          <Reveal className="relative flex justify-center">
+          <Reveal className="order-1 md:order-2 relative flex justify-center">
             <div className="relative group w-full max-w-[600px]">
               <div className="absolute -inset-1 rounded-2xl bg-gradient-to-br from-[#D4AF37]/30 to-[#00D4FF]/20 blur-xl opacity-60 group-hover:opacity-80 transition-opacity duration-500" />
               <Image src="/images/wsb-financial-literacy.jpg" alt="Jason and Genesis Beninato at the National Financial Literacy Campaign" width={1600} height={1200} className="relative rounded-2xl shadow-2xl object-cover w-full h-auto transition-transform duration-700 group-hover:scale-[1.03]" priority sizes="(max-width: 768px) 100vw, 600px" />
