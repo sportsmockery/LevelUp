@@ -39,6 +39,13 @@ yarn-error.log*
 # claude code local state
 .claude/
 
+# ssh keys (never commit)
+gitkey
+gitkey.pub
+*.pem
+id_rsa*
+id_ed25519*
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
