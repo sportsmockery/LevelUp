@@ -27,7 +27,7 @@ function Reveal({ children, className = '' }: { children: React.ReactNode; class
 
 function Section({ children, className = '', id }: { children: React.ReactNode; className?: string; id?: string }) {
   return (
-    <section id={id} className={`relative px-6 py-24 md:py-32 ${className}`}>
+    <section id={id} className={`relative px-5 sm:px-6 py-16 sm:py-20 md:py-32 ${className}`}>
       {children}
     </section>
   );
@@ -269,7 +269,7 @@ function BuilderAccessFlow({ onClose }: { onClose: () => void }) {
       className={`fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm transition-opacity duration-300 ${mounted ? 'opacity-100' : 'opacity-0'}`}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className={`relative w-full max-w-lg rounded-2xl border border-white/10 bg-[#0B0F1A]/95 backdrop-blur-xl p-8 shadow-2xl max-h-[90vh] overflow-y-auto transition-all duration-300 ${mounted ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-10 scale-[0.97]'}`}>
+      <div className={`relative w-full max-w-lg rounded-2xl border border-white/10 bg-[#0B0F1A]/95 backdrop-blur-xl p-6 sm:p-8 shadow-2xl max-h-[90vh] overflow-y-auto transition-all duration-300 ${mounted ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-10 scale-[0.97]'}`}>
         <button onClick={onClose} className="absolute top-4 right-4 text-white/40 hover:text-white/80 transition-colors text-xl leading-none">&#10005;</button>
 
         <div className="mb-6">
@@ -446,28 +446,28 @@ export default function WSBPage() {
       {questionOpen && <QuestionPanel onClose={() => setQuestionOpen(false)} />}
 
       {/* ── HERO ───────────────────────────────────────────────────── */}
-      <Section className="min-h-[90vh] flex items-center">
+      <Section className="min-h-[85vh] md:min-h-[90vh] flex items-center">
         <ParticleHero />
-        <div className="relative z-10 mx-auto max-w-7xl w-full grid md:grid-cols-2 gap-12 items-center">
+        <div className="relative z-10 mx-auto max-w-7xl w-full grid md:grid-cols-2 gap-10 md:gap-12 items-center">
           <Reveal>
-            <p className="text-[#D4AF37] font-semibold tracking-widest uppercase text-sm mb-4">World System Builders</p>
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.08] tracking-tight">
+            <p className="text-[#D4AF37] font-semibold tracking-widest uppercase text-xs sm:text-sm mb-3 sm:mb-4">World System Builders</p>
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.08] tracking-tight">
               From Customer<br />
               <span className="bg-gradient-to-r from-[#D4AF37] to-[#00D4FF] bg-clip-text text-transparent">to Builder.</span>
             </h1>
-            <p className="mt-6 text-lg md:text-xl text-white/70 max-w-xl leading-relaxed">Jason and Genesis Beninato are opening the door for a select group to become licensed leaders inside World System Builders.</p>
-            <p className="mt-4 text-base text-white/50 max-w-xl leading-relaxed">You already believe in financial education. Now you have the opportunity to learn the business, earn your license, serve families, and build something bigger — with mentorship from people who live it every day.</p>
-            <div className="mt-10 flex flex-wrap gap-4">
-              <button onClick={openFlow} className="inline-block rounded-full bg-gradient-to-r from-[#D4AF37] to-[#B8941F] px-8 py-4 text-sm font-bold uppercase tracking-wider text-black shadow-lg shadow-[#D4AF37]/20 hover:shadow-[#D4AF37]/40 transition-all duration-300 hover:scale-105">Start Step 1</button>
-              <a href="#blueprint" className="inline-block rounded-full border border-white/20 px-8 py-4 text-sm font-semibold uppercase tracking-wider text-white/80 hover:bg-white/5 transition-all duration-300">See the Builder Blueprint</a>
+            <p className="mt-5 sm:mt-6 text-base sm:text-lg md:text-xl text-white/70 max-w-xl leading-relaxed">Jason and Genesis Beninato are opening the door for a select group to become licensed leaders inside World System Builders.</p>
+            <p className="mt-3 sm:mt-4 text-sm sm:text-base text-white/50 max-w-xl leading-relaxed">You already believe in financial education. Now you have the opportunity to learn the business, earn your license, serve families, and build something bigger — with mentorship from people who live it every day.</p>
+            <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4">
+              <button onClick={openFlow} className="rounded-full bg-gradient-to-r from-[#D4AF37] to-[#B8941F] px-6 sm:px-8 py-3.5 sm:py-4 text-sm font-bold uppercase tracking-wider text-black shadow-lg shadow-[#D4AF37]/20 hover:shadow-[#D4AF37]/40 transition-all duration-300 hover:scale-105 text-center">Start Step 1</button>
+              <a href="#blueprint" className="rounded-full border border-white/20 px-6 sm:px-8 py-3.5 sm:py-4 text-sm font-semibold uppercase tracking-wider text-white/80 hover:bg-white/5 transition-all duration-300 text-center">See the Builder Blueprint</a>
             </div>
           </Reveal>
           <Reveal className="relative flex justify-center">
-            <div className="relative group">
+            <div className="relative group w-full max-w-[600px]">
               <div className="absolute -inset-1 rounded-2xl bg-gradient-to-br from-[#D4AF37]/30 to-[#00D4FF]/20 blur-xl opacity-60 group-hover:opacity-80 transition-opacity duration-500" />
-              <Image src="/images/jason-family.jpg" alt="Jason and Genesis Beninato with family at financial literacy event" width={600} height={600} className="relative rounded-2xl shadow-2xl object-cover transition-transform duration-700 group-hover:scale-[1.03]" priority />
-              <div className="absolute bottom-0 left-0 right-0 rounded-b-2xl bg-gradient-to-t from-black/70 to-transparent px-6 py-4">
-                <p className="text-sm font-medium text-white/90 tracking-wide">Built on family. Led with purpose.</p>
+              <Image src="/images/wsb-financial-literacy.jpg" alt="Jason and Genesis Beninato at the National Financial Literacy Campaign" width={1600} height={1200} className="relative rounded-2xl shadow-2xl object-cover w-full h-auto transition-transform duration-700 group-hover:scale-[1.03]" priority sizes="(max-width: 768px) 100vw, 600px" />
+              <div className="absolute bottom-0 left-0 right-0 rounded-b-2xl bg-gradient-to-t from-black/70 to-transparent px-4 sm:px-6 py-3 sm:py-4">
+                <p className="text-xs sm:text-sm font-medium text-white/90 tracking-wide">Leading the National Financial Literacy Campaign.</p>
               </div>
             </div>
           </Reveal>
@@ -480,10 +480,10 @@ export default function WSBPage() {
           <Reveal>
             <h2 className="text-3xl md:text-4xl font-bold">Most people stay customers. <span className="text-[#D4AF37]">Builders choose ownership.</span></h2>
           </Reveal>
-          <div className="mt-16 grid md:grid-cols-3 gap-6">
+          <div className="mt-16 grid md:grid-cols-3 gap-6 items-stretch">
             {identityCards.map((c) => (
-              <Reveal key={c.title}>
-                <div className={`rounded-2xl border ${c.border} bg-white/[0.03] p-8 hover:bg-white/[0.06] transition-colors duration-300`}>
+              <Reveal key={c.title} className="h-full">
+                <div className={`rounded-2xl border ${c.border} bg-white/[0.03] p-8 hover:bg-white/[0.06] transition-colors duration-300 h-full`}>
                   <h3 className="text-xl font-bold mb-3">{c.title}</h3>
                   <p className="text-white/60 leading-relaxed">{c.desc}</p>
                 </div>
@@ -607,10 +607,12 @@ export default function WSBPage() {
 
       {/* ── JASON + GENESIS ────────────────────────────────────────── */}
       <Section>
-        <div className="mx-auto max-w-6xl grid md:grid-cols-2 gap-12 items-center">
-          <Reveal className="relative group flex justify-center">
-            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-br from-[#D4AF37]/25 to-[#00D4FF]/15 blur-xl opacity-50 group-hover:opacity-70 transition-opacity duration-500" />
-            <Image src="/images/jason-family.jpg" alt="Jason and Genesis Beninato with family" width={560} height={560} className="relative rounded-2xl shadow-2xl object-cover transition-transform duration-700 group-hover:scale-[1.03]" />
+        <div className="mx-auto max-w-6xl grid md:grid-cols-2 gap-10 md:gap-12 items-center">
+          <Reveal className="relative flex justify-center">
+            <div className="relative group w-full max-w-[560px]">
+              <div className="absolute -inset-1 rounded-2xl bg-gradient-to-br from-[#D4AF37]/25 to-[#00D4FF]/15 blur-xl opacity-50 group-hover:opacity-70 transition-opacity duration-500" />
+              <Image src="/images/jason-family.jpg" alt="Jason and Genesis Beninato with family" width={560} height={560} className="relative rounded-2xl shadow-2xl object-cover w-full h-auto transition-transform duration-700 group-hover:scale-[1.03]" sizes="(max-width: 768px) 100vw, 560px" />
+            </div>
           </Reveal>
           <Reveal>
             <h2 className="text-3xl md:text-4xl font-bold mb-6">This is built <span className="text-[#D4AF37]">together.</span></h2>
