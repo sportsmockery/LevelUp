@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import { Upload, Video, Zap, CheckCircle, ChevronRight, AlertCircle, Brain } from 'lucide-react';
+import { Upload, Video, Zap, CheckCircle, ChevronRight, AlertCircle, Brain, FileText, X } from 'lucide-react';
 
 type QBIQResult = {
   overall_score: number;
@@ -24,6 +24,16 @@ type QBIQResult = {
 };
 
 const FRAME_COUNT = 16;
+const MAX_PDF_BYTES = 20 * 1024 * 1024;
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
+}
 
 async function extractFrames(file: File, count: number): Promise<string[]> {
   return new Promise((resolve, reject) => {
@@ -78,6 +88,7 @@ async function extractFrames(file: File, count: number): Promise<string[]> {
 
 export default function QBPage() {
   const [file, setFile] = useState<File | null>(null);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [prompt, setPrompt] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<QBIQResult | null>(null);
@@ -85,6 +96,7 @@ export default function QBPage() {
   const [statusMessage, setStatusMessage] = useState('');
   const [error, setError] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
 
   const handleAnalyze = useCallback(async () => {
     if (!file) return;
@@ -96,7 +108,15 @@ export default function QBPage() {
       setStatusMessage('Extracting key frames...');
       setProgress(10);
       const frames = await extractFrames(file, FRAME_COUNT);
-      setProgress(35);
+      setProgress(30);
+
+      let pdfPayload: { name: string; data: string } | undefined;
+      if (pdfFile) {
+        setStatusMessage('Reading PDF...');
+        const data = await readFileAsDataUrl(pdfFile);
+        pdfPayload = { name: pdfFile.name, data };
+        setProgress(40);
+      }
 
       setStatusMessage('QBIQ is studying the tape...');
       const tick = setInterval(() => {
@@ -106,7 +126,11 @@ export default function QBPage() {
       const res = await fetch('/api/qb/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ frames, prompt: prompt.trim() || undefined }),
+        body: JSON.stringify({
+          frames,
+          prompt: prompt.trim() || undefined,
+          pdf: pdfPayload,
+        }),
       });
       clearInterval(tick);
 
@@ -128,15 +152,33 @@ export default function QBPage() {
       setProgress(0);
       setStatusMessage('');
     }
-  }, [file, prompt]);
+  }, [file, pdfFile, prompt]);
 
   const reset = () => {
     setFile(null);
+    setPdfFile(null);
     setPrompt('');
     setResult(null);
     setError('');
     setProgress(0);
     setStatusMessage('');
+  };
+
+  const handlePdfSelect = (selected: File | null) => {
+    setError('');
+    if (!selected) {
+      setPdfFile(null);
+      return;
+    }
+    if (selected.type !== 'application/pdf' && !selected.name.toLowerCase().endsWith('.pdf')) {
+      setError('Attachment must be a PDF.');
+      return;
+    }
+    if (selected.size > MAX_PDF_BYTES) {
+      setError(`PDF is too large (${(selected.size / 1024 / 1024).toFixed(1)} MB). Max 20 MB.`);
+      return;
+    }
+    setPdfFile(selected);
   };
 
   return (
@@ -181,6 +223,48 @@ export default function QBPage() {
                 <p className="text-zinc-300 font-medium">Tap to select QB film</p>
                 <p className="text-zinc-500 text-sm">MP4, MOV — single play works best</p>
               </div>
+            )}
+          </div>
+
+          <div className="mt-6">
+            <label className="block text-xs font-medium text-zinc-400 mb-2">
+              ATTACH PDF (optional — playbook, scouting report, route concept)
+            </label>
+            <input
+              ref={pdfInputRef}
+              type="file"
+              accept="application/pdf,.pdf"
+              className="hidden"
+              onChange={(e) => handlePdfSelect(e.target.files?.[0] || null)}
+            />
+            {pdfFile ? (
+              <div className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3">
+                <FileText className="w-5 h-5 text-amber-400 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-white truncate">{pdfFile.name}</p>
+                  <p className="text-xs text-zinc-500">{(pdfFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPdfFile(null);
+                    if (pdfInputRef.current) pdfInputRef.current.value = '';
+                  }}
+                  className="text-zinc-500 hover:text-zinc-200"
+                  aria-label="Remove PDF"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => pdfInputRef.current?.click()}
+                className="w-full flex items-center justify-center gap-2 border border-dashed border-zinc-700 rounded-2xl px-4 py-3 text-sm text-zinc-400 hover:border-amber-500 hover:text-amber-400 transition-colors"
+              >
+                <FileText className="w-4 h-4" />
+                Attach PDF (max 20 MB)
+              </button>
             )}
           </div>
 

@@ -66,6 +66,7 @@ const QBIQ_RESPONSE_SCHEMA = {
 type Frame = string; // data URL: data:image/jpeg;base64,...
 
 const MAX_PROMPT_LEN = 2000;
+const MAX_PDF_BYTES = 20 * 1024 * 1024; // 20 MB cap for inline PDF
 
 function parseDataUrl(dataUrl: string): { mimeType: string; data: string } | null {
   const match = /^data:([^;]+);base64,(.+)$/.exec(dataUrl);
@@ -82,7 +83,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let body: { frames?: Frame[]; prompt?: string };
+  let body: {
+    frames?: Frame[];
+    prompt?: string;
+    pdf?: { name?: string; data?: string } | null;
+  };
   try {
     body = await request.json();
   } catch {
@@ -96,13 +101,35 @@ export async function POST(request: NextRequest) {
 
   const userPrompt = typeof body.prompt === 'string' ? body.prompt.trim().slice(0, MAX_PROMPT_LEN) : '';
 
+  let pdfPart: { mimeType: string; data: string } | null = null;
+  let pdfName = '';
+  if (body.pdf && typeof body.pdf.data === 'string' && body.pdf.data.length > 0) {
+    const parsed = parseDataUrl(body.pdf.data);
+    if (!parsed || parsed.mimeType !== 'application/pdf') {
+      return NextResponse.json({ error: 'PDF must be a base64 data URL with mimeType application/pdf' }, { status: 400 });
+    }
+    const approxBytes = Math.floor((parsed.data.length * 3) / 4);
+    if (approxBytes > MAX_PDF_BYTES) {
+      return NextResponse.json({ error: `PDF too large (${(approxBytes / 1024 / 1024).toFixed(1)} MB). Max 20 MB.` }, { status: 413 });
+    }
+    pdfPart = parsed;
+    pdfName = typeof body.pdf.name === 'string' ? body.pdf.name.slice(0, 200) : '';
+  }
+
   const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
   let intro = `You are analyzing ${frames.length} ordered frames from a quarterback's football clip. Frames are evenly spaced from start to end of the play. Analyze QB play only — ignore unrelated bystanders.`;
+  if (pdfPart) {
+    intro += `\n\nThe user also attached a PDF${pdfName ? ` ("${pdfName}")` : ''} — treat it as supporting context (e.g., playbook, scouting report, coaching notes, route concept). Use it to inform your analysis where relevant, but the video frames remain the primary evidence for what actually happened on the play.`;
+  }
   if (userPrompt) {
     intro += `\n\nCOACH'S NOTE FROM THE USER (prioritize answering this in the summary and reasoning, while still filling out every required field):\n"""${userPrompt}"""`;
   }
   intro += `\n\nReturn JSON only.`;
   parts.push({ text: intro });
+
+  if (pdfPart) {
+    parts.push({ inlineData: { mimeType: pdfPart.mimeType, data: pdfPart.data } });
+  }
 
   for (let i = 0; i < frames.length; i++) {
     const parsed = parseDataUrl(frames[i]);
