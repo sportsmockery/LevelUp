@@ -197,6 +197,15 @@ export default function QBPage() {
 
       {!result ? (
         <div className="p-6">
+          <div className="mb-6 bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
+            <p className="text-amber-400 text-[10px] font-medium tracking-widest mb-2">EVALUATING</p>
+            <p className="text-white font-medium text-sm">Carter Burhans — QB</p>
+            <p className="text-zinc-400 text-xs mt-1">
+              Class of 2030 • 5&apos;10&quot; • 3.9 GPA • Victor J. Andrew HS • also plays FS
+            </p>
+            <p className="text-zinc-500 text-xs">Multi-sport: Baseball (.500 AAA), Track</p>
+          </div>
+
           <div
             className="border-2 border-dashed border-zinc-700 rounded-3xl p-10 text-center cursor-pointer hover:border-amber-500 transition-colors"
             onClick={() => inputRef.current?.click()}
