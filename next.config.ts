@@ -6,12 +6,17 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '10mb',
     },
   },
+  async redirects() {
+    return [
+      // College Scout uses relative asset paths (./assets/...). Without a
+      // trailing slash, the browser resolves them against '/' instead of
+      // '/scout/', breaking asset loading. Force the trailing slash.
+      { source: '/scout', destination: '/scout/', permanent: false },
+    ];
+  },
   async rewrites() {
     return [
-      // College Scout SPA — serve public/scout/index.html for the app entry.
-      // Hash routing means deep links live at /scout#/profile etc., so all
-      // top-level paths under /scout (except /scout/assets/*) resolve to the index.
-      { source: '/scout', destination: '/scout/index.html' },
+      // Serve public/scout/index.html for the SPA entry.
       { source: '/scout/', destination: '/scout/index.html' },
     ];
   },
