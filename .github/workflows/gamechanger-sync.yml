@@ -1,0 +1,37 @@
+name: GameChanger Sync
+
+on:
+  schedule:
+    # Every day at 10:00 UTC (5am Central).
+    - cron: '0 10 * * *'
+  workflow_dispatch:
+    inputs:
+      teams:
+        description: 'Comma-separated public_ids to sync (defaults to GC_TEAM_IDS secret)'
+        required: false
+        type: string
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GC_TEAM_IDS: ${{ inputs.teams || secrets.GC_TEAM_IDS }}
+      GC_TOKEN: ${{ secrets.GC_TOKEN }}
+      GC_DEVICE_ID: ${{ secrets.GC_DEVICE_ID }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: scripts/gamechanger/requirements.txt
+
+      - name: Install deps
+        run: pip install -r scripts/gamechanger/requirements.txt
+
+      - name: Run sync
+        run: python scripts/gamechanger/sync.py
