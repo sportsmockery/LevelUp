@@ -17,8 +17,8 @@ jobs:
     timeout-minutes: 10
     env:
       GC_TEAM_IDS: ${{ inputs.teams || secrets.GC_TEAM_IDS }}
-      GC_TOKEN: ${{ secrets.GC_TOKEN }}
-      GC_DEVICE_ID: ${{ secrets.GC_DEVICE_ID }}
+      # Tokens live in the gc_auth_tokens Supabase row and rotate on every
+      # refresh. Daily cron keeps the refresh token from ever expiring.
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
     steps:

@@ -1,11 +1,12 @@
 """
 GameChanger -> Supabase sync.
 
+Tokens are stored in scripts/gamechanger/tokens.json (seeded via seed_tokens.py).
+Access token auto-refreshes via the refresh-token flow before each run.
+
 Env vars (in .env.local at project root):
   GC_TEAM_IDS                      comma-separated public_ids
                                    (or GC_TEAM_ID for a single team)
-  GC_TOKEN                         JWT from web app; required for stats
-  GC_DEVICE_ID                     required when GC_TOKEN is set
   NEXT_PUBLIC_SUPABASE_URL
   SUPABASE_SERVICE_ROLE_KEY
 
@@ -13,6 +14,7 @@ Usage:
   python scripts/gamechanger/sync.py
   python scripts/gamechanger/sync.py --probe       # explore endpoints
   python scripts/gamechanger/sync.py --teams       # list /me/teams
+  python scripts/gamechanger/sync.py --refresh     # force a token refresh and exit
 """
 
 from __future__ import annotations
@@ -30,8 +32,33 @@ import requests
 from dotenv import load_dotenv
 from supabase import Client, create_client
 
+from auth import FileTokenStore, SupabaseTokenStore, TokenStore
+
 ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT / ".env.local")
+TOKENS_PATH = Path(__file__).parent / "tokens.json"
+
+
+def get_token_store() -> TokenStore:
+    """Prefer Supabase (persists across machines + CI). Fall back to local file."""
+    sb_url = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+    sb_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    if sb_url and sb_key:
+        sb = create_client(sb_url, sb_key)
+        store: TokenStore = SupabaseTokenStore(sb)
+        if store.load() is not None:
+            return store
+        # Supabase row missing — bootstrap it from the local file if present.
+        file_store = FileTokenStore(TOKENS_PATH)
+        local = file_store.load()
+        if local:
+            print("Bootstrapping Supabase token row from local tokens.json...")
+            store.save(local)
+            return store
+        print("WARN: Supabase has no token row and no local tokens.json. "
+              "Run seed_tokens.py.")
+        return store
+    return FileTokenStore(TOKENS_PATH)
 
 GC_BASE = "https://api.team-manager.gc.com"
 PROBE_DIR = ROOT / "scripts" / "gamechanger" / "probes"
@@ -382,16 +409,32 @@ def cmd_probe(team_public_id: str, token: str, device_id: str) -> None:
         print(f"  {status} {p:55s} {preview}")
 
 
+def get_credentials() -> tuple[str, str]:
+    """Return (access_token, device_id). Auto-refreshes via the store."""
+    return get_token_store().get_valid_access_token()
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--probe", metavar="PUBLIC_ID", nargs="?", const="__first__",
                     help="Probe endpoints for one team (defaults to first GC_TEAM_IDS)")
     ap.add_argument("--teams", action="store_true", help="List your teams")
+    ap.add_argument("--refresh", action="store_true",
+                    help="Force a token refresh and exit (writes tokens.json)")
     args = ap.parse_args()
 
-    token = env("GC_TOKEN")
-    device_id = env("GC_DEVICE_ID")
-    check_token_freshness(token)
+    if args.refresh:
+        store = get_token_store()
+        data = store.load()
+        if not data:
+            sys.exit("No tokens found; run seed_tokens.py first.")
+        # Force refresh by zeroing accessExpires.
+        data["accessExpires"] = 0
+        store.save(data)
+        store.get_valid_access_token()
+        return
+
+    token, device_id = get_credentials()
 
     if args.teams:
         cmd_teams(token, device_id)

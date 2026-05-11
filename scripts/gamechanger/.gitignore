@@ -1,2 +1,5 @@
 probes/
 .venv/
+tokens.json
+refresh_proto.py
+__pycache__/
