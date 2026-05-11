@@ -26,11 +26,23 @@ const COL_OVERRIDES_TO_DB: Record<string, string> = {
   inf60: "inf_60",
   fortyYd: "forty_yd",
   sixtyYd: "sixty_yd",
+  pitchingBB: "pitching_bb",
+  pitchingK: "pitching_k",
+  oddsD1P4: "odds_d1_p4",
+  oddsD1MM: "odds_d1_mm",
+  oddsNAIA: "odds_naia",
+  oddsJUCO: "odds_juco",
 };
 const COL_OVERRIDES_FROM_DB: Record<string, string> = {
   inf_60: "inf60",
   forty_yd: "fortyYd",
   sixty_yd: "sixtyYd",
+  pitching_bb: "pitchingBB",
+  pitching_k: "pitchingK",
+  odds_d1_p4: "oddsD1P4",
+  odds_d1_mm: "oddsD1MM",
+  odds_naia: "oddsNAIA",
+  odds_juco: "oddsJUCO",
 };
 
 function rowToDb(row: any): any {
