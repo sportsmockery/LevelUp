@@ -26,9 +26,10 @@ import time
 from pathlib import Path
 from typing import Any
 
-import requests
+from curl_cffi import requests
 
 EDEN_BASE = "https://api.team-manager.gc.com"
+BROWSER_IMPERSONATE = "chrome131"
 CLIENT_ID = "001acc71-6c9f-42e6-82ca-e7a0ebe6b255"
 CLIENT_KEY_B64 = "ZyGC18Fs7S4rtSPV7jDWl9MN0xDsLpShHsI3IEg380U="
 STORAGE_KEY_B64 = "tCveS/ThcKvE87Zq6JGCo9r4XjdrlEod4w87QWgcfWo="
@@ -100,6 +101,7 @@ def _post_auth(body: dict, *, token: str | None, device_id: str) -> dict:
         data=json.dumps(body, separators=(",", ":")),
         headers=headers,
         timeout=20,
+        impersonate=BROWSER_IMPERSONATE,
     )
     r.raise_for_status()
     return r.json()

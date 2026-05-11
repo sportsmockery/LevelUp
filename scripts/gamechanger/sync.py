@@ -28,11 +28,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import requests
+from curl_cffi import requests
 from dotenv import load_dotenv
 from supabase import Client, create_client
 
-from auth import FileTokenStore, SupabaseTokenStore, TokenStore
+from auth import BROWSER_IMPERSONATE, FileTokenStore, SupabaseTokenStore, TokenStore
 
 ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT / ".env.local")
@@ -127,7 +127,7 @@ def gc_get(path: str, *, accept: str | None = None, token: str | None = None,
     if extra:
         headers.update(extra)
     url = url_override or f"{GC_BASE}{path}"
-    r = requests.get(url, headers=headers, timeout=30)
+    r = requests.get(url, headers=headers, timeout=30, impersonate=BROWSER_IMPERSONATE)
     try:
         body = r.json()
     except ValueError:

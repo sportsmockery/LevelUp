@@ -3,3 +3,4 @@ probes/
 tokens.json
 refresh_proto.py
 __pycache__/
+logs/
