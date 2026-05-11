@@ -49,6 +49,25 @@ type DevItem = {
   id: number; athleteId: number; category: string; drill: string;
   frequency: string; measure: string; status: string; createdAt: number;
 };
+type SeasonStats = {
+  id: number; athleteId: number; season: string; level: string | null;
+  games: number | null; ab: number | null; hits: number | null;
+  doubles: number | null; triples: number | null; hr: number | null;
+  rbi: number | null; runs: number | null; bb: number | null; so: number | null; sb: number | null;
+  avg: number | null; obp: number | null; slg: number | null; ops: number | null;
+  ip: number | null; er: number | null; pitchingK: number | null; pitchingBB: number | null;
+  era: number | null; whip: number | null;
+  fldPct: number | null; errors: number | null;
+  notes: string | null; createdAt: number;
+};
+type VideoAnalysis = {
+  id: number; athleteId: number; kind: string; title: string;
+  recordedDate: number | null; videoUrl: string | null;
+  s1: number | null; s2: number | null; s3: number | null; s4: number | null;
+  s5: number | null; s6: number | null; s7: number | null; s8: number | null;
+  composite: number | null; highRoiFix: string | null; notes: string | null;
+  createdAt: number;
+};
 
 // ─────────────────────────────────────────────────────────────────────
 // Validation schemas (zod 4 compatible — uses .optional() / .nullable())
@@ -157,6 +176,64 @@ const devCreate = devPatch.extend({
   measure: z.string(),
 });
 
+const statsPatch = z.object({
+  athleteId: z.number().optional(),
+  season: z.string().optional(),
+  level: z.string().nullable().optional(),
+  games: z.number().nullable().optional(),
+  ab: z.number().nullable().optional(),
+  hits: z.number().nullable().optional(),
+  doubles: z.number().nullable().optional(),
+  triples: z.number().nullable().optional(),
+  hr: z.number().nullable().optional(),
+  rbi: z.number().nullable().optional(),
+  runs: z.number().nullable().optional(),
+  bb: z.number().nullable().optional(),
+  so: z.number().nullable().optional(),
+  sb: z.number().nullable().optional(),
+  avg: z.number().nullable().optional(),
+  obp: z.number().nullable().optional(),
+  slg: z.number().nullable().optional(),
+  ops: z.number().nullable().optional(),
+  ip: z.number().nullable().optional(),
+  er: z.number().nullable().optional(),
+  pitchingK: z.number().nullable().optional(),
+  pitchingBB: z.number().nullable().optional(),
+  era: z.number().nullable().optional(),
+  whip: z.number().nullable().optional(),
+  fldPct: z.number().nullable().optional(),
+  errors: z.number().nullable().optional(),
+  notes: z.string().nullable().optional(),
+});
+const statsCreate = statsPatch.extend({
+  athleteId: z.number(),
+  season: z.string(),
+});
+
+const videoAnalysisPatch = z.object({
+  athleteId: z.number().optional(),
+  kind: z.string().optional(),
+  title: z.string().optional(),
+  recordedDate: z.number().nullable().optional(),
+  videoUrl: z.string().nullable().optional(),
+  s1: z.number().nullable().optional(),
+  s2: z.number().nullable().optional(),
+  s3: z.number().nullable().optional(),
+  s4: z.number().nullable().optional(),
+  s5: z.number().nullable().optional(),
+  s6: z.number().nullable().optional(),
+  s7: z.number().nullable().optional(),
+  s8: z.number().nullable().optional(),
+  composite: z.number().nullable().optional(),
+  highRoiFix: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+});
+const videoAnalysisCreate = videoAnalysisPatch.extend({
+  athleteId: z.number(),
+  kind: z.string(),
+  title: z.string(),
+});
+
 // ─────────────────────────────────────────────────────────────────────
 // In-memory store (per warm instance, persisted on globalThis)
 // ─────────────────────────────────────────────────────────────────────
@@ -168,7 +245,9 @@ if (!G.__cs_scout_store) {
     reports: [] as ScoutingReport[],
     projections: [] as Projection[],
     devItems: [] as DevItem[],
-    ids: { a: 0, p: 0, r: 0, j: 0, d: 0 },
+    seasonStats: [] as SeasonStats[],
+    videoAnalyses: [] as VideoAnalysis[],
+    ids: { a: 0, p: 0, r: 0, j: 0, d: 0, s: 0, v: 0 },
     seeded: false,
   };
 }
@@ -229,7 +308,7 @@ function seed() {
     inputs: JSON.stringify({
       battingAvg: 0.512, teamHRLeader: true, hrVsTop10Pitcher: true,
       sixtyYd: 7.4, exitVelo: 82, heightIn: 70, weightLb: 145, gpa: 3.9,
-      multiSport: true, qbBoost: true,
+      multiSport: true,
     }),
     pgGrade: 7.4,
     composite: 71,
@@ -237,6 +316,21 @@ function seed() {
     oddsNAIA: 0.97, oddsJUCO: 0.99,
     notes: "Baseline projection seeded from Diamond Projection v1.",
   } as Projection);
+
+  // Seed a baseline 2025 batting line so the Stats page has content out of the box.
+  S.seasonStats.push({
+    id: ++S.ids.s,
+    athleteId: carter.id,
+    season: "2025 AAA Travel",
+    level: "AAA Travel",
+    games: 38, ab: 122, hits: 63, doubles: 14, triples: 2, hr: 6,
+    rbi: 48, runs: 41, bb: 22, so: 18, sb: 14,
+    avg: 0.516, obp: 0.606, slg: 0.811, ops: 1.417,
+    ip: null, er: null, pitchingK: null, pitchingBB: null, era: null, whip: null,
+    fldPct: 0.965, errors: 5,
+    notes: "Team HR leader. HR vs. top-10 nationally ranked pitcher.",
+    createdAt: now(),
+  } as SeasonStats);
 
   S.seeded = true;
 }
@@ -298,6 +392,33 @@ const store = {
     S.devItems[i] = { ...S.devItems[i], ...d }; return S.devItems[i];
   },
   deleteDevItem: (id: number) => { S.devItems = S.devItems.filter((x: DevItem) => x.id !== id); },
+  listStats: (athleteId: number) =>
+    S.seasonStats.filter((s: SeasonStats) => s.athleteId === athleteId)
+      .sort((a: SeasonStats, b: SeasonStats) => (b.createdAt || 0) - (a.createdAt || 0)),
+  createStats: (s: any): SeasonStats => {
+    const row: SeasonStats = { ...s, id: ++S.ids.s, createdAt: now() };
+    S.seasonStats.push(row); return row;
+  },
+  updateStats: (id: number, s: any) => {
+    const i = S.seasonStats.findIndex((x: SeasonStats) => x.id === id);
+    if (i < 0) return undefined;
+    S.seasonStats[i] = { ...S.seasonStats[i], ...s }; return S.seasonStats[i];
+  },
+  deleteStats: (id: number) => { S.seasonStats = S.seasonStats.filter((x: SeasonStats) => x.id !== id); },
+  listVideoAnalyses: (athleteId: number, kind?: string) =>
+    S.videoAnalyses.filter((v: VideoAnalysis) =>
+      v.athleteId === athleteId && (!kind || v.kind === kind),
+    ).sort((a: VideoAnalysis, b: VideoAnalysis) => (b.createdAt || 0) - (a.createdAt || 0)),
+  createVideoAnalysis: (v: any): VideoAnalysis => {
+    const row: VideoAnalysis = { ...v, id: ++S.ids.v, createdAt: now() };
+    S.videoAnalyses.push(row); return row;
+  },
+  updateVideoAnalysis: (id: number, v: any) => {
+    const i = S.videoAnalyses.findIndex((x: VideoAnalysis) => x.id === id);
+    if (i < 0) return undefined;
+    S.videoAnalyses[i] = { ...S.videoAnalyses[i], ...v }; return S.videoAnalyses[i];
+  },
+  deleteVideoAnalysis: (id: number) => { S.videoAnalyses = S.videoAnalyses.filter((x: VideoAnalysis) => x.id !== id); },
 };
 
 // ─────────────────────────────────────────────────────────────────────
@@ -406,6 +527,44 @@ async function route(req: NextRequest, ctx: { params: Promise<{ path?: string[] 
     }
     if (method === "DELETE" && (m = match(path, "dev-items/:id"))) {
       store.deleteDevItem(Number(m.id));
+      return jsonRes(200, { ok: true });
+    }
+
+    // Season stats
+    if (method === "GET" && (m = match(path, "athletes/:id/stats")))
+      return jsonRes(200, store.listStats(Number(m.id)));
+    if (method === "POST" && (m = match(path, "stats"))) {
+      const r = safe(statsCreate, body); if (!r.ok) return r.res;
+      return jsonRes(200, store.createStats(r.data));
+    }
+    if (method === "PATCH" && (m = match(path, "stats/:id"))) {
+      const r = safe(statsPatch, body); if (!r.ok) return r.res;
+      const u = store.updateStats(Number(m.id), r.data);
+      if (!u) return jsonRes(404, { error: "Not found" });
+      return jsonRes(200, u);
+    }
+    if (method === "DELETE" && (m = match(path, "stats/:id"))) {
+      store.deleteStats(Number(m.id));
+      return jsonRes(200, { ok: true });
+    }
+
+    // Video analyses (swing / pitching). Filter by ?kind=swing|pitching.
+    if (method === "GET" && (m = match(path, "athletes/:id/analyses"))) {
+      const kind = req.nextUrl.searchParams.get("kind") || undefined;
+      return jsonRes(200, store.listVideoAnalyses(Number(m.id), kind));
+    }
+    if (method === "POST" && (m = match(path, "analyses"))) {
+      const r = safe(videoAnalysisCreate, body); if (!r.ok) return r.res;
+      return jsonRes(200, store.createVideoAnalysis(r.data));
+    }
+    if (method === "PATCH" && (m = match(path, "analyses/:id"))) {
+      const r = safe(videoAnalysisPatch, body); if (!r.ok) return r.res;
+      const u = store.updateVideoAnalysis(Number(m.id), r.data);
+      if (!u) return jsonRes(404, { error: "Not found" });
+      return jsonRes(200, u);
+    }
+    if (method === "DELETE" && (m = match(path, "analyses/:id"))) {
+      store.deleteVideoAnalysis(Number(m.id));
       return jsonRes(200, { ok: true });
     }
 
