@@ -448,69 +448,154 @@ function computeAdvancedStats(
   out[14] = { pct: clamp(earlyCount), display: scoreStr(earlyCount), sortKey: earlyCount };
 
   // 15. Two-Strike Survival
-  const twoStrike = clamp(avg * 0.8, 0.1, 0.4);
-  out[15] = { pct: clamp(((twoStrike - 0.15) / 0.2) * 100), display: f3(twoStrike) };
+  const twoStrikeRaw = avg * 0.8;
+  const twoStrike = clamp(twoStrikeRaw, 0.1, 0.4);
+  out[15] = {
+    pct: clamp(((twoStrike - 0.15) / 0.2) * 100),
+    display: f3(twoStrike),
+    sortKey: twoStrikeRaw,
+  };
 
-  // 16. xERA — bend ERA toward K/BB profile (only if pitched)
+  // 16-25. Pitching computations (only if the player has pitched).
   if (isPitcher) {
     const kRate = so / Math.max(ip, 1);
-    const xera = clamp(era * 0.6 + (5 - kRate) * 0.7 + whip * 0.4, 1.0, 12.0);
-    out[16] = { pct: clamp(((bench.eraMean - xera) / bench.eraStd) * 15 + 55), display: f2(xera) };
-    const xfip = clamp(xera * 0.95 + 0.3, 1.0, 12.0);
-    out[17] = { pct: clamp(((bench.eraMean - xfip) / bench.eraStd) * 15 + 55), display: f2(xfip) };
-    const siera = clamp(xera * 0.92 + 0.5, 1.0, 12.0);
-    out[18] = { pct: clamp(((bench.eraMean - siera) / bench.eraStd) * 15 + 55), display: f2(siera) };
-    const kbb = clamp(kRate * 8 - whip * 4, -5, 30);
-    out[19] = { pct: clamp((kbb + 5) * 3), display: pctStr(kbb) };
-    const csw = clamp(22 + kRate * 1.5 - whip * 1.5, 18, 38);
-    out[20] = { pct: clamp((csw - 18) * 5), display: pctStr(csw) };
-    const stuffPlus = clamp(100 + (kRate - 1) * 18, 60, 160);
-    out[21] = { pct: clamp((stuffPlus - 60) * 1.0), display: plusStr(stuffPlus) };
-    const commandPlus = clamp(100 + (1.3 - whip) * 40, 60, 160);
-    out[22] = { pct: clamp((commandPlus - 60) * 1.0), display: plusStr(commandPlus) };
-    const whiffPct = clamp(15 + kRate * 3.5, 10, 40);
-    out[23] = { pct: clamp((whiffPct - 10) * 3.3), display: pctStr(whiffPct) };
-    const firstStrike = clamp(55 + (1.3 - whip) * 18, 40, 75);
-    out[24] = { pct: clamp((firstStrike - 40) * 2.8), display: pctStr(firstStrike) };
-    const putaway = clamp(15 + kRate * 4, 10, 35);
-    out[25] = { pct: clamp((putaway - 10) * 4), display: pctStr(putaway) };
+    const xeraRaw = era * 0.6 + (5 - kRate) * 0.7 + whip * 0.4;
+    const xera = clamp(xeraRaw, 1.0, 12.0);
+    // Lower xERA = better → invert for sortKey.
+    out[16] = {
+      pct: clamp(((bench.eraMean - xera) / bench.eraStd) * 15 + 55),
+      display: f2(xera),
+      sortKey: -xeraRaw,
+    };
+    const xfipRaw = xera * 0.95 + 0.3;
+    const xfip = clamp(xfipRaw, 1.0, 12.0);
+    out[17] = {
+      pct: clamp(((bench.eraMean - xfip) / bench.eraStd) * 15 + 55),
+      display: f2(xfip),
+      sortKey: -xfipRaw,
+    };
+    const sieraRaw = xera * 0.92 + 0.5;
+    const siera = clamp(sieraRaw, 1.0, 12.0);
+    out[18] = {
+      pct: clamp(((bench.eraMean - siera) / bench.eraStd) * 15 + 55),
+      display: f2(siera),
+      sortKey: -sieraRaw,
+    };
+    const kbbRawCalc = kRate * 8 - whip * 4;
+    const kbb = clamp(kbbRawCalc, -5, 30);
+    out[19] = {
+      pct: clamp((kbb + 5) * 3),
+      display: pctStr(kbb),
+      sortKey: kbbRawCalc,
+    };
+    const cswRaw = 22 + kRate * 1.5 - whip * 1.5;
+    const csw = clamp(cswRaw, 18, 38);
+    out[20] = {
+      pct: clamp((csw - 18) * 5),
+      display: pctStr(csw),
+      sortKey: cswRaw,
+    };
+    const stuffPlusRaw = 100 + (kRate - 1) * 18;
+    const stuffPlus = clamp(stuffPlusRaw, 60, 160);
+    out[21] = {
+      pct: clamp((stuffPlus - 60) * 1.0),
+      display: plusStr(stuffPlus),
+      sortKey: stuffPlusRaw,
+    };
+    const commandPlusRaw = 100 + (1.3 - whip) * 40;
+    const commandPlus = clamp(commandPlusRaw, 60, 160);
+    out[22] = {
+      pct: clamp((commandPlus - 60) * 1.0),
+      display: plusStr(commandPlus),
+      sortKey: commandPlusRaw,
+    };
+    const whiffPctRaw = 15 + kRate * 3.5;
+    const whiffPct = clamp(whiffPctRaw, 10, 40);
+    out[23] = {
+      pct: clamp((whiffPct - 10) * 3.3),
+      display: pctStr(whiffPct),
+      sortKey: whiffPctRaw,
+    };
+    const firstStrikeRaw = 55 + (1.3 - whip) * 18;
+    const firstStrike = clamp(firstStrikeRaw, 40, 75);
+    out[24] = {
+      pct: clamp((firstStrike - 40) * 2.8),
+      display: pctStr(firstStrike),
+      sortKey: firstStrikeRaw,
+    };
+    const putawayRaw = 15 + kRate * 4;
+    const putaway = clamp(putawayRaw, 10, 35);
+    out[25] = {
+      pct: clamp((putaway - 10) * 4),
+      display: pctStr(putaway),
+      sortKey: putawayRaw,
+    };
   } else {
     for (let id = 16; id <= 25; id++) out[id] = dash;
   }
 
-  // 26-35. Two-way + athletic composites — reuse core composites where possible
-  out[26] = { pct: core[29] ?? 50, display: scoreStr(core[29] ?? 50) };
-  out[27] = { pct: core[26] ?? 50, display: scoreStr(core[26] ?? 50) };
-  out[28] = { pct: core[28] ?? 50, display: scoreStr(core[28] ?? 50) };
-  const clutchMult = clamp(1 + ((core[5] ?? 50) - 50) * 0.006, 0.8, 1.4);
-  out[29] = { pct: clamp((clutchMult - 0.8) * 165), display: `${clutchMult.toFixed(2)}x` };
-  out[30] = { pct: core[35] ?? 50, display: scoreStr(core[35] ?? 50) };
-  out[31] = { pct: Math.round(((core[1] ?? 50) + (core[16] ?? 50)) / 2), display: scoreStr(Math.round(((core[1] ?? 50) + (core[16] ?? 50)) / 2)) };
-  out[32] = { pct: clamp(70 + sb * 1.5 + hr * 2, 40, 100), display: scoreStr(clamp(70 + sb * 1.5 + hr * 2, 40, 100)) };
-  out[33] = { pct: core[29] ?? 50, display: scoreStr(core[29] ?? 50) };
-  out[34] = { pct: clamp((core[1] ?? 50) * 0.9 + sb * 1.2, 0, 100), display: scoreStr(clamp((core[1] ?? 50) * 0.9 + sb * 1.2, 0, 100)) };
-  out[35] = { pct: clamp(60 + sb * 1.8 + hr * 1.5, 40, 100), display: scoreStr(clamp(60 + sb * 1.8 + hr * 1.5, 40, 100)) };
+  // 26-35. Two-way + athletic composites — reuse core composites where possible.
+  // Each sortKey uses the unclamped underlying signal so high-clamp ties
+  // still break to a deterministic order.
+  out[26] = { pct: core[29] ?? 50, display: scoreStr(core[29] ?? 50), sortKey: core[29] ?? 50 };
+  out[27] = { pct: core[26] ?? 50, display: scoreStr(core[26] ?? 50), sortKey: core[26] ?? 50 };
+  out[28] = { pct: core[28] ?? 50, display: scoreStr(core[28] ?? 50), sortKey: core[28] ?? 50 };
+  const clutchMultRaw = 1 + ((core[5] ?? 50) - 50) * 0.006;
+  const clutchMult = clamp(clutchMultRaw, 0.8, 1.4);
+  out[29] = {
+    pct: clamp((clutchMult - 0.8) * 165),
+    display: `${clutchMult.toFixed(2)}x`,
+    sortKey: clutchMultRaw,
+  };
+  out[30] = { pct: core[35] ?? 50, display: scoreStr(core[35] ?? 50), sortKey: core[35] ?? 50 };
+  const synergyRaw = ((core[1] ?? 50) + (core[16] ?? 50)) / 2;
+  out[31] = {
+    pct: Math.round(synergyRaw),
+    display: scoreStr(Math.round(synergyRaw)),
+    sortKey: synergyRaw,
+  };
+  const ironRaw = 70 + sb * 1.5 + hr * 2;
+  const iron = clamp(ironRaw, 40, 100);
+  out[32] = { pct: iron, display: scoreStr(iron), sortKey: ironRaw };
+  out[33] = { pct: core[29] ?? 50, display: scoreStr(core[29] ?? 50), sortKey: core[29] ?? 50 };
+  const energyRaw = (core[1] ?? 50) * 0.9 + sb * 1.2;
+  const energy = clamp(energyRaw, 0, 100);
+  out[34] = { pct: energy, display: scoreStr(energy), sortKey: energyRaw };
+  const multiRaw = 60 + sb * 1.8 + hr * 1.5;
+  const multi = clamp(multiRaw, 40, 100);
+  out[35] = { pct: multi, display: scoreStr(multi), sortKey: multiRaw };
 
-  // 36-45. Team-level — reuse core team #s, augment with simple proxies
+  // 36-45. Team-level — pct only (these don't show per-player rank chips).
   out[36] = { pct: core[36] ?? 78, display: scoreStr(core[36] ?? 78) };
-  out[37] = { pct: clamp((core[1] ?? 50) * 0.3, 0, 100), display: `+${((core[1] ?? 50) * 0.005).toFixed(2)} R/G` };
+  out[37] = {
+    pct: clamp((core[1] ?? 50) * 0.3, 0, 100),
+    display: `+${((core[1] ?? 50) * 0.005).toFixed(2)} R/G`,
+  };
   out[38] = { pct: core[44] ?? 50, display: scoreStr(core[44] ?? 50) };
   out[39] = { pct: core[41] ?? 83, display: scoreStr(core[41] ?? 83) };
-  out[40] = { pct: 100 - Math.abs(50 - (core[7] ?? 88)), display: scoreStr(100 - Math.abs(50 - (core[7] ?? 88))) };
+  out[40] = {
+    pct: 100 - Math.abs(50 - (core[7] ?? 88)),
+    display: scoreStr(100 - Math.abs(50 - (core[7] ?? 88))),
+  };
   out[41] = { pct: clamp(so * 1.5, 0, 100), display: `+${Math.round(so * 0.4)}` };
-  out[42] = { pct: clamp(50 + (core[8] ?? 50) * 0.4, 0, 100), display: `+${Math.round((core[8] ?? 50) * 0.1)}` };
+  out[42] = {
+    pct: clamp(50 + (core[8] ?? 50) * 0.4, 0, 100),
+    display: `+${Math.round((core[8] ?? 50) * 0.1)}`,
+  };
   out[43] = { pct: core[12] ?? 50, display: scoreStr(core[12] ?? 50) };
   out[44] = { pct: clamp(sb * 4, 0, 100), display: `+${sb}` };
   out[45] = { pct: core[38] ?? 91, display: scoreStr(core[38] ?? 91) };
 
   // 46-50. Predictive / aging
-  out[46] = { pct: core[14] ?? 85, display: scoreStr(core[14] ?? 85) };
-  const breakout = clamp((core[14] ?? 85) * 0.8 + ((core[1] ?? 50) - 50) * 0.3, 0, 100);
-  out[47] = { pct: breakout, display: pctStr(breakout) };
-  const bust = clamp(100 - (core[7] ?? 88), 0, 100);
-  out[48] = { pct: 100 - bust, display: pctStr(bust) };
+  out[46] = { pct: core[14] ?? 85, display: scoreStr(core[14] ?? 85), sortKey: core[14] ?? 85 };
+  const breakoutRaw = (core[14] ?? 85) * 0.8 + ((core[1] ?? 50) - 50) * 0.3;
+  const breakout = clamp(breakoutRaw, 0, 100);
+  out[47] = { pct: breakout, display: pctStr(breakout), sortKey: breakoutRaw };
+  const bustRaw = 100 - (core[7] ?? 88);
+  const bust = clamp(bustRaw, 0, 100);
+  out[48] = { pct: 100 - bust, display: pctStr(bust), sortKey: -bustRaw };
   out[49] = { pct: 75, display: 'Age 17-19' };
-  out[50] = { pct: core[50] ?? 50, display: scoreStr(core[50] ?? 50) };
+  out[50] = { pct: core[50] ?? 50, display: scoreStr(core[50] ?? 50), sortKey: core[50] ?? 50 };
 
   // ──────────────────────────────────────────────────────────────────────
   // RAW-STAT OVERRIDES — when GameChanger gives us a directly-measured
