@@ -480,6 +480,111 @@ function computeAdvancedStats(
   out[49] = { pct: 75, display: 'Age 17-19' };
   out[50] = { pct: core[50] ?? 50, display: scoreStr(core[50] ?? 50) };
 
+  // ──────────────────────────────────────────────────────────────────────
+  // RAW-STAT OVERRIDES — when GameChanger gives us a directly-measured
+  // value (HHB%, BB%, K%, C%, LD%, 1st-S%, S%, K/BB), use it instead of
+  // the OPS-derived proxy. This is what makes the modal rank chips show
+  // real per-stat ordering instead of "everyone's ranked by OPS again".
+  // ──────────────────────────────────────────────────────────────────────
+  const rawNumFrom = (
+    raw: Record<string, unknown> | null,
+    key: string,
+  ): number | null => {
+    if (!raw) return null;
+    const v = raw[key];
+    if (v == null || v === '') return null;
+    const s = typeof v === 'string' ? v.trim().replace(/%$/, '') : String(v);
+    const n = parseFloat(s);
+    return Number.isFinite(n) ? n : null;
+  };
+  // GC stores percent fields as either 0–1 fractions or 0–100 numbers.
+  // Normalize to 0–100 so the percentile maths below are consistent.
+  const asPct = (n: number | null): number | null =>
+    n == null ? null : n > 0 && n <= 1 ? n * 100 : n;
+
+  const hhbRaw = asPct(rawNumFrom(player.battingRaw, 'HHB%'));
+  if (hhbRaw != null) {
+    out[5] = { pct: clamp((hhbRaw - 20) * 2.5), display: pctStr(hhbRaw) };
+  }
+
+  const ldRaw = asPct(rawNumFrom(player.battingRaw, 'LD%'));
+  if (ldRaw != null) {
+    // Sweet Spot ≈ line-drive frequency. >25% is elite at youth level.
+    out[6] = { pct: clamp((ldRaw - 12) * 5), display: pctStr(ldRaw) };
+  }
+
+  const kPctRaw = asPct(rawNumFrom(player.battingRaw, 'K%'));
+  if (kPctRaw != null) {
+    // Whiff Rate display = K% itself; pct inverts (lower K% = better).
+    out[9] = { pct: clamp((35 - kPctRaw) * 3.3, 0, 100), display: pctStr(kPctRaw) };
+  }
+
+  const bbPctRaw = asPct(rawNumFrom(player.battingRaw, 'BB%'));
+  if (bbPctRaw != null) {
+    // Walk Rate Above Age — youth 14U avg is ~8% BB.
+    const above = bbPctRaw - 8;
+    out[11] = {
+      pct: clamp((above + 8) * 5),
+      display: `${above >= 0 ? '+' : ''}${above.toFixed(1)}%`,
+    };
+  }
+
+  if (kPctRaw != null) {
+    // K Rate Below Age — youth 14U avg is ~20% K.
+    const below = 20 - kPctRaw;
+    out[12] = {
+      pct: clamp((below + 8) * 5),
+      display: `${below >= 0 ? '+' : ''}${below.toFixed(1)}%`,
+    };
+  }
+
+  const cPctRaw = asPct(rawNumFrom(player.battingRaw, 'C%'));
+  if (cPctRaw != null) {
+    // Zone Contact % uses GC's overall Contact %.
+    out[13] = { pct: clamp((cPctRaw - 60) * 2.8), display: pctStr(cPctRaw) };
+  }
+
+  const qabRaw = asPct(rawNumFrom(player.battingRaw, 'QAB%'));
+  if (qabRaw != null) {
+    // Early-Count Aggression proxied by QAB% (quality at-bats).
+    out[14] = { pct: clamp((qabRaw - 30) * 2.5), display: pctStr(qabRaw) };
+  }
+
+  // Pitching overrides (only for pitchers).
+  if (isPitcher) {
+    const firstSRaw = asPct(rawNumFrom(player.pitchingRaw, '1st-S%'));
+    if (firstSRaw != null) {
+      out[24] = {
+        pct: clamp((firstSRaw - 40) * 2.8),
+        display: pctStr(firstSRaw),
+      };
+    }
+
+    const sPctRaw = asPct(rawNumFrom(player.pitchingRaw, 'S%'));
+    if (sPctRaw != null) {
+      // CSW% best proxy at GC level is overall strike %.
+      out[20] = { pct: clamp((sPctRaw - 50) * 5), display: pctStr(sPctRaw) };
+    }
+
+    const kbbRaw = rawNumFrom(player.pitchingRaw, 'K/BB');
+    if (kbbRaw != null) {
+      // K-BB% — high K/BB ratio = dominant arm. Scale to roughly 0–30.
+      const kbbPct = clamp(kbbRaw * 7, 0, 30);
+      out[19] = { pct: clamp((kbbPct + 5) * 3), display: pctStr(kbbPct) };
+    }
+
+    const baaRaw = rawNumFrom(player.pitchingRaw, 'BAA');
+    if (baaRaw != null) {
+      // Reuse for xERA calibration nudge — lower BAA pulls xERA down.
+      const baseXera = parseFloat(out[16]?.display ?? '0');
+      const nudged = Math.max(1.0, baseXera - (0.25 - baaRaw) * 3);
+      out[16] = {
+        pct: clamp(((bench.eraMean - nudged) / bench.eraStd) * 15 + 55),
+        display: f2(nudged),
+      };
+    }
+  }
+
   return out;
 }
 
@@ -2316,7 +2421,13 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
                           : insight.category === 'team'
                           ? 'bg-violet-500/10 text-violet-300'
                           : 'bg-emerald-500/10 text-emerald-300';
-                      const rankInfo = modalInsightRanks[insight.id];
+                      // Team-category insights describe the roster, not a
+                      // single player, so a per-player rank chip would be
+                      // misleading. Suppress the chip in that case.
+                      const rankInfo =
+                        insight.category === 'team'
+                          ? undefined
+                          : modalInsightRanks[insight.id];
                       const rankClass = rankInfo
                         ? rankInfo.rank === 1
                           ? 'bg-emerald-500/10 text-emerald-300'
