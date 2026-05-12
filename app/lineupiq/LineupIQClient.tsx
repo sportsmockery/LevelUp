@@ -983,9 +983,11 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
     if (exporting || !effectiveTeam) return;
     setExporting(true);
     try {
+      // html2canvas-pro supports modern CSS color functions (oklch/oklab/color-mix)
+      // emitted by Tailwind v4. The original html2canvas silently fails on them.
       const [{ default: jsPDF }, { default: html2canvas }] = await Promise.all([
         import('jspdf'),
-        import('html2canvas'),
+        import('html2canvas-pro'),
       ]);
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
@@ -1093,6 +1095,13 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
 
       pdf.save(
         `LineupIQ_${activeLevel}_${effectiveTeam.name.replace(/[^A-Za-z0-9]+/g, '')}.pdf`,
+      );
+    } catch (err) {
+      console.error('[LineupIQ] PDF export failed:', err);
+      alert(
+        `PDF export failed: ${
+          err instanceof Error ? err.message : 'Unknown error'
+        }`,
       );
     } finally {
       setExporting(false);
