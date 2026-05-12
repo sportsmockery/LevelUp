@@ -251,7 +251,15 @@ const advancedInsightsLibrary: AdvancedInsight[] = [
 ];
 
 type ComputedStats = Record<number, number>;
-type AdvancedComputed = Record<number, { pct: number; display: string }>;
+// `pct` is clamped 0–100 and drives color thresholds + top-8 selection.
+// `sortKey`, when present, is the un-clamped underlying signal used to
+// break ties when ranking players within a single stat — without it,
+// any metric whose `pct` saturates at 100 ends up sorted by input order
+// (which is OPS-desc) and every player gets the same rank everywhere.
+type AdvancedComputed = Record<
+  number,
+  { pct: number; display: string; sortKey?: number }
+>;
 
 function clamp(n: number, lo = 0, hi = 100): number {
   return Math.min(hi, Math.max(lo, n));
@@ -361,59 +369,83 @@ function computeAdvancedStats(
   const out: AdvancedComputed = {};
 
   // 1. xBA — adjust AVG up/down by OPS deviation from age mean
-  const xba = clamp(avg + (ops - bench.opsMean) * 0.08, 0.15, 0.55);
-  out[1] = { pct: clamp(((xba - 0.2) / 0.25) * 100), display: f3(xba) };
+  const xbaRaw = avg + (ops - bench.opsMean) * 0.08;
+  const xba = clamp(xbaRaw, 0.15, 0.55);
+  out[1] = { pct: clamp(((xba - 0.2) / 0.25) * 100), display: f3(xba), sortKey: xbaRaw };
 
   // 2. xSLG — extra-base profile from OPS-AVG residual + HR rate
-  const xslg = clamp(ops - avg + hr * 0.005, 0.2, 0.95);
-  out[2] = { pct: clamp(((xslg - 0.25) / 0.5) * 100), display: f3(xslg) };
+  const xslgRaw = ops - avg + hr * 0.005;
+  const xslg = clamp(xslgRaw, 0.2, 0.95);
+  out[2] = { pct: clamp(((xslg - 0.25) / 0.5) * 100), display: f3(xslg), sortKey: xslgRaw };
 
   // 3. xwOBA — scaled OPS into wOBA range
-  const xwoba = clamp(ops * 0.45 + 0.05, 0.2, 0.6);
-  out[3] = { pct: clamp(((xwoba - 0.25) / 0.3) * 100), display: f3(xwoba) };
+  const xwobaRaw = ops * 0.45 + 0.05;
+  const xwoba = clamp(xwobaRaw, 0.2, 0.6);
+  out[3] = { pct: clamp(((xwoba - 0.25) / 0.3) * 100), display: f3(xwoba), sortKey: xwobaRaw };
 
   // 4. Barrel Rate — HR / batted-ball estimate
   const battedBalls = Math.max(rbi + sb + 15, 25);
-  const barrel = clamp((hr / battedBalls) * 100, 0, 30);
-  out[4] = { pct: clamp(barrel * 5), display: pctStr(barrel) };
+  const barrelRaw = (hr / battedBalls) * 100;
+  const barrel = clamp(barrelRaw, 0, 30);
+  out[4] = { pct: clamp(barrel * 5), display: pctStr(barrel), sortKey: barrelRaw };
 
-  // 5. Hard-Hit % — reuse core hard-contact proxy (#12)
-  const hardHit = clamp(28 + (core[12] ?? 50) * 0.35, 15, 70);
-  out[5] = { pct: clamp((hardHit - 20) * 2.5), display: pctStr(hardHit) };
+  // 5. Hard-Hit % — reuse core hard-contact proxy (#12). Overridden by
+  // raw HHB% below when GameChanger provides it.
+  const hardHitRaw = 28 + (core[12] ?? 50) * 0.35;
+  const hardHit = clamp(hardHitRaw, 15, 70);
+  out[5] = { pct: clamp((hardHit - 20) * 2.5), display: pctStr(hardHit), sortKey: hardHitRaw };
 
   // 6. Sweet Spot %
-  const sweet = clamp(avg * 100 + (xslg - avg) * 25, 15, 55);
-  out[6] = { pct: clamp((sweet - 20) * 3), display: pctStr(sweet) };
+  const sweetRaw = avg * 100 + (xslg - avg) * 25;
+  const sweet = clamp(sweetRaw, 15, 55);
+  out[6] = { pct: clamp((sweet - 20) * 3), display: pctStr(sweet), sortKey: sweetRaw };
 
   // 7. Pull Power Index — reuse core #9 (isolated impact)
-  out[7] = { pct: clamp(core[9] ?? 50), display: scoreStr(core[9] ?? 50) };
+  const pullPower = core[9] ?? 50;
+  out[7] = { pct: clamp(pullPower), display: scoreStr(pullPower), sortKey: pullPower };
 
   // 8. Oppo Hitting Index
-  const oppo = clamp(avg * 200 - hr * 0.8, 0, 100);
-  out[8] = { pct: oppo, display: scoreStr(oppo) };
+  const oppoRaw = avg * 200 - hr * 0.8;
+  const oppo = clamp(oppoRaw, 0, 100);
+  out[8] = { pct: oppo, display: scoreStr(oppo), sortKey: oppoRaw };
 
   // 9. Whiff Rate (lower better — display raw, pct inverted)
-  const whiff = clamp(28 - (core[7] ?? 88) * 0.15, 12, 38);
-  out[9] = { pct: clamp((38 - whiff) * 4), display: pctStr(whiff) };
+  const whiffRaw = 28 - (core[7] ?? 88) * 0.15;
+  const whiff = clamp(whiffRaw, 12, 38);
+  // Lower whiff = better → sortKey inverts so higher sortKey = better.
+  out[9] = { pct: clamp((38 - whiff) * 4), display: pctStr(whiff), sortKey: -whiffRaw };
 
   // 10. Chase Rate (lower better)
-  const chase = clamp(32 - (ops - bench.opsMean) * 20, 15, 45);
-  out[10] = { pct: clamp((45 - chase) * 3.3), display: pctStr(chase) };
+  const chaseRaw = 32 - (ops - bench.opsMean) * 20;
+  const chase = clamp(chaseRaw, 15, 45);
+  out[10] = { pct: clamp((45 - chase) * 3.3), display: pctStr(chase), sortKey: -chaseRaw };
 
   // 11. Walk Rate Above Age — OPS-AVG residual proxy
-  const bbAbove = clamp((ops - avg - 0.15) * 60, -8, 12);
-  out[11] = { pct: clamp((bbAbove + 8) * 5), display: `${bbAbove >= 0 ? '+' : ''}${bbAbove.toFixed(1)}%` };
+  const bbAboveRaw = (ops - avg - 0.15) * 60;
+  const bbAbove = clamp(bbAboveRaw, -8, 12);
+  out[11] = {
+    pct: clamp((bbAbove + 8) * 5),
+    display: `${bbAbove >= 0 ? '+' : ''}${bbAbove.toFixed(1)}%`,
+    sortKey: bbAboveRaw,
+  };
 
   // 12. K Rate Below Age
-  const kBelow = clamp((core[7] ?? 88) * 0.12 - 5, -8, 12);
-  out[12] = { pct: clamp((kBelow + 8) * 5), display: `${kBelow >= 0 ? '+' : ''}${kBelow.toFixed(1)}%` };
+  const kBelowRaw = (core[7] ?? 88) * 0.12 - 5;
+  const kBelow = clamp(kBelowRaw, -8, 12);
+  out[12] = {
+    pct: clamp((kBelow + 8) * 5),
+    display: `${kBelow >= 0 ? '+' : ''}${kBelow.toFixed(1)}%`,
+    sortKey: kBelowRaw,
+  };
 
   // 13. Zone Contact %
-  const zoneCt = clamp(avg * 180 + 60, 60, 95);
-  out[13] = { pct: clamp((zoneCt - 60) * 2.8), display: pctStr(zoneCt) };
+  const zoneCtRaw = avg * 180 + 60;
+  const zoneCt = clamp(zoneCtRaw, 60, 95);
+  out[13] = { pct: clamp((zoneCt - 60) * 2.8), display: pctStr(zoneCt), sortKey: zoneCtRaw };
 
   // 14. Early-Count Aggression
-  out[14] = { pct: clamp(core[5] ?? 50), display: scoreStr(core[5] ?? 50) };
+  const earlyCount = core[5] ?? 50;
+  out[14] = { pct: clamp(earlyCount), display: scoreStr(earlyCount), sortKey: earlyCount };
 
   // 15. Two-Strike Survival
   const twoStrike = clamp(avg * 0.8, 0.1, 0.4);
@@ -504,83 +536,108 @@ function computeAdvancedStats(
 
   const hhbRaw = asPct(rawNumFrom(player.battingRaw, 'HHB%'));
   if (hhbRaw != null) {
-    out[5] = { pct: clamp((hhbRaw - 20) * 2.5), display: pctStr(hhbRaw) };
+    out[5] = {
+      pct: clamp((hhbRaw - 20) * 2.5),
+      display: pctStr(hhbRaw),
+      sortKey: hhbRaw,
+    };
   }
 
   const ldRaw = asPct(rawNumFrom(player.battingRaw, 'LD%'));
   if (ldRaw != null) {
-    // Sweet Spot ≈ line-drive frequency. >25% is elite at youth level.
-    out[6] = { pct: clamp((ldRaw - 12) * 5), display: pctStr(ldRaw) };
+    out[6] = {
+      pct: clamp((ldRaw - 12) * 5),
+      display: pctStr(ldRaw),
+      sortKey: ldRaw,
+    };
   }
 
   const kPctRaw = asPct(rawNumFrom(player.battingRaw, 'K%'));
   if (kPctRaw != null) {
-    // Whiff Rate display = K% itself; pct inverts (lower K% = better).
-    out[9] = { pct: clamp((35 - kPctRaw) * 3.3, 0, 100), display: pctStr(kPctRaw) };
+    // Lower K% is better — invert for sortKey so higher sortKey wins.
+    out[9] = {
+      pct: clamp((35 - kPctRaw) * 3.3, 0, 100),
+      display: pctStr(kPctRaw),
+      sortKey: -kPctRaw,
+    };
   }
 
   const bbPctRaw = asPct(rawNumFrom(player.battingRaw, 'BB%'));
   if (bbPctRaw != null) {
-    // Walk Rate Above Age — youth 14U avg is ~8% BB.
     const above = bbPctRaw - 8;
     out[11] = {
       pct: clamp((above + 8) * 5),
       display: `${above >= 0 ? '+' : ''}${above.toFixed(1)}%`,
+      sortKey: bbPctRaw,
     };
   }
 
   if (kPctRaw != null) {
-    // K Rate Below Age — youth 14U avg is ~20% K.
     const below = 20 - kPctRaw;
     out[12] = {
       pct: clamp((below + 8) * 5),
       display: `${below >= 0 ? '+' : ''}${below.toFixed(1)}%`,
+      // Lower K% = better, so the unclamped (20 − K%) is already a
+      // "higher is better" signal we can use directly.
+      sortKey: below,
     };
   }
 
   const cPctRaw = asPct(rawNumFrom(player.battingRaw, 'C%'));
   if (cPctRaw != null) {
-    // Zone Contact % uses GC's overall Contact %.
-    out[13] = { pct: clamp((cPctRaw - 60) * 2.8), display: pctStr(cPctRaw) };
+    out[13] = {
+      pct: clamp((cPctRaw - 60) * 2.8),
+      display: pctStr(cPctRaw),
+      sortKey: cPctRaw,
+    };
   }
 
   const qabRaw = asPct(rawNumFrom(player.battingRaw, 'QAB%'));
   if (qabRaw != null) {
-    // Early-Count Aggression proxied by QAB% (quality at-bats).
-    out[14] = { pct: clamp((qabRaw - 30) * 2.5), display: pctStr(qabRaw) };
+    out[14] = {
+      pct: clamp((qabRaw - 30) * 2.5),
+      display: pctStr(qabRaw),
+      sortKey: qabRaw,
+    };
   }
 
-  // Pitching overrides (only for pitchers).
   if (isPitcher) {
     const firstSRaw = asPct(rawNumFrom(player.pitchingRaw, '1st-S%'));
     if (firstSRaw != null) {
       out[24] = {
         pct: clamp((firstSRaw - 40) * 2.8),
         display: pctStr(firstSRaw),
+        sortKey: firstSRaw,
       };
     }
 
     const sPctRaw = asPct(rawNumFrom(player.pitchingRaw, 'S%'));
     if (sPctRaw != null) {
-      // CSW% best proxy at GC level is overall strike %.
-      out[20] = { pct: clamp((sPctRaw - 50) * 5), display: pctStr(sPctRaw) };
+      out[20] = {
+        pct: clamp((sPctRaw - 50) * 5),
+        display: pctStr(sPctRaw),
+        sortKey: sPctRaw,
+      };
     }
 
     const kbbRaw = rawNumFrom(player.pitchingRaw, 'K/BB');
     if (kbbRaw != null) {
-      // K-BB% — high K/BB ratio = dominant arm. Scale to roughly 0–30.
       const kbbPct = clamp(kbbRaw * 7, 0, 30);
-      out[19] = { pct: clamp((kbbPct + 5) * 3), display: pctStr(kbbPct) };
+      out[19] = {
+        pct: clamp((kbbPct + 5) * 3),
+        display: pctStr(kbbPct),
+        sortKey: kbbRaw,
+      };
     }
 
     const baaRaw = rawNumFrom(player.pitchingRaw, 'BAA');
     if (baaRaw != null) {
-      // Reuse for xERA calibration nudge — lower BAA pulls xERA down.
       const baseXera = parseFloat(out[16]?.display ?? '0');
       const nudged = Math.max(1.0, baseXera - (0.25 - baaRaw) * 3);
       out[16] = {
         pct: clamp(((bench.eraMean - nudged) / bench.eraStd) * 15 + 55),
         display: f2(nudged),
+        sortKey: -baaRaw, // lower BAA = better
       };
     }
   }
@@ -1408,13 +1465,19 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
     const out: Record<number, { rank: number; total: number }> = {};
     for (const insight of modalTopAdvanced) {
       const scored = everyPlayerAdv
-        .map((s) => ({
-          id: s.id,
-          pct: s.adv[insight.id]?.pct ?? 0,
-          display: s.adv[insight.id]?.display ?? '—',
-        }))
+        .map((s) => {
+          const cell = s.adv[insight.id];
+          return {
+            id: s.id,
+            pct: cell?.pct ?? 0,
+            // Fall back to pct when the cell has no unclamped sortKey,
+            // and to player.id to keep ordering deterministic on ties.
+            key: cell?.sortKey ?? cell?.pct ?? 0,
+            display: cell?.display ?? '—',
+          };
+        })
         .filter((s) => s.display !== '—');
-      scored.sort((a, b) => b.pct - a.pct);
+      scored.sort((a, b) => b.key - a.key || a.id.localeCompare(b.id));
       const idx = scored.findIndex((s) => s.id === selectedPlayer.id);
       if (idx >= 0) out[insight.id] = { rank: idx + 1, total: scored.length };
     }
@@ -2186,17 +2249,23 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
             if (pickerStat.kind === 'core') {
               const raw = core[pickerStat.stat.id] ?? 0;
               const pct = clamp(raw);
-              return { p, pct, display: Math.round(pct).toString() };
+              return {
+                p,
+                pct,
+                key: raw,
+                display: Math.round(pct).toString(),
+              };
             }
             const adv = computeAdvancedStats(p, bench, core);
             const cell = adv[pickerStat.insight.id];
             return {
               p,
               pct: cell?.pct ?? 0,
+              key: cell?.sortKey ?? cell?.pct ?? 0,
               display: cell?.display ?? '—',
             };
           })
-          .sort((a, b) => b.pct - a.pct);
+          .sort((a, b) => b.key - a.key || a.p.id.localeCompare(b.p.id));
 
         const statName =
           pickerStat.kind === 'core'
