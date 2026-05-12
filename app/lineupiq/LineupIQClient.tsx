@@ -22,6 +22,9 @@ import {
   Play,
   Flame,
   AlertTriangle,
+  Info,
+  ChevronRight,
+  Lightbulb,
 } from 'lucide-react';
 
 export type LineupTeam = {
@@ -488,6 +491,205 @@ function topAdvancedInsights(adv: AdvancedComputed, n = 8): AdvancedInsight[] {
     .slice(0, n);
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// COACH INSIGHTS — plain-English, actionable summary derived from the same
+// computed core + advanced stats. Drives both the Coach Insights cards and
+// the Recommended Action footer in the player modal.
+// ────────────────────────────────────────────────────────────────────────────
+type CoachInsight = {
+  category: string;
+  icon: string;
+  insight: string;
+  tooltip: string;
+};
+
+function getCoachInsights(
+  player: LineupPlayer,
+  core: ComputedStats,
+  adv: AdvancedComputed,
+): CoachInsight[] {
+  const insights: CoachInsight[] = [];
+  const npi = core[1] ?? 0;
+  const prevention = core[16] ?? 0;
+  const twoWay = core[26] ?? 0;
+  const usageRisk = core[47] ?? 88; // 100 = safe, lower = riskier workload
+  const coach = core[50] ?? 0;
+  const hardHit = adv[5]?.pct ?? 0;
+  const pullPower = adv[7]?.pct ?? 0;
+  const zoneContact = adv[13]?.pct ?? 0;
+
+  if (npi > 75)
+    insights.push({
+      category: 'Offense',
+      icon: '🔥',
+      insight: `Elite offensive producer (NPI ${Math.round(npi)}). Strong candidate for the 3rd or 4th spot in the lineup.`,
+      tooltip:
+        'NPI = OPS z-score vs age peers. >75 = top-quartile bat at this age.',
+    });
+  else if (npi > 60)
+    insights.push({
+      category: 'Offense',
+      icon: '📈',
+      insight: `Above-average bat (NPI ${Math.round(npi)}). Consider moving up in the order — good contact rate.`,
+      tooltip:
+        'NPI between 60–75 = solid contributor. Look for room to climb in the order.',
+    });
+  else if (npi > 0)
+    insights.push({
+      category: 'Offense',
+      icon: '📊',
+      insight: `Developing hitter (NPI ${Math.round(npi)}). Drill plate discipline and contact quality.`,
+      tooltip: 'NPI <60 = below age median. Focus reps on at-bat quality.',
+    });
+
+  if (hardHit > 55)
+    insights.push({
+      category: 'Power',
+      icon: '💥',
+      insight: `Strong hard-hit profile (${Math.round(hardHit)} percentile). Defenses will shift — coach the swing path to keep working.`,
+      tooltip:
+        'Hard-Hit % proxy from contact quality. >55th pct = high-energy contact frequency.',
+    });
+
+  if (pullPower > 80)
+    insights.push({
+      category: 'Power',
+      icon: '🏏',
+      insight: `Extreme pull-power tendency (${Math.round(pullPower)} pct). Use shift-aware lineup spots.`,
+      tooltip:
+        'Pull Power Index — XBH bias toward pull side. Coaches with shift defenses target these hitters.',
+    });
+
+  if (zoneContact > 80)
+    insights.push({
+      category: 'Plate Discipline',
+      icon: '🎯',
+      insight: `Excellent zone contact (${Math.round(zoneContact)} pct). High-floor at-bat — trust him with two strikes.`,
+      tooltip:
+        'Zone Contact % — connects on in-zone pitches. >80 pct stabilizes the lineup.',
+    });
+
+  if (player.sb >= 10)
+    insights.push({
+      category: 'Speed',
+      icon: '⚡',
+      insight: `${player.sb} stolen bases on the year. Excellent leadoff or pinch-runner option.`,
+      tooltip: 'High SB volume — leverage in late-inning, close-game situations.',
+    });
+
+  if (player.hasPitched) {
+    if (usageRisk < 75)
+      insights.push({
+        category: 'Pitching',
+        icon: '🧢',
+        insight: `Moderate workload risk. Cap pitch count around 60–65 in high-leverage games.`,
+        tooltip: `Usage Risk score ${Math.round(
+          usageRisk,
+        )} — lower = more fatigue exposure given current IP + role.`,
+      });
+    else if (prevention > 65)
+      insights.push({
+        category: 'Pitching',
+        icon: '✅',
+        insight: `Run-prevention edge (Prevention ${Math.round(prevention)}). Trust in close-and-late.`,
+        tooltip:
+          'Age-Adjusted Run Prevention Index. >65 = above the staff average.',
+      });
+  }
+
+  if (twoWay > 70)
+    insights.push({
+      category: 'Two-Way',
+      icon: '⭐',
+      insight: `True two-way contributor (${Math.round(twoWay)} composite). Valuable in the lineup AND on the mound.`,
+      tooltip:
+        'Cross-Age Two-Way Composite = (Hitting NPI + Prevention) / 2.',
+    });
+
+  insights.push({
+    category: 'Recommendation',
+    icon: '✅',
+    insight:
+      coach > 80
+        ? `Start today. High-impact player — give the green light on the bases.`
+        : coach > 65
+        ? `Steady contributor. Standard usage, monitor workload across the week.`
+        : `Spot start or platoon — favorable matchup spots only.`,
+    tooltip: `Coach Decision Engine: 0.35·NPI + 0.30·Prevention + 0.20·Consistency + … (Coach Score ${Math.round(
+      coach,
+    )}).`,
+  });
+
+  return insights;
+}
+
+function getRecommendedAction(
+  player: LineupPlayer,
+  core: ComputedStats,
+): string {
+  const coach = core[50] ?? 0;
+  const npi = core[1] ?? 0;
+  const usageRisk = core[47] ?? 88;
+  if (coach > 80) return 'Bat 3rd or 4th — cleanup spot';
+  if (npi > 75) return 'Move up in the batting order';
+  if (player.hasPitched && usageRisk < 70) return 'Rest or limit pitch count';
+  if (player.sb > 12) return 'Use as leadoff or pinch-runner';
+  return "Start in today's lineup";
+}
+
+// Tailwind needs full class strings (no dynamic interpolation) so each
+// standout theme is enumerated explicitly. label is for the kicker text,
+// border/bg/text decorate the score badge, accent is the insight line.
+type StandoutColor = 'indigo' | 'sky' | 'amber' | 'purple' | 'rose' | 'teal';
+
+const STANDOUT_COLORS: Record<
+  StandoutColor,
+  { label: string; border: string; bg: string; text: string; accent: string }
+> = {
+  indigo: {
+    label: 'text-indigo-400',
+    border: 'border-indigo-500',
+    bg: 'bg-indigo-500/10',
+    text: 'text-indigo-300',
+    accent: 'text-emerald-400',
+  },
+  sky: {
+    label: 'text-sky-400',
+    border: 'border-sky-500',
+    bg: 'bg-sky-500/10',
+    text: 'text-sky-300',
+    accent: 'text-sky-400',
+  },
+  amber: {
+    label: 'text-amber-400',
+    border: 'border-amber-500',
+    bg: 'bg-amber-500/10',
+    text: 'text-amber-300',
+    accent: 'text-amber-400',
+  },
+  purple: {
+    label: 'text-purple-400',
+    border: 'border-purple-500',
+    bg: 'bg-purple-500/10',
+    text: 'text-purple-300',
+    accent: 'text-purple-400',
+  },
+  rose: {
+    label: 'text-rose-400',
+    border: 'border-rose-500',
+    bg: 'bg-rose-500/10',
+    text: 'text-rose-300',
+    accent: 'text-rose-400',
+  },
+  teal: {
+    label: 'text-teal-400',
+    border: 'border-teal-500',
+    bg: 'bg-teal-500/10',
+    text: 'text-teal-300',
+    accent: 'text-teal-400',
+  },
+};
+
 function RadarChart({
   player,
   bench,
@@ -876,6 +1078,126 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
     return pitchers.sort((a, b) => parseFloat(a.era) - parseFloat(b.era))[0] ?? null;
   }, [roster]);
 
+  // Algorithmic Standouts — 6 distinct "best at X" cards. We de-duplicate
+  // greedily so the same player doesn't claim every card on small rosters.
+  const standouts = useMemo(() => {
+    if (!roster.length) return [] as Array<{
+      kind: string;
+      label: string;
+      color: StandoutColor;
+      player: LineupPlayer;
+      score: number;
+      subtitle: string;
+      insight: string;
+    }>;
+    const withCore = roster.map((p) => ({ p, core: computeAllStats(p, bench) }));
+    const claimed = new Set<string>();
+    const pick = (
+      sorter: (a: { p: LineupPlayer; core: ComputedStats }, b: { p: LineupPlayer; core: ComputedStats }) => number,
+      filter?: (e: { p: LineupPlayer; core: ComputedStats }) => boolean,
+    ) => {
+      const pool = withCore
+        .filter((e) => !claimed.has(e.p.id) && (!filter || filter(e)));
+      if (!pool.length) return null;
+      const winner = [...pool].sort(sorter)[0];
+      claimed.add(winner.p.id);
+      return winner;
+    };
+
+    const out: Array<{
+      kind: string;
+      label: string;
+      color: StandoutColor;
+      player: LineupPlayer;
+      score: number;
+      subtitle: string;
+      insight: string;
+    }> = [];
+
+    const offensive = pick((a, b) => (b.core[1] ?? 0) - (a.core[1] ?? 0));
+    if (offensive)
+      out.push({
+        kind: 'offensive',
+        label: 'Offensive Juggernaut',
+        color: 'indigo',
+        player: offensive.p,
+        score: Math.round(offensive.core[1] ?? 0),
+        subtitle: `NPI ${Math.round(offensive.core[1] ?? 0)} • Coach Score ${Math.round(offensive.core[50] ?? 0)}`,
+        insight: 'Elite contact + power. Strong cleanup candidate.',
+      });
+
+    const mound = pick(
+      (a, b) => parseFloat(a.p.era) - parseFloat(b.p.era),
+      (e) => e.p.hasPitched,
+    );
+    if (mound)
+      out.push({
+        kind: 'mound',
+        label: 'Mound Ace',
+        color: 'sky',
+        player: mound.p,
+        score: Math.round(mound.core[16] ?? 0),
+        subtitle: `Prevention ${Math.round(mound.core[16] ?? 0)} • ERA ${mound.p.era}`,
+        insight: 'Best run prevention on staff. Start vs strong offenses.',
+      });
+
+    const speed = pick(
+      (a, b) => b.p.sb - a.p.sb,
+      (e) => e.p.sb > 0,
+    );
+    if (speed)
+      out.push({
+        kind: 'speed',
+        label: 'Speed Demon',
+        color: 'amber',
+        player: speed.p,
+        score: speed.p.sb,
+        subtitle: `${speed.p.sb} SB • OPS ${speed.p.ops}`,
+        insight: 'Elite base stealer. Perfect leadoff or pinch-runner.',
+      });
+
+    const twoWay = pick(
+      (a, b) => (b.core[26] ?? 0) - (a.core[26] ?? 0),
+      (e) => e.p.hasPitched,
+    );
+    if (twoWay)
+      out.push({
+        kind: 'twoway',
+        label: 'Two-Way Star',
+        color: 'purple',
+        player: twoWay.p,
+        score: Math.round(twoWay.core[26] ?? 0),
+        subtitle: `Two-Way ${Math.round(twoWay.core[26] ?? 0)} • Versat ${Math.round(twoWay.core[28] ?? 0)}`,
+        insight: 'Valuable on both sides of the ball — flexible usage.',
+      });
+
+    const clutch = pick((a, b) => (b.core[5] ?? 0) - (a.core[5] ?? 0));
+    if (clutch)
+      out.push({
+        kind: 'clutch',
+        label: 'Clutch Performer',
+        color: 'rose',
+        player: clutch.p,
+        score: Math.round(clutch.core[5] ?? 0),
+        subtitle: `RBI ${clutch.p.rbi} • OPS ${clutch.p.ops}`,
+        insight: 'Thrives in high-pressure situations. Reliable late.',
+      });
+
+    const efficiency = pick((a, b) => (b.core[12] ?? 0) - (a.core[12] ?? 0));
+    if (efficiency)
+      out.push({
+        kind: 'efficiency',
+        label: 'High-Efficiency',
+        color: 'teal',
+        player: efficiency.p,
+        score: Math.round(efficiency.core[12] ?? 0),
+        subtitle: `AVG ${efficiency.p.avg} • OPS ${efficiency.p.ops}`,
+        insight: 'Extremely efficient at-bats. Builds rallies.',
+      });
+
+    return out;
+  }, [roster, bench]);
+
   // Game Day Decision Center — pure-derived from existing season totals.
   // Top-9-by-NPI lineup, with projected runs scaled from average NPI.
   const lineupOptimizer = useMemo(() => {
@@ -952,6 +1274,15 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
     () => (modalAdvanced ? topAdvancedInsights(modalAdvanced, 8) : []),
     [modalAdvanced],
   );
+
+  const modalCoach = useMemo(() => {
+    if (!selectedPlayer || !modalAdvanced) return null;
+    const core = computeAllStats(selectedPlayer, bench);
+    return {
+      insights: getCoachInsights(selectedPlayer, core, modalAdvanced),
+      action: getRecommendedAction(selectedPlayer, core),
+    };
+  }, [selectedPlayer, modalAdvanced, bench]);
 
   // Team-wide rank of the selected player for each of their top-8 advanced
   // insights. Excludes players whose insight value is '—' so pitchers aren't
@@ -1234,58 +1565,40 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
               Normalized {prettyLevel(activeLevel)}
             </span>
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {hittingLeader && (
-              <div
-                onClick={() => setSelectedPlayer(hittingLeader)}
-                className="cursor-pointer bg-gradient-to-r from-slate-900 to-slate-800 border border-slate-700/50 rounded-2xl p-5 flex items-center justify-between shadow-xl hover:scale-[1.02] transition-all"
-              >
-                <div>
-                  <p className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-1">
-                    Offensive Juggernaut
-                  </p>
-                  <h3 className="text-2xl font-bold">
-                    {hittingLeader.name}{' '}
-                    <span className="text-slate-500 font-normal text-lg">
-                      {hittingLeader.number}
-                    </span>
-                  </h3>
-                  <p className="text-emerald-400 mt-1 text-sm">
-                    NPI {Math.round(computeAllStats(hittingLeader, bench)[1])} • Coach Score{' '}
-                    {Math.round(computeAllStats(hittingLeader, bench)[50])}
-                  </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {standouts.map((s) => {
+              const c = STANDOUT_COLORS[s.color];
+              return (
+                <div
+                  key={s.kind}
+                  onClick={() => setSelectedPlayer(s.player)}
+                  className="cursor-pointer bg-gradient-to-r from-slate-900 to-slate-800 border border-slate-700/50 rounded-3xl p-5 shadow-xl hover:scale-[1.02] transition-all group"
+                >
+                  <div className="flex justify-between items-start mb-3 gap-3">
+                    <div className="min-w-0">
+                      <p
+                        className={`text-[10px] font-bold uppercase tracking-widest mb-1 ${c.label}`}
+                      >
+                        {s.label}
+                      </p>
+                      <h3 className="text-xl font-bold truncate">
+                        {s.player.name}{' '}
+                        <span className="text-slate-500 font-normal text-base">
+                          {s.player.number}
+                        </span>
+                      </h3>
+                      <p className="text-slate-400 text-xs mt-1 truncate">{s.subtitle}</p>
+                    </div>
+                    <div
+                      className={`h-14 w-14 rounded-2xl border-[3px] flex items-center justify-center font-black text-2xl flex-shrink-0 group-hover:scale-110 transition-transform tabular-nums ${c.border} ${c.bg} ${c.text}`}
+                    >
+                      {s.score}
+                    </div>
+                  </div>
+                  <p className={`text-xs ${c.accent}`}>{s.insight}</p>
                 </div>
-                <div className="h-16 w-16 rounded-full border-[3px] border-indigo-500 flex items-center justify-center bg-indigo-500/10 text-indigo-300 font-black text-xl">
-                  {Math.round(computeAllStats(hittingLeader, bench)[1])}
-                </div>
-              </div>
-            )}
-
-            {pitchingLeader && (
-              <div
-                onClick={() => setSelectedPlayer(pitchingLeader)}
-                className="cursor-pointer bg-gradient-to-r from-slate-900 to-slate-800 border border-slate-700/50 rounded-2xl p-5 flex items-center justify-between shadow-xl hover:scale-[1.02] transition-all"
-              >
-                <div>
-                  <p className="text-xs font-bold text-sky-400 uppercase tracking-wider mb-1">
-                    Mound Ace
-                  </p>
-                  <h3 className="text-2xl font-bold">
-                    {pitchingLeader.name}{' '}
-                    <span className="text-slate-500 font-normal text-lg">
-                      {pitchingLeader.number}
-                    </span>
-                  </h3>
-                  <p className="text-sky-400 mt-1 text-sm">
-                    Prevention {Math.round(computeAllStats(pitchingLeader, bench)[16])} • Coach Score{' '}
-                    {Math.round(computeAllStats(pitchingLeader, bench)[50])}
-                  </p>
-                </div>
-                <div className="h-16 w-16 rounded-full border-[3px] border-sky-500 flex items-center justify-center bg-sky-500/10 text-sky-300 font-black text-xl">
-                  {Math.round(computeAllStats(pitchingLeader, bench)[16])}
-                </div>
-              </div>
-            )}
+              );
+            })}
           </div>
         </div>
 
@@ -1904,11 +2217,71 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
                 </div>
               </div>
 
-              {/* Complete Stats — full GameChanger raw offense / defense dump */}
-              <CompleteStatsGrid title="Hitting — full stat line" data={selectedPlayer.battingRaw} />
-              {selectedPlayer.hasPitched && (
-                <CompleteStatsGrid title="Pitching — full stat line" data={selectedPlayer.pitchingRaw} />
+              {/* Coach Insights — plain-English actionable summary from
+                  computed core + advanced stats. Categorized + tooltip on
+                  hover with the underlying formula context. */}
+              {modalCoach && modalCoach.insights.length > 0 && (
+                <div className="mt-10">
+                  <div className="flex items-center justify-between flex-wrap gap-2 mb-5">
+                    <h3 className="text-lg font-bold text-slate-200 flex items-center gap-2">
+                      <Lightbulb className="w-5 h-5 text-amber-400" />
+                      Coach Insights
+                    </h3>
+                    <span className="text-xs uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full">
+                      What the data tells you
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {modalCoach.insights.map((item, i) => (
+                      <div
+                        key={`${item.category}-${i}`}
+                        className="bg-slate-800/50 border border-slate-700/50 rounded-3xl p-4 flex gap-3 hover:bg-slate-800 transition-colors"
+                      >
+                        <div className="text-2xl flex-shrink-0 leading-none pt-0.5">
+                          {item.icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">
+                            {item.category}
+                          </p>
+                          <p className="text-sm text-slate-100 leading-snug">
+                            {item.insight}
+                          </p>
+                        </div>
+                        <div className="group relative flex-shrink-0">
+                          <Info className="w-4 h-4 text-slate-500 hover:text-slate-200 cursor-help mt-0.5" />
+                          <div className="absolute hidden group-hover:block bg-slate-950 border border-slate-700 text-[11px] text-slate-200 rounded-2xl p-3 w-64 right-0 top-6 shadow-2xl z-50">
+                            {item.tooltip}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
+
+              {/* Complete Stats — full GameChanger raw offense / defense dump.
+                  Tucked behind a disclosure so the coach-friendly insights
+                  stay above the fold; raw data is still one click away. */}
+              <details className="mt-8 group">
+                <summary className="cursor-pointer flex items-center justify-between gap-2 px-4 py-3 bg-slate-800/30 hover:bg-slate-800/50 border border-slate-700/50 rounded-2xl text-sm font-medium text-slate-300 transition-colors list-none">
+                  <span className="flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4 text-slate-400" />
+                    View full raw stat line
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-slate-400 transition-transform group-open:rotate-90" />
+                </summary>
+                <CompleteStatsGrid
+                  title="Hitting — full stat line"
+                  data={selectedPlayer.battingRaw}
+                />
+                {selectedPlayer.hasPitched && (
+                  <CompleteStatsGrid
+                    title="Pitching — full stat line"
+                    data={selectedPlayer.pitchingRaw}
+                  />
+                )}
+              </details>
 
               {/* Advanced Insights — top 8 cards, categorized + coach insight */}
               {modalAdvanced && modalTopAdvanced.length > 0 && (
@@ -1991,6 +2364,32 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
                 </div>
               )}
             </div>
+
+            {/* Recommended Action footer — decisive single-tap CTA based on
+                the Coach Decision Engine score + supporting signals. */}
+            {modalCoach && (
+              <div className="border-t border-slate-700 p-6 bg-slate-950/60 rounded-b-3xl">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!modalCoach) return;
+                    alert(
+                      `Recommended Action for ${selectedPlayer.name}\n\n${modalCoach.action}`,
+                    );
+                  }}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 transition-all text-white font-semibold text-base sm:text-lg py-4 sm:py-5 rounded-3xl flex items-center justify-center gap-3 shadow-lg shadow-emerald-500/30"
+                >
+                  <Play className="w-5 h-5" />
+                  <span className="uppercase tracking-widest text-sm sm:text-base">
+                    {modalCoach.action}
+                  </span>
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+                <p className="text-center text-[11px] text-slate-500 mt-3">
+                  Auto-derived from Coach Decision Engine • tap to log to today&apos;s lineup
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
