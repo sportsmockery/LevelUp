@@ -20,6 +20,9 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  Play,
+  Flame,
+  AlertTriangle,
 } from 'lucide-react';
 
 export type LineupTeam = {
@@ -827,6 +830,7 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
   const effectiveTeam =
     teamsForLevel.find((t) => t.id === activeTeamId) ?? teamsForLevel[0] ?? teams[0];
 
+  const [mode, setMode] = useState<'gameday' | 'analytics'>('gameday');
   const [activeTab, setActiveTab] = useState<'hitting' | 'pitching' | 'nextgen'>('hitting');
   const [activeNextGenCategory, setActiveNextGenCategory] =
     useState<NextGenCategory>('hitting');
@@ -847,6 +851,66 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
   const pitchingLeader = useMemo(() => {
     const pitchers = roster.filter((p) => p.hasPitched);
     return pitchers.sort((a, b) => parseFloat(a.era) - parseFloat(b.era))[0] ?? null;
+  }, [roster]);
+
+  // Game Day Decision Center — pure-derived from existing season totals.
+  // Top-9-by-NPI lineup, with projected runs scaled from average NPI.
+  const lineupOptimizer = useMemo(() => {
+    if (roster.length < 2) return null;
+    const npiToRuns = (avgNpi: number) =>
+      Math.max(2, Math.min(14, (avgNpi - 30) * 0.18));
+    const ranked = roster
+      .map((p) => ({ p, npi: computeAllStats(p, bench)[1] ?? 0 }))
+      .sort((a, b) => b.npi - a.npi);
+    const optimal = ranked.slice(0, 9);
+    // Current "order" proxy = roster as-is (already sorted by OPS desc on load).
+    const currentTop9 = roster
+      .slice(0, 9)
+      .map((p) => ({ p, npi: computeAllStats(p, bench)[1] ?? 0 }));
+    const avg = (arr: { npi: number }[]) =>
+      arr.reduce((s, x) => s + x.npi, 0) / Math.max(1, arr.length);
+    const projected = npiToRuns(avg(optimal));
+    const current = npiToRuns(avg(currentTop9));
+    const delta = projected - current;
+    return {
+      projectedRuns: projected.toFixed(1),
+      improvement:
+        delta >= 0.05
+          ? `+${delta.toFixed(1)} runs vs current order`
+          : 'Current order is already optimal',
+      order: optimal.map((x) => x.p),
+    };
+  }, [roster, bench]);
+
+  // Hot Today = top NPI hitter (proxy without per-game trend data).
+  const hotPlayer = useMemo(() => {
+    if (!roster.length) return null;
+    return [...roster].sort(
+      (a, b) =>
+        (computeAllStats(b, bench)[1] ?? 0) - (computeAllStats(a, bench)[1] ?? 0),
+    )[0];
+  }, [roster, bench]);
+
+  // Usage Risk = high IP pitcher OR high SB hitter (core composite #47 logic).
+  const usageRisk = useMemo(() => {
+    if (!roster.length) return null;
+    const pitcherByIp = roster
+      .filter((p) => p.hasPitched)
+      .sort((a, b) => parseFloat(b.ip) - parseFloat(a.ip))[0];
+    const runnerBySb = [...roster].sort((a, b) => b.sb - a.sb)[0];
+    if (pitcherByIp && parseFloat(pitcherByIp.ip) >= 20) {
+      return {
+        player: pitcherByIp,
+        reason: `${pitcherByIp.ip} IP — monitor pitch count + rest days`,
+      };
+    }
+    if (runnerBySb && runnerBySb.sb >= 10) {
+      return {
+        player: runnerBySb,
+        reason: `${runnerBySb.sb} SB — monitor leg fatigue`,
+      };
+    }
+    return null;
   }, [roster]);
 
   const filteredNextGen = NEXT_GEN_STATS.filter((s) => s.category === activeNextGenCategory);
@@ -1040,6 +1104,22 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
               ))}
             </div>
 
+            <div className="flex items-center gap-1 bg-slate-800 rounded-2xl p-1 border border-slate-700">
+              {(['gameday', 'analytics'] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setMode(m)}
+                  className={`px-5 py-1.5 text-xs font-bold uppercase tracking-widest rounded-[14px] transition-all ${
+                    mode === m
+                      ? 'bg-white text-slate-900 shadow'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {m === 'gameday' ? 'Game Day' : 'Analytics'}
+                </button>
+              ))}
+            </div>
+
             <button
               onClick={handleExportPDF}
               disabled={exporting}
@@ -1178,6 +1258,108 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
           </div>
         </div>
 
+        {mode === 'gameday' && (
+          <section className="mb-10">
+            <h2 className="text-lg font-semibold mb-4 text-slate-300 flex items-center">
+              <Play className="mr-2 h-5 w-5 text-emerald-400" />
+              Game Day Decision Center
+            </h2>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+              <div className="lg:col-span-7 bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-700/50 rounded-3xl p-6 shadow-xl">
+                <h3 className="flex items-center gap-2 text-xs uppercase tracking-widest text-slate-400 font-bold mb-5">
+                  <ArrowUpDown className="w-4 h-4" /> Optimal Lineup Simulator
+                </h3>
+                {lineupOptimizer ? (
+                  <div className="flex flex-wrap gap-6 items-end justify-between">
+                    <div>
+                      <p className="text-6xl font-black text-emerald-400 font-mono tabular-nums leading-none">
+                        {lineupOptimizer.projectedRuns}
+                      </p>
+                      <p className="text-slate-400 text-sm mt-2">Projected team runs</p>
+                      <p className="text-emerald-400 text-sm font-semibold mt-1">
+                        {lineupOptimizer.improvement}
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      {lineupOptimizer.order.map((p, i) => (
+                        <button
+                          key={p.id}
+                          onClick={() => setSelectedPlayer(p)}
+                          className="text-left text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700/50 px-4 py-1.5 rounded-full font-medium transition-colors"
+                        >
+                          <span className="text-slate-500 mr-2 tabular-nums">{i + 1}.</span>
+                          <span className="text-slate-200">{p.name}</span>
+                          <span className="text-slate-500 ml-2 font-mono tabular-nums">
+                            OPS {p.ops}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-slate-400 text-sm">
+                    Need at least 2 players with season stats to build a lineup.
+                  </p>
+                )}
+              </div>
+
+              <div className="lg:col-span-5 space-y-4">
+                <button
+                  type="button"
+                  disabled={!hotPlayer}
+                  onClick={() => hotPlayer && setSelectedPlayer(hotPlayer)}
+                  className="w-full text-left bg-slate-900 border border-slate-700/50 rounded-3xl p-5 hover:bg-slate-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <h3 className="flex items-center gap-2 text-xs uppercase tracking-widest text-amber-400 font-bold mb-2">
+                    <Flame className="w-4 h-4" /> Hot Today
+                  </h3>
+                  {hotPlayer ? (
+                    <>
+                      <p className="text-lg font-bold text-slate-100">
+                        {hotPlayer.name}{' '}
+                        <span className="text-slate-500 text-sm font-normal">
+                          {hotPlayer.number}
+                        </span>
+                      </p>
+                      <p className="text-amber-400 text-sm mt-1">
+                        NPI {Math.round(computeAllStats(hotPlayer, bench)[1] ?? 0)} • OPS{' '}
+                        {hotPlayer.ops} — consider moving to cleanup
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-slate-400 text-sm">No active hitters yet.</p>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  disabled={!usageRisk}
+                  onClick={() => usageRisk && setSelectedPlayer(usageRisk.player)}
+                  className="w-full text-left bg-slate-900 border border-slate-700/50 rounded-3xl p-5 hover:bg-slate-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <h3 className="flex items-center gap-2 text-xs uppercase tracking-widest text-rose-400 font-bold mb-2">
+                    <AlertTriangle className="w-4 h-4" /> Usage Risk
+                  </h3>
+                  {usageRisk ? (
+                    <>
+                      <p className="text-lg font-bold text-slate-100">
+                        {usageRisk.player.name}{' '}
+                        <span className="text-slate-500 text-sm font-normal">
+                          {usageRisk.player.number}
+                        </span>
+                      </p>
+                      <p className="text-rose-400 text-sm mt-1">{usageRisk.reason}</p>
+                    </>
+                  ) : (
+                    <p className="text-slate-400 text-sm">No workload concerns flagged.</p>
+                  )}
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {mode === 'analytics' && (
         <section className="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl backdrop-blur-sm">
           <div className="flex border-b border-slate-800">
             {(['hitting', 'pitching', 'nextgen'] as const).map((tab) => (
@@ -1423,7 +1605,7 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
                 </div>
               )}
 
-              {/* ADVANCED ANALYTICS GRID */}
+              {/* ADVANCED ANALYTICS GRID — coach insight + percentile chip */}
               {nextGenView === 'advanced' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filteredAdvanced.map((insight) => {
@@ -1478,6 +1660,7 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
             </div>
           )}
         </section>
+        )}
       </main>
 
       {selectedPlayer && (
@@ -1537,7 +1720,7 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
                 <CompleteStatsGrid title="Pitching — full stat line" data={selectedPlayer.pitchingRaw} />
               )}
 
-              {/* Advanced Insights section — top 8 metrics from the new library */}
+              {/* Advanced Insights — top 8 cards, categorized + coach insight */}
               {modalAdvanced && modalTopAdvanced.length > 0 && (
                 <div className="mt-10">
                   <div className="flex items-center justify-between mb-4">
@@ -1549,7 +1732,7 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
                       Top 8 by percentile
                     </span>
                   </div>
-                  <div className="divide-y divide-slate-800 bg-slate-800/30 rounded-3xl overflow-hidden">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     {modalTopAdvanced.map((insight) => {
                       const cell = modalAdvanced[insight.id];
                       const colorClass =
@@ -1560,27 +1743,37 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
                           : cell.pct > 50
                           ? 'text-amber-400'
                           : 'text-rose-400';
+                      const badgeClass =
+                        insight.category === 'hitting'
+                          ? 'bg-blue-500/10 text-blue-300'
+                          : insight.category === 'pitching'
+                          ? 'bg-sky-500/10 text-sky-300'
+                          : insight.category === 'twoway'
+                          ? 'bg-amber-500/10 text-amber-300'
+                          : insight.category === 'team'
+                          ? 'bg-violet-500/10 text-violet-300'
+                          : 'bg-emerald-500/10 text-emerald-300';
                       return (
                         <div
                           key={insight.id}
-                          className="flex items-center justify-between gap-4 px-5 py-3 hover:bg-slate-800/40 transition-colors"
+                          className="bg-slate-800/40 border border-slate-700/50 rounded-3xl p-4 flex flex-col gap-2 hover:bg-slate-800 transition-colors"
                         >
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-slate-100 truncate">
-                                {insight.name}
-                              </span>
-                              <span className="text-[10px] uppercase tracking-widest text-slate-500">
-                                {insight.category}
-                              </span>
-                            </div>
-                            <p className="text-xs text-slate-400 italic line-clamp-1">
-                              {insight.coachInsight}
-                            </p>
-                          </div>
-                          <div className={`text-2xl font-black font-mono ${colorClass} tabular-nums`}>
+                          <span
+                            className={`self-start text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${badgeClass}`}
+                          >
+                            {insight.category}
+                          </span>
+                          <p className="font-semibold text-slate-100 text-sm leading-tight">
+                            {insight.name}
+                          </p>
+                          <p
+                            className={`text-3xl font-black font-mono ${colorClass} tabular-nums leading-none`}
+                          >
                             {cell.display}
-                          </div>
+                          </p>
+                          <p className="text-[11px] text-slate-400 italic line-clamp-2 mt-auto">
+                            {insight.coachInsight}
+                          </p>
                         </div>
                       );
                     })}
