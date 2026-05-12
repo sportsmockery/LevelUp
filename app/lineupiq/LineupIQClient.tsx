@@ -17,6 +17,9 @@ import {
   X,
   Layers,
   FlaskConical,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
 } from 'lucide-react';
 
 export type LineupTeam = {
@@ -636,6 +639,37 @@ type StatColumn = {
   emphasize?: boolean;
 };
 
+type SortDir = 'asc' | 'desc';
+type SortState = { key: string; dir: SortDir };
+
+// Stat keys where lower is better — first click of these headers starts ascending.
+// Everything else defaults to descending on first click.
+const LOWER_IS_BETTER = new Set<string>([
+  'ERA', 'WHIP', 'BAA', 'L', 'BSV', 'BB', 'HBP', 'WP', 'BK',
+  'R', 'ER', 'H', 'GIDP', 'CS', 'SO',
+]);
+
+function defaultSortDir(key: string, tab: 'hitting' | 'pitching'): SortDir {
+  // In the hitting context, BB/H/R/SO from the batter mean different things —
+  // for hitters more H/R is better, but SO is bad. Pitching keys go the other way.
+  if (tab === 'hitting') {
+    if (key === 'SO' || key === 'GIDP' || key === 'CS') return 'asc';
+    return 'desc';
+  }
+  return LOWER_IS_BETTER.has(key) ? 'asc' : 'desc';
+}
+
+function toSortNumber(v: unknown): number | null {
+  if (v == null || v === '') return null;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  if (typeof v === 'string') {
+    const trimmed = v.trim().replace(/%$/, '');
+    const n = parseFloat(trimmed);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
 const HITTING_COLUMNS: StatColumn[] = [
   { key: 'GP', label: 'GP', fmt: fmtIntCell },
   { key: 'PA', label: 'PA', fmt: fmtIntCell },
@@ -796,6 +830,10 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
   const [activeTab, setActiveTab] = useState<'hitting' | 'pitching' | 'nextgen'>('hitting');
   const [activeNextGenCategory, setActiveNextGenCategory] =
     useState<NextGenCategory>('hitting');
+  // Per-tab sort state. '__player__' sorts by player name; any other key reads
+  // from the player's raw offense/defense JSONB.
+  const [hittingSort, setHittingSort] = useState<SortState>({ key: 'OPS', dir: 'desc' });
+  const [pitchingSort, setPitchingSort] = useState<SortState>({ key: 'ERA', dir: 'asc' });
   const [nextGenView, setNextGenView] = useState<NextGenView>('core');
   const [selectedPlayer, setSelectedPlayer] = useState<LineupPlayer | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -1158,37 +1196,95 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
           </div>
 
           {activeTab !== 'nextgen' && (() => {
-            const columns = activeTab === 'hitting' ? HITTING_COLUMNS : PITCHING_COLUMNS;
-            const rows =
-              activeTab === 'pitching'
-                ? roster.filter((p) => p.hasPitched)
-                : roster;
-            const accentClass = activeTab === 'hitting' ? 'text-blue-400' : 'text-sky-400';
+            const tab = activeTab as 'hitting' | 'pitching';
+            const columns = tab === 'hitting' ? HITTING_COLUMNS : PITCHING_COLUMNS;
+            const baseRows = tab === 'pitching' ? roster.filter((p) => p.hasPitched) : roster;
+            const accentClass = tab === 'hitting' ? 'text-blue-400' : 'text-sky-400';
+
+            const sort = tab === 'hitting' ? hittingSort : pitchingSort;
+            const setSort = tab === 'hitting' ? setHittingSort : setPitchingSort;
+
+            const sortedRows = (() => {
+              const rawFor = (p: LineupPlayer) =>
+                tab === 'hitting' ? p.battingRaw : p.pitchingRaw;
+              const arr = [...baseRows];
+              if (sort.key === '__player__') {
+                arr.sort((a, b) => a.name.localeCompare(b.name));
+              } else {
+                arr.sort((a, b) => {
+                  const av = toSortNumber(rawFor(a)?.[sort.key]);
+                  const bv = toSortNumber(rawFor(b)?.[sort.key]);
+                  // Always sort missing values to the end regardless of direction.
+                  if (av === null && bv === null) return 0;
+                  if (av === null) return 1;
+                  if (bv === null) return -1;
+                  return av - bv;
+                });
+              }
+              if (sort.dir === 'desc') arr.reverse();
+              return arr;
+            })();
+
+            const onHeaderClick = (key: string) => {
+              setSort((curr) =>
+                curr.key === key
+                  ? { key, dir: curr.dir === 'desc' ? 'asc' : 'desc' }
+                  : { key, dir: key === '__player__' ? 'asc' : defaultSortDir(key, tab) },
+              );
+            };
+
+            const SortIcon = ({ colKey }: { colKey: string }) => {
+              if (sort.key !== colKey) {
+                return (
+                  <ArrowUpDown
+                    className="inline w-3 h-3 ml-1 text-slate-600 group-hover/th:text-slate-400 transition-colors"
+                    strokeWidth={2.5}
+                  />
+                );
+              }
+              return sort.dir === 'desc' ? (
+                <ArrowDown className="inline w-3 h-3 ml-1 text-blue-400" strokeWidth={2.5} />
+              ) : (
+                <ArrowUp className="inline w-3 h-3 ml-1 text-blue-400" strokeWidth={2.5} />
+              );
+            };
+
+            const headerClass = (active: boolean, emphasize: boolean) =>
+              `p-4 font-semibold text-right whitespace-nowrap cursor-pointer select-none group/th transition-colors hover:bg-slate-800/60 ${
+                active ? 'text-blue-300' : emphasize ? accentClass : ''
+              }`;
+
             return (
               <div className="relative">
                 <div className="overflow-x-auto">
                   <table className="text-left border-collapse w-max min-w-full">
                     <thead>
                       <tr className="bg-slate-900/80 text-slate-400 text-xs uppercase tracking-wider">
-                        <th className="sticky left-0 z-20 bg-slate-900/95 backdrop-blur-sm p-4 font-semibold border-r border-slate-800 min-w-[220px]">
+                        <th
+                          onClick={() => onHeaderClick('__player__')}
+                          className={`sticky left-0 z-20 bg-slate-900/95 backdrop-blur-sm p-4 font-semibold border-r border-slate-800 min-w-[220px] cursor-pointer select-none group/th transition-colors hover:bg-slate-800/60 ${
+                            sort.key === '__player__' ? 'text-blue-300' : ''
+                          }`}
+                        >
                           Player
+                          <SortIcon colKey="__player__" />
                         </th>
                         {columns.map((col) => (
                           <th
                             key={col.key}
-                            className={`p-4 font-semibold text-right whitespace-nowrap ${
-                              col.emphasize ? accentClass : ''
-                            }`}
+                            onClick={() => onHeaderClick(col.key)}
+                            className={headerClass(sort.key === col.key, !!col.emphasize)}
+                            title={`Sort by ${col.label}`}
                           >
                             {col.label}
+                            <SortIcon colKey={col.key} />
                           </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/50">
-                      {rows.map((player) => {
-                        const raw =
-                          activeTab === 'hitting' ? player.battingRaw : player.pitchingRaw;
+                      {sortedRows.map((player) => {
+                        const raw = tab === 'hitting' ? player.battingRaw : player.pitchingRaw;
                         return (
                           <tr
                             key={player.id}
@@ -1208,8 +1304,11 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
                             {columns.map((col) => {
                               const value = col.fmt(raw?.[col.key]);
                               const isDash = value === '—';
+                              const isSortCol = sort.key === col.key;
                               const cellClass = isDash
                                 ? 'text-slate-600'
+                                : isSortCol
+                                ? 'font-bold text-blue-300'
                                 : col.emphasize
                                 ? `font-bold ${accentClass}`
                                 : 'text-slate-300';
@@ -1229,7 +1328,7 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
                   </table>
                 </div>
                 <p className="text-[10px] uppercase tracking-widest text-slate-500 px-4 py-2 border-t border-slate-800">
-                  ← Scroll horizontally for full stat line • Click a row for complete stats
+                  ← Scroll horizontally • Click any column header to sort • Click a row for complete stats
                 </p>
               </div>
             );
