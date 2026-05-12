@@ -41,6 +41,10 @@ export type LineupPlayer = {
   so: number;
   whip: string;
   hasPitched: boolean;
+  // Full GameChanger offense/defense JSONB — populated from gc_*_stats.raw.
+  // Drives the wide hitting/pitching tables and the modal "Complete Stats".
+  battingRaw: Record<string, unknown> | null;
+  pitchingRaw: Record<string, unknown> | null;
 };
 
 type TeamAggregate = { teamAvg: string; runDiff: string; staffEra: string; ip: string };
@@ -588,6 +592,169 @@ function MetricCard({
   );
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// STAT COLUMN DEFINITIONS — drives the wide hitting/pitching tables.
+// Each row reads from LineupPlayer.battingRaw / pitchingRaw (the full
+// GameChanger offense/defense JSONB), so any key GC provides is surfaceable.
+// ────────────────────────────────────────────────────────────────────────────
+
+function fmtIntCell(v: unknown): string {
+  if (v == null || v === '') return '—';
+  const n = typeof v === 'number' ? v : parseFloat(String(v));
+  return Number.isFinite(n) ? Math.round(n).toString() : '—';
+}
+function fmt3Cell(v: unknown): string {
+  if (v == null || v === '') return '—';
+  const n = typeof v === 'number' ? v : parseFloat(String(v));
+  if (!Number.isFinite(n)) return '—';
+  const s = n.toFixed(3);
+  return s.startsWith('0.') ? s.slice(1) : s.startsWith('-0.') ? '-' + s.slice(2) : s;
+}
+function fmt2Cell(v: unknown): string {
+  if (v == null || v === '') return '—';
+  const n = typeof v === 'number' ? v : parseFloat(String(v));
+  return Number.isFinite(n) ? n.toFixed(2) : '—';
+}
+function fmt1Cell(v: unknown): string {
+  if (v == null || v === '') return '—';
+  const n = typeof v === 'number' ? v : parseFloat(String(v));
+  return Number.isFinite(n) ? n.toFixed(1) : '—';
+}
+function fmtPctCell(v: unknown): string {
+  if (v == null || v === '') return '—';
+  if (typeof v === 'string' && v.trim().endsWith('%')) return v.trim();
+  const n = typeof v === 'number' ? v : parseFloat(String(v));
+  if (!Number.isFinite(n)) return '—';
+  if (n > 0 && n <= 1) return `${(n * 100).toFixed(1)}%`;
+  return `${n.toFixed(1)}%`;
+}
+
+type StatColumn = {
+  key: string;
+  label: string;
+  fmt: (v: unknown) => string;
+  emphasize?: boolean;
+};
+
+const HITTING_COLUMNS: StatColumn[] = [
+  { key: 'GP', label: 'GP', fmt: fmtIntCell },
+  { key: 'PA', label: 'PA', fmt: fmtIntCell },
+  { key: 'AB', label: 'AB', fmt: fmtIntCell },
+  { key: 'R', label: 'R', fmt: fmtIntCell },
+  { key: 'H', label: 'H', fmt: fmtIntCell },
+  { key: '1B', label: '1B', fmt: fmtIntCell },
+  { key: '2B', label: '2B', fmt: fmtIntCell },
+  { key: '3B', label: '3B', fmt: fmtIntCell },
+  { key: 'HR', label: 'HR', fmt: fmtIntCell },
+  { key: 'RBI', label: 'RBI', fmt: fmtIntCell },
+  { key: 'BB', label: 'BB', fmt: fmtIntCell },
+  { key: 'SO', label: 'SO', fmt: fmtIntCell },
+  { key: 'K-L', label: 'K-L', fmt: fmtIntCell },
+  { key: 'HBP', label: 'HBP', fmt: fmtIntCell },
+  { key: 'SB', label: 'SB', fmt: fmtIntCell },
+  { key: 'CS', label: 'CS', fmt: fmtIntCell },
+  { key: 'SHF', label: 'SF', fmt: fmtIntCell },
+  { key: 'SHB', label: 'SAC', fmt: fmtIntCell },
+  { key: 'TB', label: 'TB', fmt: fmtIntCell },
+  { key: 'XBH', label: 'XBH', fmt: fmtIntCell },
+  { key: 'GIDP', label: 'GIDP', fmt: fmtIntCell },
+  { key: 'ROE', label: 'ROE', fmt: fmtIntCell },
+  { key: 'AVG', label: 'AVG', fmt: fmt3Cell, emphasize: true },
+  { key: 'OBP', label: 'OBP', fmt: fmt3Cell },
+  { key: 'SLG', label: 'SLG', fmt: fmt3Cell },
+  { key: 'OPS', label: 'OPS', fmt: fmt3Cell, emphasize: true },
+  { key: 'ISO', label: 'ISO', fmt: fmt3Cell },
+  { key: 'BABIP', label: 'BABIP', fmt: fmt3Cell },
+  { key: 'QAB%', label: 'QAB%', fmt: fmtPctCell },
+  { key: 'BB%', label: 'BB%', fmt: fmtPctCell },
+  { key: 'K%', label: 'K%', fmt: fmtPctCell },
+  { key: 'C%', label: 'C%', fmt: fmtPctCell },
+  { key: 'HHB%', label: 'HHB%', fmt: fmtPctCell },
+  { key: 'LD%', label: 'LD%', fmt: fmtPctCell },
+  { key: 'GB%', label: 'GB%', fmt: fmtPctCell },
+  { key: 'FB%', label: 'FB%', fmt: fmtPctCell },
+];
+
+const PITCHING_COLUMNS: StatColumn[] = [
+  { key: 'GP', label: 'GP', fmt: fmtIntCell },
+  { key: 'GS', label: 'GS', fmt: fmtIntCell },
+  { key: 'W', label: 'W', fmt: fmtIntCell },
+  { key: 'L', label: 'L', fmt: fmtIntCell },
+  { key: 'SV', label: 'SV', fmt: fmtIntCell },
+  { key: 'BSV', label: 'BSV', fmt: fmtIntCell },
+  { key: 'IP', label: 'IP', fmt: fmt1Cell, emphasize: true },
+  { key: 'BF', label: 'BF', fmt: fmtIntCell },
+  { key: 'P', label: 'P', fmt: fmtIntCell },
+  { key: 'STR', label: 'STR', fmt: fmtIntCell },
+  { key: 'H', label: 'H', fmt: fmtIntCell },
+  { key: 'R', label: 'R', fmt: fmtIntCell },
+  { key: 'ER', label: 'ER', fmt: fmtIntCell },
+  { key: 'HR', label: 'HR', fmt: fmtIntCell },
+  { key: 'BB', label: 'BB', fmt: fmtIntCell },
+  { key: 'SO', label: 'SO', fmt: fmtIntCell, emphasize: true },
+  { key: 'K-L', label: 'K-L', fmt: fmtIntCell },
+  { key: 'HBP', label: 'HBP', fmt: fmtIntCell },
+  { key: 'WP', label: 'WP', fmt: fmtIntCell },
+  { key: 'BK', label: 'BK', fmt: fmtIntCell },
+  { key: 'ERA', label: 'ERA', fmt: fmt2Cell, emphasize: true },
+  { key: 'WHIP', label: 'WHIP', fmt: fmt2Cell, emphasize: true },
+  { key: 'BAA', label: 'BAA', fmt: fmt3Cell },
+  { key: 'K/BB', label: 'K/BB', fmt: fmt2Cell },
+  { key: 'K/IP', label: 'K/IP', fmt: fmt2Cell },
+  { key: 'P/IP', label: 'P/IP', fmt: fmt2Cell },
+  { key: 'P/BF', label: 'P/BF', fmt: fmt2Cell },
+  { key: '1st-P%', label: '1stP%', fmt: fmtPctCell },
+  { key: '1st-S%', label: '1stS%', fmt: fmtPctCell },
+  { key: 'S%', label: 'S%', fmt: fmtPctCell },
+  { key: 'LOB%', label: 'LOB%', fmt: fmtPctCell },
+];
+
+// Keys to hide from the modal's Complete Stats view (already shown elsewhere
+// or are internal/auxiliary fields the user doesn't need).
+const HIDDEN_RAW_KEYS = new Set<string>([]);
+
+function CompleteStatsGrid({
+  title,
+  data,
+}: {
+  title: string;
+  data: Record<string, unknown> | null;
+}) {
+  if (!data) return null;
+  const entries = Object.entries(data)
+    .filter(([k, v]) => !HIDDEN_RAW_KEYS.has(k) && v !== null && v !== '')
+    .sort(([a], [b]) => a.localeCompare(b));
+  if (!entries.length) return null;
+
+  const formatValue = (v: unknown): string => {
+    if (typeof v === 'number') {
+      if (Number.isInteger(v)) return v.toString();
+      return v.toFixed(3).replace(/\.?0+$/, '');
+    }
+    if (typeof v === 'string') return v;
+    if (typeof v === 'boolean') return v ? 'true' : 'false';
+    return JSON.stringify(v);
+  };
+
+  return (
+    <div className="mt-6">
+      <h4 className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">
+        {title} <span className="text-slate-600 font-normal normal-case">({entries.length} stats)</span>
+      </h4>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 text-sm bg-slate-800/30 rounded-2xl p-4">
+        {entries.map(([k, v]) => (
+          <div key={k} className="flex items-baseline justify-between gap-2 py-1 border-b border-slate-800/60 last:border-b-0">
+            <span className="text-slate-400 font-mono text-xs truncate">{k}</span>
+            <span className="text-slate-100 font-mono font-semibold tabular-nums text-xs">
+              {formatValue(v)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const NEXT_GEN_CATEGORIES: { key: NextGenCategory; label: string; icon: React.ReactNode }[] = [
   { key: 'hitting', label: 'Hitting Value', icon: <Target className="w-4 h-4" /> },
   { key: 'pitching', label: 'Pitching Dominance', icon: <Shield className="w-4 h-4" /> },
@@ -990,76 +1157,83 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
             ))}
           </div>
 
-          {activeTab !== 'nextgen' && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-900/80 text-slate-400 text-xs uppercase tracking-wider">
-                    <th className="p-4 font-semibold">Player</th>
-                    {activeTab === 'hitting' && (
-                      <>
-                        <th className="p-4 font-semibold text-right">AVG</th>
-                        <th className="p-4 font-semibold text-right">OPS</th>
-                        <th className="p-4 font-semibold text-right">HR</th>
-                        <th className="p-4 font-semibold text-right">RBI</th>
-                        <th className="p-4 font-semibold text-right">SB</th>
-                      </>
-                    )}
-                    {activeTab === 'pitching' && (
-                      <>
-                        <th className="p-4 font-semibold text-right">ERA</th>
-                        <th className="p-4 font-semibold text-right">IP</th>
-                        <th className="p-4 font-semibold text-right">K</th>
-                        <th className="p-4 font-semibold text-right">WHIP</th>
-                      </>
-                    )}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/50">
-                  {(activeTab === 'pitching'
-                    ? roster.filter((p) => p.hasPitched)
-                    : roster
-                  ).map((player) => (
-                    <tr
-                      key={player.id}
-                      className="hover:bg-slate-800/40 transition-colors group cursor-pointer"
-                      onClick={() => setSelectedPlayer(player)}
-                    >
-                      <td className="p-4 flex items-center">
-                        <div className="h-8 w-8 rounded bg-slate-800 text-slate-400 flex items-center justify-center font-bold text-xs mr-3 group-hover:bg-blue-900 group-hover:text-blue-300 transition-colors">
-                          {player.number.replace('#', '')}
-                        </div>
-                        <span className="font-medium text-slate-200">{player.name}</span>
-                      </td>
-                      {activeTab === 'hitting' && (
-                        <>
-                          <td className="p-4 text-right font-mono text-slate-300">{player.avg}</td>
-                          <td className="p-4 text-right font-mono font-bold text-blue-400">
-                            {player.ops}
-                          </td>
-                          <td className="p-4 text-right font-mono text-slate-300">{player.hr}</td>
-                          <td className="p-4 text-right font-mono text-slate-300">{player.rbi}</td>
-                          <td className="p-4 text-right font-mono text-slate-300">{player.sb}</td>
-                        </>
-                      )}
-                      {activeTab === 'pitching' && (
-                        <>
-                          <td className="p-4 text-right font-mono font-bold text-sky-400">
-                            {player.era}
-                          </td>
-                          <td className="p-4 text-right font-mono text-slate-300">{player.ip}</td>
-                          <td className="p-4 text-right font-mono text-slate-300">{player.so}</td>
-                          <td className="p-4 text-right font-mono text-slate-300">
-                            {player.whip}
-                          </td>
-                        </>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {activeTab !== 'nextgen' && (() => {
+            const columns = activeTab === 'hitting' ? HITTING_COLUMNS : PITCHING_COLUMNS;
+            const rows =
+              activeTab === 'pitching'
+                ? roster.filter((p) => p.hasPitched)
+                : roster;
+            const accentClass = activeTab === 'hitting' ? 'text-blue-400' : 'text-sky-400';
+            return (
+              <div className="relative">
+                <div className="overflow-x-auto">
+                  <table className="text-left border-collapse w-max min-w-full">
+                    <thead>
+                      <tr className="bg-slate-900/80 text-slate-400 text-xs uppercase tracking-wider">
+                        <th className="sticky left-0 z-20 bg-slate-900/95 backdrop-blur-sm p-4 font-semibold border-r border-slate-800 min-w-[220px]">
+                          Player
+                        </th>
+                        {columns.map((col) => (
+                          <th
+                            key={col.key}
+                            className={`p-4 font-semibold text-right whitespace-nowrap ${
+                              col.emphasize ? accentClass : ''
+                            }`}
+                          >
+                            {col.label}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/50">
+                      {rows.map((player) => {
+                        const raw =
+                          activeTab === 'hitting' ? player.battingRaw : player.pitchingRaw;
+                        return (
+                          <tr
+                            key={player.id}
+                            className="hover:bg-slate-800/40 transition-colors group cursor-pointer"
+                            onClick={() => setSelectedPlayer(player)}
+                          >
+                            <td className="sticky left-0 z-10 bg-slate-900/95 group-hover:bg-slate-800/95 backdrop-blur-sm p-4 border-r border-slate-800 min-w-[220px]">
+                              <div className="flex items-center">
+                                <div className="h-8 w-8 rounded bg-slate-800 text-slate-400 flex items-center justify-center font-bold text-xs mr-3 group-hover:bg-blue-900 group-hover:text-blue-300 transition-colors flex-shrink-0">
+                                  {player.number.replace('#', '')}
+                                </div>
+                                <span className="font-medium text-slate-200 truncate">
+                                  {player.name}
+                                </span>
+                              </div>
+                            </td>
+                            {columns.map((col) => {
+                              const value = col.fmt(raw?.[col.key]);
+                              const isDash = value === '—';
+                              const cellClass = isDash
+                                ? 'text-slate-600'
+                                : col.emphasize
+                                ? `font-bold ${accentClass}`
+                                : 'text-slate-300';
+                              return (
+                                <td
+                                  key={col.key}
+                                  className={`p-4 text-right font-mono tabular-nums whitespace-nowrap ${cellClass}`}
+                                >
+                                  {value}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-[10px] uppercase tracking-widest text-slate-500 px-4 py-2 border-t border-slate-800">
+                  ← Scroll horizontally for full stat line • Click a row for complete stats
+                </p>
+              </div>
+            );
+          })()}
 
           {activeTab === 'nextgen' && (
             <div className="p-6">
@@ -1213,7 +1387,7 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
           onClick={() => setSelectedPlayer(null)}
         >
           <div
-            className="bg-slate-900 rounded-3xl max-w-2xl w-full max-h-[92vh] overflow-auto"
+            className="bg-slate-900 rounded-3xl max-w-3xl w-full max-h-[92vh] overflow-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between border-b border-slate-700 px-8 py-6">
@@ -1257,6 +1431,12 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
                   <div className="text-xs text-slate-400 mt-2">COACH SCORE</div>
                 </div>
               </div>
+
+              {/* Complete Stats — full GameChanger raw offense / defense dump */}
+              <CompleteStatsGrid title="Hitting — full stat line" data={selectedPlayer.battingRaw} />
+              {selectedPlayer.hasPitched && (
+                <CompleteStatsGrid title="Pitching — full stat line" data={selectedPlayer.pitchingRaw} />
+              )}
 
               {/* Advanced Insights section — top 8 metrics from the new library */}
               {modalAdvanced && modalTopAdvanced.length > 0 && (

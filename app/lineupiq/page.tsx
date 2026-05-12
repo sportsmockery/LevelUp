@@ -225,6 +225,10 @@ async function loadDashboardData(): Promise<{
         so,
         whip: whip !== null ? whip.toFixed(2) : '—',
         hasPitched: ip > 0,
+        // Full GC raw offense/defense objects — surfaced for the wide
+        // hitting/pitching tables and the modal's Complete Stats view.
+        battingRaw: bat as Record<string, unknown> | null,
+        pitchingRaw: pit as Record<string, unknown> | null,
       });
     }
 
