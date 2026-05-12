@@ -953,6 +953,32 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
     [modalAdvanced],
   );
 
+  // Team-wide rank of the selected player for each of their top-8 advanced
+  // insights. Excludes players whose insight value is '—' so pitchers aren't
+  // ranked dead-last on hitting-only stats and vice versa.
+  const modalInsightRanks = useMemo(() => {
+    if (!selectedPlayer || modalTopAdvanced.length === 0)
+      return {} as Record<number, { rank: number; total: number }>;
+    const everyPlayerAdv = roster.map((p) => {
+      const core = computeAllStats(p, bench);
+      return { id: p.id, adv: computeAdvancedStats(p, bench, core) };
+    });
+    const out: Record<number, { rank: number; total: number }> = {};
+    for (const insight of modalTopAdvanced) {
+      const scored = everyPlayerAdv
+        .map((s) => ({
+          id: s.id,
+          pct: s.adv[insight.id]?.pct ?? 0,
+          display: s.adv[insight.id]?.display ?? '—',
+        }))
+        .filter((s) => s.display !== '—');
+      scored.sort((a, b) => b.pct - a.pct);
+      const idx = scored.findIndex((s) => s.id === selectedPlayer.id);
+      if (idx >= 0) out[insight.id] = { rank: idx + 1, total: scored.length };
+    }
+    return out;
+  }, [selectedPlayer, modalTopAdvanced, roster, bench]);
+
   async function handleExportPDF() {
     if (exporting || !effectiveTeam) return;
     setExporting(true);
@@ -1908,16 +1934,36 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
                           : insight.category === 'team'
                           ? 'bg-violet-500/10 text-violet-300'
                           : 'bg-emerald-500/10 text-emerald-300';
+                      const rankInfo = modalInsightRanks[insight.id];
+                      const rankClass = rankInfo
+                        ? rankInfo.rank === 1
+                          ? 'bg-emerald-500/10 text-emerald-300'
+                          : rankInfo.rank <= 3
+                          ? 'bg-amber-500/10 text-amber-300'
+                          : rankInfo.rank <= rankInfo.total / 2
+                          ? 'bg-cyan-500/10 text-cyan-300'
+                          : 'bg-slate-700/40 text-slate-400'
+                        : '';
                       return (
                         <div
                           key={insight.id}
                           className="bg-slate-800/40 border border-slate-700/50 rounded-3xl p-4 flex flex-col gap-2 hover:bg-slate-800 transition-colors"
                         >
-                          <span
-                            className={`self-start text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${badgeClass}`}
-                          >
-                            {insight.category}
-                          </span>
+                          <div className="flex items-center justify-between gap-2">
+                            <span
+                              className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${badgeClass}`}
+                            >
+                              {insight.category}
+                            </span>
+                            {rankInfo && (
+                              <span
+                                className={`text-[9px] font-bold tracking-widest px-2 py-0.5 rounded-full whitespace-nowrap tabular-nums ${rankClass}`}
+                                title={`Ranked ${rankInfo.rank} of ${rankInfo.total} on team`}
+                              >
+                                #{rankInfo.rank}/{rankInfo.total}
+                              </span>
+                            )}
+                          </div>
                           <p className="font-semibold text-slate-100 text-sm leading-tight">
                             {insight.name}
                           </p>
