@@ -1379,9 +1379,19 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
 
           {activeTab !== 'nextgen' && (() => {
             const tab = activeTab as 'hitting' | 'pitching';
-            const columns = tab === 'hitting' ? HITTING_COLUMNS : PITCHING_COLUMNS;
+            const allColumns = tab === 'hitting' ? HITTING_COLUMNS : PITCHING_COLUMNS;
             const baseRows = tab === 'pitching' ? roster.filter((p) => p.hasPitched) : roster;
             const accentClass = tab === 'hitting' ? 'text-blue-400' : 'text-sky-400';
+
+            // Hide columns where GameChanger returns no value for any player on
+            // this team — keeps the wide table focused on stats actually tracked.
+            const rawForVis = (p: LineupPlayer) =>
+              tab === 'hitting' ? p.battingRaw : p.pitchingRaw;
+            const columns = baseRows.length
+              ? allColumns.filter((col) =>
+                  baseRows.some((p) => col.fmt(rawForVis(p)?.[col.key]) !== '—'),
+                )
+              : allColumns;
 
             const sort = tab === 'hitting' ? hittingSort : pitchingSort;
             const setSort = tab === 'hitting' ? setHittingSort : setPitchingSort;
