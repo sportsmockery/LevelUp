@@ -827,7 +827,13 @@ function RadarChart({
     .join(' ');
 
   return (
-    <svg width={size} height={size} className="mx-auto drop-shadow-xl">
+    <svg
+      viewBox={`0 0 ${size} ${size}`}
+      width={size}
+      height={size}
+      preserveAspectRatio="xMidYMid meet"
+      className="block mx-auto drop-shadow-xl w-full max-w-[280px] h-auto"
+    >
       {[0.2, 0.4, 0.6, 0.8, 1].map((ratio, i) => (
         <circle
           key={i}
@@ -1567,31 +1573,34 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
       id="dashboard-main"
     >
       <nav className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-wrap gap-4 justify-between items-center">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex flex-wrap gap-2 sm:gap-4 justify-between items-center">
           <div className="flex items-center space-x-3">
-            <div className="h-10 w-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
-              <Activity className="text-white h-6 w-6" />
+            <div className="h-9 w-9 sm:h-10 sm:w-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+              <Activity className="text-white h-5 w-5 sm:h-6 sm:w-6" />
             </div>
-            <h1 className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
+            <h1 className="text-lg sm:text-xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
               Lineup<span className="font-light">IQ</span>
             </h1>
           </div>
 
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             {families.map(({ family, teams: famTeams }) => (
               <div
                 key={family}
                 className="flex items-center gap-1 bg-slate-800 rounded-2xl p-1 border border-slate-700"
               >
-                <span className="px-3 text-xs font-bold uppercase tracking-widest text-slate-400">
+                <span className="hidden sm:inline px-3 text-xs font-bold uppercase tracking-widest text-slate-400">
                   {family}
+                </span>
+                <span className="sm:hidden pl-2 pr-1 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                  {family.slice(0, 3)}
                 </span>
                 {famTeams.map((t) => (
                   <button
                     key={t.id}
                     onClick={() => setActiveTeamId(t.id)}
                     title={`${t.name} • ${t.record}`}
-                    className={`px-4 py-1.5 text-xs font-bold uppercase tracking-widest rounded-[14px] transition-all ${
+                    className={`px-3 sm:px-4 py-1.5 text-[11px] sm:text-xs font-bold uppercase tracking-widest rounded-[14px] transition-all ${
                       activeTeamId === t.id
                         ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
                         : 'text-slate-400 hover:text-slate-200'
@@ -1608,13 +1617,16 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
                 <button
                   key={m}
                   onClick={() => setMode(m)}
-                  className={`px-5 py-1.5 text-xs font-bold uppercase tracking-widest rounded-[14px] transition-all ${
+                  className={`px-3 sm:px-5 py-1.5 text-[11px] sm:text-xs font-bold uppercase tracking-widest rounded-[14px] transition-all ${
                     mode === m
                       ? 'bg-white text-slate-900 shadow'
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  {m === 'gameday' ? 'Game Day' : 'Analytics'}
+                  {m === 'gameday' ? 'Game' : 'Stats'}
+                  <span className="hidden sm:inline">
+                    {m === 'gameday' ? ' Day' : ''}
+                  </span>
                 </button>
               ))}
             </div>
@@ -1622,13 +1634,17 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
             <button
               onClick={handleExportPDF}
               disabled={exporting}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed px-6 py-2 rounded-2xl text-sm font-semibold transition-all shadow-lg shadow-emerald-500/30"
+              aria-label={exporting ? 'Exporting PDF' : 'Export PDF'}
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed px-3 sm:px-6 py-2 rounded-2xl text-sm font-semibold transition-all shadow-lg shadow-emerald-500/30"
             >
-              <Download className="w-4 h-4" /> {exporting ? 'Exporting…' : 'Export PDF'}
+              <Download className="w-4 h-4" />
+              <span className="hidden sm:inline">
+                {exporting ? 'Exporting…' : 'Export PDF'}
+              </span>
             </button>
 
             {effectiveTeam && (
-              <div className="text-sm text-slate-300 flex items-center gap-2 whitespace-nowrap">
+              <div className="hidden md:flex w-full md:w-auto text-sm text-slate-300 items-center gap-2 whitespace-nowrap">
                 <span className="font-medium">{effectiveTeam.name}</span>
                 <span className="text-blue-400 font-bold">{effectiveTeam.record}</span>
               </div>
@@ -1637,7 +1653,7 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
           <MetricCard
             title="Team Batting Average"
@@ -1714,14 +1730,14 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
               Game Day Decision Center
             </h2>
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-              <div className="lg:col-span-7 bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-700/50 rounded-3xl p-6 shadow-xl">
-                <h3 className="flex items-center gap-2 text-xs uppercase tracking-widest text-slate-400 font-bold mb-5">
+              <div className="lg:col-span-7 bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-700/50 rounded-3xl p-4 sm:p-6 shadow-xl">
+                <h3 className="flex items-center gap-2 text-xs uppercase tracking-widest text-slate-400 font-bold mb-4 sm:mb-5">
                   <ArrowUpDown className="w-4 h-4" /> Optimal Lineup Simulator
                 </h3>
                 {lineupOptimizer ? (
-                  <div className="flex flex-wrap gap-6 items-end justify-between">
+                  <div className="flex flex-wrap gap-4 sm:gap-6 items-end justify-between">
                     <div>
-                      <p className="text-6xl font-black text-emerald-400 font-mono tabular-nums leading-none">
+                      <p className="text-5xl sm:text-6xl font-black text-emerald-400 font-mono tabular-nums leading-none">
                         {lineupOptimizer.projectedRuns}
                       </p>
                       <p className="text-slate-400 text-sm mt-2">Projected team runs</p>
@@ -1729,12 +1745,12 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
                         {lineupOptimizer.improvement}
                       </p>
                     </div>
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-1.5 w-full sm:w-auto">
                       {lineupOptimizer.order.map((p, i) => (
                         <button
                           key={p.id}
                           onClick={() => setSelectedPlayer(p)}
-                          className="text-left text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700/50 px-4 py-1.5 rounded-full font-medium transition-colors"
+                          className="text-left text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700/50 px-3 sm:px-4 py-1.5 rounded-full font-medium transition-colors truncate"
                         >
                           <span className="text-slate-500 mr-2 tabular-nums">{i + 1}.</span>
                           <span className="text-slate-200">{p.name}</span>
@@ -1815,13 +1831,18 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`flex-1 py-4 text-sm font-bold uppercase tracking-widest transition-all ${
+                className={`flex-1 py-3 sm:py-4 text-[11px] sm:text-sm font-bold uppercase tracking-wider sm:tracking-widest transition-all ${
                   activeTab === tab
                     ? 'bg-blue-600/10 text-blue-400 border-b-2 border-blue-500'
                     : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/50'
                 }`}
               >
-                {tab === 'nextgen' ? 'NEXT-GEN INTELLIGENCE' : tab}
+                <span className="hidden sm:inline">
+                  {tab === 'nextgen' ? 'NEXT-GEN INTELLIGENCE' : tab}
+                </span>
+                <span className="sm:hidden">
+                  {tab === 'nextgen' ? 'Next-Gen' : tab}
+                </span>
               </button>
             ))}
           </div>
@@ -2207,10 +2228,10 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
             onClick={() => setPickerStat(null)}
           >
             <div
-              className="bg-slate-900 border border-slate-700 rounded-3xl max-w-2xl w-full max-h-[80vh] overflow-auto"
+              className="bg-slate-900 border border-slate-700 rounded-3xl max-w-2xl w-full max-h-[85vh] sm:max-h-[80vh] overflow-auto"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-start justify-between border-b border-slate-800 px-6 py-4 sticky top-0 bg-slate-900/95 backdrop-blur-sm gap-4">
+              <div className="flex items-start justify-between border-b border-slate-800 px-4 sm:px-6 py-3 sm:py-4 sticky top-0 bg-slate-900/95 backdrop-blur-sm gap-3 sm:gap-4">
                 <div className="min-w-0">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
                     {statCategory} • Pick a player
@@ -2280,45 +2301,54 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
             className="bg-slate-900 rounded-3xl max-w-3xl w-full max-h-[92vh] overflow-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-slate-700 px-8 py-6">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-2xl bg-slate-800 flex items-center justify-center font-bold text-lg">
+            <div className="flex items-center justify-between border-b border-slate-700 px-4 sm:px-8 py-4 sm:py-6 gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="h-10 w-10 rounded-2xl bg-slate-800 flex items-center justify-center font-bold text-base sm:text-lg flex-shrink-0">
                   {selectedPlayer.number}
                 </div>
-                <div>
-                  <h2 className="text-3xl font-bold">{selectedPlayer.name}</h2>
-                  <p className="text-slate-400">
+                <div className="min-w-0">
+                  <h2 className="text-xl sm:text-3xl font-bold truncate">
+                    {selectedPlayer.name}
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-400 truncate">
                     {prettyLevel(activeLevel)} • Radar + advanced insights
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedPlayer(null)}
-                className="p-3 hover:bg-slate-800 rounded-2xl transition-colors"
+                aria-label="Close player details"
+                className="p-2 sm:p-3 hover:bg-slate-800 rounded-2xl transition-colors flex-shrink-0"
               >
-                <X className="w-6 h-6" />
+                <X className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             </div>
-            <div className="p-8">
+            <div className="p-4 sm:p-8">
               <RadarChart player={selectedPlayer} bench={bench} />
-              <div className="mt-10 grid grid-cols-3 gap-6 text-center">
-                <div className="bg-slate-800/50 rounded-3xl p-6">
-                  <div className="text-emerald-400 text-5xl font-black font-mono">
+              <div className="mt-6 sm:mt-10 grid grid-cols-3 gap-2 sm:gap-6 text-center">
+                <div className="bg-slate-800/50 rounded-2xl sm:rounded-3xl p-3 sm:p-6">
+                  <div className="text-emerald-400 text-3xl sm:text-5xl font-black font-mono tabular-nums">
                     {Math.round(computeAllStats(selectedPlayer, bench)[1])}
                   </div>
-                  <div className="text-xs text-slate-400 mt-2">NPI</div>
+                  <div className="text-[10px] sm:text-xs text-slate-400 mt-1 sm:mt-2 tracking-wider">
+                    NPI
+                  </div>
                 </div>
-                <div className="bg-slate-800/50 rounded-3xl p-6">
-                  <div className="text-cyan-400 text-5xl font-black font-mono">
+                <div className="bg-slate-800/50 rounded-2xl sm:rounded-3xl p-3 sm:p-6">
+                  <div className="text-cyan-400 text-3xl sm:text-5xl font-black font-mono tabular-nums">
                     {Math.round(computeAllStats(selectedPlayer, bench)[16])}
                   </div>
-                  <div className="text-xs text-slate-400 mt-2">PREVENTION</div>
+                  <div className="text-[10px] sm:text-xs text-slate-400 mt-1 sm:mt-2 tracking-wider">
+                    PREVENTION
+                  </div>
                 </div>
-                <div className="bg-slate-800/50 rounded-3xl p-6">
-                  <div className="text-indigo-400 text-5xl font-black font-mono">
+                <div className="bg-slate-800/50 rounded-2xl sm:rounded-3xl p-3 sm:p-6">
+                  <div className="text-indigo-400 text-3xl sm:text-5xl font-black font-mono tabular-nums">
                     {Math.round(computeAllStats(selectedPlayer, bench)[50])}
                   </div>
-                  <div className="text-xs text-slate-400 mt-2">COACH SCORE</div>
+                  <div className="text-[10px] sm:text-xs text-slate-400 mt-1 sm:mt-2 tracking-wider">
+                    COACH
+                  </div>
                 </div>
               </div>
 
