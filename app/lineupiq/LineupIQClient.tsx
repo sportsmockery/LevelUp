@@ -7,7 +7,6 @@ import {
   Activity,
   Crosshair,
   Zap,
-  ChevronDown,
   Target,
   Award,
   Shield,
@@ -88,6 +87,22 @@ function benchmarksFor(level: string): Benchmarks {
 function prettyLevel(level: string): string {
   if (/^\d{4}$/.test(level)) return `Class of ${level}`;
   return level.toUpperCase();
+}
+
+// Short label used inside grouped team pills (e.g. "14U", "'35").
+function pillLevel(level: string): string {
+  if (/^\d{4}$/.test(level)) return `'${level.slice(2)}`;
+  return level.toUpperCase();
+}
+
+// Maps a full GameChanger team name to its club family for the grouped
+// nav pills (Bulldogs / Hitters / Rhino / …). Falls back to the first word
+// so any new tracked team renders sensibly without code changes.
+function familyName(teamName: string): string {
+  if (/bulldogs/i.test(teamName)) return 'Bulldogs';
+  if (/hitters/i.test(teamName)) return 'Hitters';
+  if (/rhino/i.test(teamName)) return 'Rhino';
+  return teamName.split(/[\s-]+/)[0] || teamName;
 }
 
 type NextGenCategory = 'hitting' | 'pitching' | 'twoway' | 'team' | 'predictive';
@@ -803,34 +818,35 @@ const NEXT_GEN_CATEGORIES: { key: NextGenCategory; label: string; icon: React.Re
 type NextGenView = 'core' | 'advanced';
 
 export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: Props) {
-  const availableLevels = useMemo(() => {
-    const set = new Set<string>();
-    for (const t of teams) set.add(t.level);
-    const ordered = Array.from(set);
-    return ordered.sort((a, b) => {
-      const au = a.match(/^(\d+)u$/);
-      const bu = b.match(/^(\d+)u$/);
-      if (au && bu) return parseInt(au[1], 10) - parseInt(bu[1], 10);
-      if (au) return -1;
-      if (bu) return 1;
-      return a.localeCompare(b);
-    });
+  // Group teams by club family for the grouped nav pills. Within a family we
+  // sort by age group (9u → 11u → 14u), then class-year teams after.
+  const families = useMemo(() => {
+    const map = new Map<string, LineupTeam[]>();
+    for (const t of teams) {
+      const key = familyName(t.name);
+      const arr = map.get(key) ?? [];
+      arr.push(t);
+      map.set(key, arr);
+    }
+    const levelOrder = (lvl: string) => {
+      const u = lvl.match(/^(\d+)u$/);
+      if (u) return parseInt(u[1], 10);
+      const yr = parseInt(lvl, 10);
+      if (!Number.isNaN(yr)) return 1000 + yr;
+      return 9999;
+    };
+    return Array.from(map.entries()).map(([family, ts]) => ({
+      family,
+      teams: ts.sort((a, b) => levelOrder(a.level) - levelOrder(b.level)),
+    }));
   }, [teams]);
 
-  const [activeLevel, setActiveLevel] = useState<string>(availableLevels[0] ?? '14u');
+  const [activeTeamId, setActiveTeamId] = useState<string>(teams[0]?.id ?? '');
 
-  const teamsForLevel = useMemo(
-    () => teams.filter((t) => t.level === activeLevel),
-    [teams, activeLevel],
-  );
+  const effectiveTeam = teams.find((t) => t.id === activeTeamId) ?? teams[0];
+  const activeLevel = effectiveTeam?.level ?? '14u';
 
-  const [activeTeamId, setActiveTeamId] = useState<string>(teamsForLevel[0]?.id ?? '');
-  const [teamPickerOpen, setTeamPickerOpen] = useState(false);
-
-  const effectiveTeam =
-    teamsForLevel.find((t) => t.id === activeTeamId) ?? teamsForLevel[0] ?? teams[0];
-
-  const [mode, setMode] = useState<'gameday' | 'analytics'>('gameday');
+  const [mode, setMode] = useState<'gameday' | 'analytics'>('analytics');
   const [activeTab, setActiveTab] = useState<'hitting' | 'pitching' | 'nextgen'>('hitting');
   const [activeNextGenCategory, setActiveNextGenCategory] =
     useState<NextGenCategory>('hitting');
@@ -840,6 +856,7 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
   const [pitchingSort, setPitchingSort] = useState<SortState>({ key: 'ERA', dir: 'asc' });
   const [nextGenView, setNextGenView] = useState<NextGenView>('core');
   const [selectedPlayer, setSelectedPlayer] = useState<LineupPlayer | null>(null);
+  const [playerPickerOpen, setPlayerPickerOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
 
   const bench = useMemo(() => benchmarksFor(activeLevel), [activeLevel]);
@@ -1083,26 +1100,31 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
             </h1>
           </div>
 
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="flex items-center gap-2 bg-slate-800 rounded-2xl p-1 border border-slate-700">
-              {availableLevels.map((lvl) => (
-                <button
-                  key={lvl}
-                  onClick={() => {
-                    setActiveLevel(lvl);
-                    const first = teams.find((t) => t.level === lvl);
-                    if (first) setActiveTeamId(first.id);
-                  }}
-                  className={`px-5 py-1.5 text-xs font-bold uppercase tracking-widest rounded-[14px] transition-all ${
-                    activeLevel === lvl
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  {prettyLevel(lvl)}
-                </button>
-              ))}
-            </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            {families.map(({ family, teams: famTeams }) => (
+              <div
+                key={family}
+                className="flex items-center gap-1 bg-slate-800 rounded-2xl p-1 border border-slate-700"
+              >
+                <span className="px-3 text-xs font-bold uppercase tracking-widest text-slate-400">
+                  {family}
+                </span>
+                {famTeams.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setActiveTeamId(t.id)}
+                    title={`${t.name} • ${t.record}`}
+                    className={`px-4 py-1.5 text-xs font-bold uppercase tracking-widest rounded-[14px] transition-all ${
+                      activeTeamId === t.id
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {pillLevel(t.level)}
+                  </button>
+                ))}
+              </div>
+            ))}
 
             <div className="flex items-center gap-1 bg-slate-800 rounded-2xl p-1 border border-slate-700">
               {(['gameday', 'analytics'] as const).map((m) => (
@@ -1128,44 +1150,12 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
               <Download className="w-4 h-4" /> {exporting ? 'Exporting…' : 'Export PDF'}
             </button>
 
-            <div className="relative">
-              <button
-                onClick={() => setTeamPickerOpen((v) => !v)}
-                className="bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg px-4 py-2 flex items-center border border-slate-700"
-              >
-                <span className="font-medium mr-3">{effectiveTeam?.name ?? 'Select team'}</span>
-                {effectiveTeam && (
-                  <span className="text-blue-400 text-sm font-bold mr-2">
-                    {effectiveTeam.record}
-                  </span>
-                )}
-                <ChevronDown className="h-4 w-4 text-slate-400" />
-              </button>
-              {teamPickerOpen && (
-                <div className="absolute right-0 mt-2 w-72 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-50">
-                  {teamsForLevel.length === 0 && (
-                    <div className="px-4 py-3 text-slate-400 text-sm">
-                      No teams at {prettyLevel(activeLevel)}
-                    </div>
-                  )}
-                  {teamsForLevel.map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => {
-                        setActiveTeamId(t.id);
-                        setTeamPickerOpen(false);
-                      }}
-                      className={`w-full text-left px-4 py-3 hover:bg-slate-800 flex items-center justify-between ${
-                        t.id === effectiveTeam?.id ? 'bg-slate-800/60' : ''
-                      }`}
-                    >
-                      <span className="text-sm text-slate-200">{t.name}</span>
-                      <span className="text-xs font-bold text-blue-400">{t.record}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            {effectiveTeam && (
+              <div className="text-sm text-slate-300 flex items-center gap-2 whitespace-nowrap">
+                <span className="font-medium">{effectiveTeam.name}</span>
+                <span className="text-blue-400 font-bold">{effectiveTeam.record}</span>
+              </div>
+            )}
           </div>
         </div>
       </nav>
@@ -1586,11 +1576,16 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
                         : value > 70
                         ? 'text-cyan-400'
                         : 'text-amber-400';
+                    const isPlayerBased = stat.category !== 'team';
                     return (
                       <div
                         key={stat.id}
-                        onClick={() => setSelectedPlayer(player)}
-                        className="cursor-pointer bg-gradient-to-br from-slate-900/80 to-slate-800 border border-slate-700/50 rounded-3xl p-5 hover:scale-[1.02] transition-all group"
+                        onClick={
+                          isPlayerBased ? () => setPlayerPickerOpen(true) : undefined
+                        }
+                        className={`bg-gradient-to-br from-slate-900/80 to-slate-800 border border-slate-700/50 rounded-3xl p-5 transition-all group ${
+                          isPlayerBased ? 'cursor-pointer hover:scale-[1.02]' : ''
+                        }`}
                       >
                         <div className="flex justify-between items-start mb-3">
                           <div>
@@ -1606,8 +1601,19 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
                           </div>
                         </div>
                         <p className="text-xs text-slate-400 mb-4 line-clamp-2">{stat.desc}</p>
-                        <div className="text-[10px] font-mono bg-slate-900 px-3 py-1 rounded-2xl text-slate-400 w-fit">
-                          {stat.formula}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-[10px] font-mono bg-slate-900 px-3 py-1 rounded-2xl text-slate-400">
+                            {stat.formula}
+                          </div>
+                          {isPlayerBased ? (
+                            <span className="text-[10px] uppercase tracking-widest text-slate-500 whitespace-nowrap">
+                              Tap to pick player
+                            </span>
+                          ) : (
+                            <span className="text-[10px] uppercase tracking-widest text-violet-400 whitespace-nowrap">
+                              Team
+                            </span>
+                          )}
                         </div>
                       </div>
                     );
@@ -1636,11 +1642,16 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
                         : pct > 50
                         ? 'text-amber-400'
                         : 'text-rose-400';
+                    const isPlayerBased = insight.category !== 'team';
                     return (
                       <div
                         key={insight.id}
-                        onClick={() => setSelectedPlayer(player)}
-                        className="cursor-pointer bg-gradient-to-br from-slate-900/80 to-slate-800 border border-slate-700/50 rounded-3xl p-5 hover:scale-[1.02] transition-all group"
+                        onClick={
+                          isPlayerBased ? () => setPlayerPickerOpen(true) : undefined
+                        }
+                        className={`bg-gradient-to-br from-slate-900/80 to-slate-800 border border-slate-700/50 rounded-3xl p-5 transition-all group ${
+                          isPlayerBased ? 'cursor-pointer hover:scale-[1.02]' : ''
+                        }`}
                       >
                         <div className="flex justify-between items-start mb-3">
                           <div>
@@ -1659,8 +1670,19 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
                         <p className="text-[11px] text-emerald-400/80 mb-3 italic line-clamp-2">
                           {insight.coachInsight}
                         </p>
-                        <div className="text-[10px] font-mono bg-slate-900 px-3 py-1 rounded-2xl text-slate-400 w-fit">
-                          {insight.formula}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-[10px] font-mono bg-slate-900 px-3 py-1 rounded-2xl text-slate-400">
+                            {insight.formula}
+                          </div>
+                          {isPlayerBased ? (
+                            <span className="text-[10px] uppercase tracking-widest text-slate-500 whitespace-nowrap">
+                              Tap to pick player
+                            </span>
+                          ) : (
+                            <span className="text-[10px] uppercase tracking-widest text-violet-400 whitespace-nowrap">
+                              Team
+                            </span>
+                          )}
                         </div>
                       </div>
                     );
@@ -1672,6 +1694,62 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
         </section>
         )}
       </main>
+
+      {playerPickerOpen && (
+        <div
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9998] p-4"
+          onClick={() => setPlayerPickerOpen(false)}
+        >
+          <div
+            className="bg-slate-900 border border-slate-700 rounded-3xl max-w-2xl w-full max-h-[80vh] overflow-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 sticky top-0 bg-slate-900/95 backdrop-blur-sm">
+              <div>
+                <h2 className="text-lg font-bold">Pick a player to analyze</h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {effectiveTeam?.name ?? ''} • {roster.length} on roster
+                </p>
+              </div>
+              <button
+                onClick={() => setPlayerPickerOpen(false)}
+                className="p-2 hover:bg-slate-800 rounded-xl transition-colors"
+                aria-label="Close player picker"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {roster.length === 0 && (
+                <p className="text-slate-400 text-sm col-span-full px-2 py-6 text-center">
+                  No players on roster.
+                </p>
+              )}
+              {roster.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => {
+                    setSelectedPlayer(p);
+                    setPlayerPickerOpen(false);
+                  }}
+                  className="text-left bg-slate-800/40 hover:bg-slate-800 border border-slate-700/50 rounded-2xl p-3 transition-colors flex items-center gap-3"
+                >
+                  <div className="h-9 w-9 rounded-xl bg-slate-700 text-slate-300 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                    {p.number.replace('#', '') || '—'}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-slate-100 text-sm truncate">{p.name}</p>
+                    <p className="text-[11px] text-slate-500 font-mono tabular-nums">
+                      OPS {p.ops} • AVG {p.avg}
+                      {p.hasPitched ? ` • ERA ${p.era}` : ''}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {selectedPlayer && (
         <div
