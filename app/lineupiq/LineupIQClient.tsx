@@ -2378,7 +2378,7 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
 
         return (
           <div
-            className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9998] p-4"
+            className="fixed inset-0 bg-black/80 flex items-center justify-center z-[10000] p-4"
             onClick={() => setPickerStat(null)}
           >
             <div
@@ -2621,10 +2621,28 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
                           ? 'bg-cyan-500/10 text-cyan-300'
                           : 'bg-slate-700/40 text-slate-400'
                         : '';
+                      const isPlayerBased = insight.category !== 'team';
                       return (
-                        <div
+                        <button
                           key={insight.id}
-                          className="bg-slate-800/40 border border-slate-700/50 rounded-3xl p-4 flex flex-col gap-2 hover:bg-slate-800 transition-colors"
+                          type="button"
+                          onClick={
+                            isPlayerBased
+                              ? () =>
+                                  setPickerStat({ kind: 'advanced', insight })
+                              : undefined
+                          }
+                          disabled={!isPlayerBased}
+                          title={
+                            isPlayerBased
+                              ? `See every player ranked by ${insight.name}`
+                              : `${insight.name} is a team metric`
+                          }
+                          className={`text-left bg-slate-800/40 border border-slate-700/50 rounded-3xl p-4 flex flex-col gap-2 transition-all ${
+                            isPlayerBased
+                              ? 'cursor-pointer hover:bg-slate-800 hover:scale-[1.02] hover:border-slate-600'
+                              : 'cursor-default'
+                          }`}
                         >
                           <div className="flex items-center justify-between gap-2">
                             <span
@@ -2652,7 +2670,7 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
                           <p className="text-[11px] text-slate-400 italic line-clamp-2 mt-auto">
                             {insight.coachInsight}
                           </p>
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
