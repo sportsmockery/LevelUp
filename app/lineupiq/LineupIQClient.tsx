@@ -856,7 +856,13 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
   const [pitchingSort, setPitchingSort] = useState<SortState>({ key: 'ERA', dir: 'asc' });
   const [nextGenView, setNextGenView] = useState<NextGenView>('core');
   const [selectedPlayer, setSelectedPlayer] = useState<LineupPlayer | null>(null);
-  const [playerPickerOpen, setPlayerPickerOpen] = useState(false);
+  // When a player-based Next-Gen card is tapped we open a picker showing every
+  // player's score for THAT stat, ranked. `null` means the picker is closed.
+  const [pickerStat, setPickerStat] = useState<
+    | { kind: 'core'; stat: NextGenStat }
+    | { kind: 'advanced'; insight: AdvancedInsight }
+    | null
+  >(null);
   const [exporting, setExporting] = useState(false);
 
   const bench = useMemo(() => benchmarksFor(activeLevel), [activeLevel]);
@@ -1581,7 +1587,9 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
                       <div
                         key={stat.id}
                         onClick={
-                          isPlayerBased ? () => setPlayerPickerOpen(true) : undefined
+                          isPlayerBased
+                            ? () => setPickerStat({ kind: 'core', stat })
+                            : undefined
                         }
                         className={`bg-gradient-to-br from-slate-900/80 to-slate-800 border border-slate-700/50 rounded-3xl p-5 transition-all group ${
                           isPlayerBased ? 'cursor-pointer hover:scale-[1.02]' : ''
@@ -1647,7 +1655,9 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
                       <div
                         key={insight.id}
                         onClick={
-                          isPlayerBased ? () => setPlayerPickerOpen(true) : undefined
+                          isPlayerBased
+                            ? () => setPickerStat({ kind: 'advanced', insight })
+                            : undefined
                         }
                         className={`bg-gradient-to-br from-slate-900/80 to-slate-800 border border-slate-700/50 rounded-3xl p-5 transition-all group ${
                           isPlayerBased ? 'cursor-pointer hover:scale-[1.02]' : ''
@@ -1695,61 +1705,118 @@ export default function LineupIQClient({ teams, rosterByTeam, teamAggregates }: 
         )}
       </main>
 
-      {playerPickerOpen && (
-        <div
-          className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9998] p-4"
-          onClick={() => setPlayerPickerOpen(false)}
-        >
+      {pickerStat && (() => {
+        const ranked = roster
+          .map((p) => {
+            const core = computeAllStats(p, bench);
+            if (pickerStat.kind === 'core') {
+              const raw = core[pickerStat.stat.id] ?? 0;
+              const pct = clamp(raw);
+              return { p, pct, display: Math.round(pct).toString() };
+            }
+            const adv = computeAdvancedStats(p, bench, core);
+            const cell = adv[pickerStat.insight.id];
+            return {
+              p,
+              pct: cell?.pct ?? 0,
+              display: cell?.display ?? '—',
+            };
+          })
+          .sort((a, b) => b.pct - a.pct);
+
+        const statName =
+          pickerStat.kind === 'core'
+            ? pickerStat.stat.name
+            : pickerStat.insight.name;
+        const statCategory =
+          pickerStat.kind === 'core'
+            ? pickerStat.stat.category
+            : pickerStat.insight.category;
+        const statDesc =
+          pickerStat.kind === 'core'
+            ? pickerStat.stat.desc
+            : pickerStat.insight.desc;
+
+        const colorFor = (pct: number, display: string) =>
+          display === '—'
+            ? 'text-slate-600'
+            : pct > 85
+            ? 'text-emerald-400'
+            : pct > 70
+            ? 'text-cyan-400'
+            : pct > 50
+            ? 'text-amber-400'
+            : 'text-rose-400';
+
+        return (
           <div
-            className="bg-slate-900 border border-slate-700 rounded-3xl max-w-2xl w-full max-h-[80vh] overflow-auto"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9998] p-4"
+            onClick={() => setPickerStat(null)}
           >
-            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 sticky top-0 bg-slate-900/95 backdrop-blur-sm">
-              <div>
-                <h2 className="text-lg font-bold">Pick a player to analyze</h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  {effectiveTeam?.name ?? ''} • {roster.length} on roster
-                </p>
-              </div>
-              <button
-                onClick={() => setPlayerPickerOpen(false)}
-                className="p-2 hover:bg-slate-800 rounded-xl transition-colors"
-                aria-label="Close player picker"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {roster.length === 0 && (
-                <p className="text-slate-400 text-sm col-span-full px-2 py-6 text-center">
-                  No players on roster.
-                </p>
-              )}
-              {roster.map((p) => (
+            <div
+              className="bg-slate-900 border border-slate-700 rounded-3xl max-w-2xl w-full max-h-[80vh] overflow-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between border-b border-slate-800 px-6 py-4 sticky top-0 bg-slate-900/95 backdrop-blur-sm gap-4">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                    {statCategory} • Pick a player
+                  </p>
+                  <h2 className="text-lg font-bold leading-tight mt-0.5">{statName}</h2>
+                  <p className="text-xs text-slate-500 mt-1 line-clamp-1">
+                    {effectiveTeam?.name ?? ''} • {roster.length} on roster • {statDesc}
+                  </p>
+                </div>
                 <button
-                  key={p.id}
-                  onClick={() => {
-                    setSelectedPlayer(p);
-                    setPlayerPickerOpen(false);
-                  }}
-                  className="text-left bg-slate-800/40 hover:bg-slate-800 border border-slate-700/50 rounded-2xl p-3 transition-colors flex items-center gap-3"
+                  onClick={() => setPickerStat(null)}
+                  className="p-2 hover:bg-slate-800 rounded-xl transition-colors flex-shrink-0"
+                  aria-label="Close player picker"
                 >
-                  <div className="h-9 w-9 rounded-xl bg-slate-700 text-slate-300 flex items-center justify-center text-xs font-bold flex-shrink-0">
-                    {p.number.replace('#', '') || '—'}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-slate-100 text-sm truncate">{p.name}</p>
-                    <p className="text-[11px] text-slate-500 font-mono tabular-nums">
-                      OPS {p.ops} • AVG {p.avg}
-                      {p.hasPitched ? ` • ERA ${p.era}` : ''}
-                    </p>
-                  </div>
+                  <X className="w-5 h-5" />
                 </button>
-              ))}
+              </div>
+              <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {ranked.length === 0 && (
+                  <p className="text-slate-400 text-sm col-span-full px-2 py-6 text-center">
+                    No players on roster.
+                  </p>
+                )}
+                {ranked.map(({ p, pct, display }) => {
+                  const colorClass = colorFor(pct, display);
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => {
+                        setSelectedPlayer(p);
+                        setPickerStat(null);
+                      }}
+                      className="text-left bg-slate-800/40 hover:bg-slate-800 border border-slate-700/50 rounded-2xl p-3 transition-colors flex items-center gap-3"
+                    >
+                      <div className="h-9 w-9 rounded-xl bg-slate-700 text-slate-300 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                        {p.number.replace('#', '') || '—'}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-slate-100 text-sm truncate">
+                          {p.name}
+                        </p>
+                        <p className="text-[11px] text-slate-500 font-mono tabular-nums">
+                          OPS {p.ops} • AVG {p.avg}
+                          {p.hasPitched ? ` • ERA ${p.era}` : ''}
+                        </p>
+                      </div>
+                      <div
+                        className={`text-2xl font-black font-mono ${colorClass} tabular-nums flex-shrink-0`}
+                      >
+                        {display}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {selectedPlayer && (
         <div
