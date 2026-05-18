@@ -87,14 +87,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    // Subscribe to auth changes
+    // Subscribe to auth changes.
+    // IMPORTANT: never call other Supabase methods synchronously inside this
+    // callback — doing so deadlocks GoTrue and causes signIn/signUp promises
+    // to hang forever. Defer the profile fetch with setTimeout(..., 0).
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event: any, s: any) => {
       setSession(s);
       setUser(s?.user ?? null);
       if (s?.user) {
-        fetchProfile(s.user.id);
+        const uid = s.user.id;
+        setTimeout(() => {
+          fetchProfile(uid);
+        }, 0);
       } else {
         setProfile(null);
       }
