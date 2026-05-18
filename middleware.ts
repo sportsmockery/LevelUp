@@ -7,6 +7,7 @@ const PROTECTED_ROUTES = [
   '/coach',
   '/profile',
   '/onboarding',
+  '/publishing/app',
 ];
 
 export async function middleware(request: NextRequest) {
