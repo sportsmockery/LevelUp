@@ -1,65 +1,118 @@
+// Songtrust / generic publishing-admin bulk catalog upload.
+// Songtrust does not publish their template publicly — this matches the
+// canonical per-writer-row layout used by most publishing administrators.
+// One row per (work, writer) pairing so 100% can be reconstructed.
+
 import type { ReleaseContext } from '@/lib/validation/catalog-validation';
 import { archiveFile } from '@/lib/files/workbookArchive';
-import { buildCsv, buildXlsx, fmtDuration, safeSlug } from '@/lib/export/spreadsheet';
+import { buildCsv, buildXlsx, fmtDurationHHMMSS, safeSlug, splitName, type Sheet } from '@/lib/export/spreadsheet';
 import type { GeneratedFile } from '@/types/exports';
 
-// Generic per-work catalog row. One row per track + writer pairing.
 const HEADERS = [
-  'work_title', 'alternate_titles', 'iswc',
-  'recording_isrc', 'recording_artist', 'recording_release_date', 'duration',
-  'writer_legal_name', 'writer_pro', 'writer_ipi', 'writer_role', 'writer_share_percent',
-  'writer_publisher_name', 'writer_publisher_ipi', 'writer_publisher_pro', 'writer_publisher_share_percent',
-  'territory', 'admin_notes',
+  'Song Title',
+  'Alternate Titles',
+  'ISWC',
+  'Year of Composition',
+  'Recording ISRC',
+  'Recording Artist',
+  'Release Title',
+  'Release Date',
+  'Duration (HH:MM:SS)',
+  'Language',
+  'Writer First Name',
+  'Writer Middle Name',
+  'Writer Last Name',
+  'Writer Legal Name',
+  'Writer PRO',
+  'Writer IPI',
+  'Writer Capacity',
+  'Writer Share %',
+  'Writer Email',
+  'Writer Country',
+  'Publisher Name',
+  'Publisher Legal Entity',
+  'Publisher PRO',
+  'Publisher IPI',
+  'Publisher Share %',
+  'Publisher Territory',
+  'Admin Notes',
 ];
 
 function rowsFor(ctx: ReleaseContext) {
   const writerById = new Map(ctx.writers.map((w) => [w.id, w]));
   const publisherById = new Map(ctx.publishers.map((p) => [p.id, p]));
+  const r = ctx.release;
   const rows: Record<string, unknown>[] = [];
+
   for (const t of ctx.tracks) {
-    const wRows = ctx.trackWriters.filter((tw) => tw.track_id === t.id);
-    const pRows = ctx.trackPublishers.filter((tp) => tp.track_id === t.id);
+    const wRows = ctx.trackWriters.filter((x) => x.track_id === t.id);
+    const pRows = ctx.trackPublishers.filter((x) => x.track_id === t.id);
     if (wRows.length === 0) continue;
-    for (let i = 0; i < wRows.length; i++) {
-      const w = writerById.get(wRows[i].writer_profile_id);
-      // pair writer with publisher of same index when present, otherwise leave blank
-      const p = pRows[i] ? publisherById.get(pRows[i].publisher_profile_id) : null;
+
+    wRows.forEach((tw, idx) => {
+      const w = writerById.get(tw.writer_profile_id);
+      // Pair writer i with publisher i where possible; if mismatched lengths,
+      // leave publisher columns blank so the user can clean up by hand.
+      const p = pRows[idx] ? publisherById.get(pRows[idx].publisher_profile_id) : null;
+      const { first, middle, last } = splitName(w?.legal_name ?? '');
       rows.push({
-        work_title: t.track_title,
-        alternate_titles: t.version,
-        iswc: t.iswc,
-        recording_isrc: t.isrc,
-        recording_artist: ctx.release.primary_artist,
-        recording_release_date: ctx.release.release_date,
-        duration: fmtDuration(t.duration_ms),
-        writer_legal_name: w?.legal_name,
-        writer_pro: w?.pro,
-        writer_ipi: w?.ipi_number,
-        writer_role: wRows[i].role,
-        writer_share_percent: Number(wRows[i].share_percent).toFixed(2),
-        writer_publisher_name: p?.publisher_name ?? '',
-        writer_publisher_ipi: p?.ipi_number ?? '',
-        writer_publisher_pro: p?.pro ?? '',
-        writer_publisher_share_percent: pRows[i] ? Number(pRows[i].share_percent).toFixed(2) : '',
-        territory: p?.territory ?? 'World',
-        admin_notes: w?.notes ?? '',
+        'Song Title': t.track_title,
+        'Alternate Titles': t.version ?? '',
+        'ISWC': t.iswc ?? '',
+        'Year of Composition': r.copyright_year ?? '',
+        'Recording ISRC': t.isrc ?? '',
+        'Recording Artist': r.primary_artist ?? '',
+        'Release Title': r.release_title,
+        'Release Date': r.release_date ?? '',
+        'Duration (HH:MM:SS)': fmtDurationHHMMSS(t.duration_ms),
+        'Language': t.language ?? '',
+        'Writer First Name': first,
+        'Writer Middle Name': middle,
+        'Writer Last Name': last,
+        'Writer Legal Name': w?.legal_name ?? '',
+        'Writer PRO': w?.pro ?? '',
+        'Writer IPI': w?.ipi_number ?? '',
+        'Writer Capacity': tw.role,
+        'Writer Share %': Number(tw.share_percent).toFixed(2),
+        'Writer Email': w?.email ?? '',
+        'Writer Country': w?.country ?? '',
+        'Publisher Name': p?.publisher_name ?? '',
+        'Publisher Legal Entity': p?.legal_entity_name ?? '',
+        'Publisher PRO': p?.pro ?? '',
+        'Publisher IPI': p?.ipi_number ?? '',
+        'Publisher Share %': pRows[idx] ? Number(pRows[idx].share_percent).toFixed(2) : '',
+        'Publisher Territory': p?.territory ?? 'World',
+        'Admin Notes': w?.notes ?? '',
       });
-    }
+    });
   }
+
   return rows;
 }
 
-export async function songtrustGenerate(opts: { orgId: string; releaseId: string; createdBy: string | null; ctx: ReleaseContext }): Promise<GeneratedFile[]> {
+export async function songtrustGenerate(opts: {
+  orgId: string; releaseId: string; createdBy: string | null; ctx: ReleaseContext;
+}): Promise<GeneratedFile[]> {
   const rows = rowsFor(opts.ctx);
   const slug = safeSlug(opts.ctx.release.release_title);
   const csv = buildCsv(HEADERS, rows);
-  const xlsx = await buildXlsx([{ name: 'Catalog', headers: HEADERS, rows }]);
+  const readme: Sheet = {
+    name: 'README',
+    headers: ['Field', 'Notes'],
+    rows: [
+      { Field: 'Source', Notes: `Generated by LevelUp Publishing on ${new Date().toISOString()}` },
+      { Field: 'Layout', Notes: 'Per-writer rows so 100% can be reconstructed across multiple writers per work. Songtrust does not publish a public bulk template — confirm column mapping with your admin contact before importing.' },
+      { Field: 'Writer Capacity', Notes: 'composer / lyricist / composer_lyricist — map to the platform\'s capacity code if different.' },
+      { Field: 'Publisher pairing', Notes: 'Publishers are paired with writers by row order. If your splits don\'t pair cleanly, fix the publisher columns manually after import.' },
+    ],
+  };
+  const xlsx = await buildXlsx([{ name: 'Catalog', headers: HEADERS, rows }, readme]);
 
   const csvFile = await archiveFile({
     orgId: opts.orgId, releaseId: opts.releaseId, platform: 'songtrust',
     fileName: `Songtrust_Catalog_${slug}.csv`, fileType: 'data_csv',
     buffer: Buffer.from(csv, 'utf-8'), contentType: 'text/csv; charset=utf-8',
-    createdBy: opts.createdBy,
+    createdBy: opts.createdBy, notes: 'Generic publishing-admin format. Songtrust template_pending.',
   });
   const xlsxFile = await archiveFile({
     orgId: opts.orgId, releaseId: opts.releaseId, platform: 'songtrust',

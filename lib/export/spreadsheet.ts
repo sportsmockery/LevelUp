@@ -67,6 +67,42 @@ export function fmtDuration(ms: number | null | undefined): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+// HH:MM:SS — what SoundExchange and MLC bulk templates require.
+export function fmtDurationHHMMSS(ms: number | null | undefined): string {
+  if (!ms || ms <= 0) return '';
+  const total = Math.round(ms / 1000);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
+
+// Best-effort split of a legal_name into first + middle + last for templates
+// that require name parts. Handles "Last, First Middle" and "First Middle Last".
+export function splitName(legalName: string): { first: string; middle: string; last: string } {
+  const trimmed = (legalName ?? '').trim();
+  if (!trimmed) return { first: '', middle: '', last: '' };
+  if (trimmed.includes(',')) {
+    const [last, rest = ''] = trimmed.split(',').map((s) => s.trim());
+    const restParts = rest.split(/\s+/).filter(Boolean);
+    return { first: restParts[0] ?? '', middle: restParts.slice(1).join(' '), last };
+  }
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return { first: '', middle: '', last: parts[0] };
+  if (parts.length === 2) return { first: parts[0], middle: '', last: parts[1] };
+  return { first: parts[0], middle: parts.slice(1, -1).join(' '), last: parts[parts.length - 1] };
+}
+
+// MLC capacity codes (their template glossary):
+// CA = composer & author (music + lyrics)
+// C  = composer (music only)
+// A  = author (lyrics only)
+export function mlcCapacityFromRole(role: string): 'CA' | 'C' | 'A' {
+  if (role === 'composer') return 'C';
+  if (role === 'lyricist') return 'A';
+  return 'CA';
+}
+
 export function safeSlug(s: string, maxLen = 64): string {
   return s.replace(/[^a-z0-9-_]+/gi, '_').slice(0, maxLen) || 'release';
 }

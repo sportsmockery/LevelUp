@@ -1,75 +1,144 @@
-// Distributor adapter — produces a generic DDEX-ish metadata sheet (CSV + XLSX).
-// Compatible with most distributors (DistroKid, TuneCore, CD Baby) as a reference doc.
+// Distributor adapter — DDEX-style metadata sheet.
+// One row per track, with release-level fields repeated. Compatible with
+// CD Baby Pro bulk import and most indie distributor onboarding flows.
+// DistroKid and TuneCore use their own UI-only flows, but this sheet doubles
+// as a clipboard reference when filling those out.
 
 import type { ReleaseContext } from '@/lib/validation/catalog-validation';
 import { archiveFile } from '@/lib/files/workbookArchive';
-import { buildCsv, buildXlsx, fmtDuration, safeSlug } from '@/lib/export/spreadsheet';
+import { buildCsv, buildXlsx, fmtDurationHHMMSS, safeSlug, type Sheet } from '@/lib/export/spreadsheet';
 import type { GeneratedFile } from '@/types/exports';
 
 const HEADERS = [
-  'release_title', 'release_type', 'primary_artist', 'featured_artists',
-  'label', 'upc', 'catalog_number', 'release_date', 'original_release_date',
-  'language', 'genre', 'sub_genre', 'copyright_year', 'p_line', 'c_line',
-  'track_number', 'disc_number', 'track_title', 'version', 'duration', 'duration_ms',
-  'isrc', 'iswc', 'explicit', 'instrumental', 'bpm', 'key',
-  'writers', 'publishers', 'producers', 'performers',
+  // Release-level (repeated per track for flat-CSV consumers)
+  'Release Title',
+  'Release Type',
+  'Primary Artist',
+  'Featured Artists',
+  'Label',
+  'UPC',
+  'Catalog Number',
+  'Release Date',
+  'Original Release Date',
+  'Language',
+  'Genre',
+  'Sub-Genre',
+  'Copyright Year',
+  'P Line',
+  'C Line',
+  'Artwork Path',
+  // Track-level
+  'Disc Number',
+  'Track Number',
+  'Track Title',
+  'Track Version',
+  'Track Artist',
+  'ISRC',
+  'ISWC',
+  'Duration (HH:MM:SS)',
+  'Duration (ms)',
+  'BPM',
+  'Key',
+  'Explicit (Y/N)',
+  'Instrumental (Y/N)',
+  'Lyrics Language',
+  'Recording Date',
+  'Recording Location',
+  'Studio',
+  'Recording Engineer',
+  'Mixing Engineer',
+  'Mastering Engineer',
+  // Credits compacted (DDEX-style "credits" strings)
+  'Writer Credits',
+  'Publisher Credits',
+  'Producer Credits',
+  'Performer Credits',
 ];
 
-function rowsFor(ctx: ReleaseContext): Record<string, unknown>[] {
-  const r = ctx.release;
+function rowsFor(ctx: ReleaseContext) {
   const writerById = new Map(ctx.writers.map((w) => [w.id, w]));
   const publisherById = new Map(ctx.publishers.map((p) => [p.id, p]));
+  const r = ctx.release;
 
   return ctx.tracks.map((t) => {
-    const wTxt = ctx.trackWriters
+    const writerCredits = ctx.trackWriters
       .filter((tw) => tw.track_id === t.id)
-      .map((tw) => `${writerById.get(tw.writer_profile_id)?.legal_name ?? 'Unknown'} (${Number(tw.share_percent).toFixed(2)}%)`)
+      .map((tw) => {
+        const w = writerById.get(tw.writer_profile_id);
+        return `${w?.legal_name ?? 'Unknown'} (${tw.role}, ${Number(tw.share_percent).toFixed(2)}%${w?.ipi_number ? `, IPI ${w.ipi_number}` : ''})`;
+      })
       .join('; ');
-    const pTxt = ctx.trackPublishers
+    const publisherCredits = ctx.trackPublishers
       .filter((tp) => tp.track_id === t.id)
-      .map((tp) => `${publisherById.get(tp.publisher_profile_id)?.publisher_name ?? 'Unknown'} (${Number(tp.share_percent).toFixed(2)}%)`)
+      .map((tp) => {
+        const p = publisherById.get(tp.publisher_profile_id);
+        return `${p?.publisher_name ?? 'Unknown'} (${Number(tp.share_percent).toFixed(2)}%${p?.ipi_number ? `, IPI ${p.ipi_number}` : ''})`;
+      })
       .join('; ');
+
     return {
-      release_title: r.release_title,
-      release_type: r.release_type,
-      primary_artist: r.primary_artist,
-      featured_artists: (r.featured_artists ?? []).join('; '),
-      label: r.label_name,
-      upc: r.upc,
-      catalog_number: r.catalog_number,
-      release_date: r.release_date,
-      original_release_date: r.original_release_date,
-      language: r.language,
-      genre: r.genre,
-      sub_genre: r.sub_genre,
-      copyright_year: r.copyright_year,
-      p_line: r.p_line,
-      c_line: r.c_line,
-      track_number: t.track_number,
-      disc_number: t.disc_number,
-      track_title: t.track_title,
-      version: t.version,
-      duration: fmtDuration(t.duration_ms),
-      duration_ms: t.duration_ms,
-      isrc: t.isrc,
-      iswc: t.iswc,
-      explicit: t.explicit,
-      instrumental: t.instrumental,
-      bpm: t.bpm,
-      key: t.musical_key,
-      writers: wTxt,
-      publishers: pTxt,
-      producers: '', // populated only if track_producers rows are loaded into context
-      performers: '',
+      'Release Title': r.release_title,
+      'Release Type': r.release_type,
+      'Primary Artist': r.primary_artist ?? '',
+      'Featured Artists': (r.featured_artists ?? []).join('; '),
+      'Label': r.label_name ?? '',
+      'UPC': r.upc ?? '',
+      'Catalog Number': r.catalog_number ?? '',
+      'Release Date': r.release_date ?? '',
+      'Original Release Date': r.original_release_date ?? '',
+      'Language': r.language ?? '',
+      'Genre': r.genre ?? '',
+      'Sub-Genre': r.sub_genre ?? '',
+      'Copyright Year': r.copyright_year ?? '',
+      'P Line': r.copyright_year ? `℗ ${r.copyright_year} ${r.p_line ?? ''}`.trim() : (r.p_line ?? ''),
+      'C Line': r.copyright_year ? `© ${r.copyright_year} ${r.c_line ?? ''}`.trim() : (r.c_line ?? ''),
+      'Artwork Path': r.artwork_path ?? '',
+      'Disc Number': t.disc_number ?? 1,
+      'Track Number': t.track_number ?? '',
+      'Track Title': t.track_title,
+      'Track Version': t.version ?? '',
+      'Track Artist': r.primary_artist ?? '',
+      'ISRC': t.isrc ?? '',
+      'ISWC': t.iswc ?? '',
+      'Duration (HH:MM:SS)': fmtDurationHHMMSS(t.duration_ms),
+      'Duration (ms)': t.duration_ms ?? '',
+      'BPM': t.bpm ?? '',
+      'Key': t.musical_key ?? '',
+      'Explicit (Y/N)': t.explicit ? 'Y' : 'N',
+      'Instrumental (Y/N)': t.instrumental ? 'Y' : 'N',
+      'Lyrics Language': t.language ?? '',
+      'Recording Date': t.recording_date ?? '',
+      'Recording Location': t.recording_location ?? '',
+      'Studio': t.studio_name ?? '',
+      'Recording Engineer': t.recording_engineer ?? '',
+      'Mixing Engineer': t.mixing_engineer ?? '',
+      'Mastering Engineer': t.mastering_engineer ?? '',
+      'Writer Credits': writerCredits,
+      'Publisher Credits': publisherCredits,
+      'Producer Credits': '',
+      'Performer Credits': '',
     };
   });
 }
 
-export async function distributorGenerate(opts: { orgId: string; releaseId: string; createdBy: string | null; ctx: ReleaseContext }): Promise<GeneratedFile[]> {
+export async function distributorGenerate(opts: {
+  orgId: string; releaseId: string; createdBy: string | null; ctx: ReleaseContext;
+}): Promise<GeneratedFile[]> {
   const rows = rowsFor(opts.ctx);
   const slug = safeSlug(opts.ctx.release.release_title);
   const csv = buildCsv(HEADERS, rows);
-  const xlsx = await buildXlsx([{ name: 'Tracks', headers: HEADERS, rows }]);
+  const readme: Sheet = {
+    name: 'README',
+    headers: ['Field', 'Notes'],
+    rows: [
+      { Field: 'Source', Notes: `Generated by LevelUp Publishing on ${new Date().toISOString()}` },
+      { Field: 'Layout', Notes: 'DDEX-style one-row-per-track sheet. Compatible with CD Baby Pro bulk import. For DistroKid / TuneCore, use as a clipboard reference for the UI.' },
+      { Field: 'Duration', Notes: 'HH:MM:SS preferred by most distributors. The ms column is provided for systems that want raw integer.' },
+      { Field: 'Artwork', Notes: 'Artwork file lives in Supabase Storage at the listed path. Download and upload to the distributor separately — 3000×3000 RGB JPG/PNG.' },
+      { Field: 'Credits format', Notes: 'Semicolon-separated. Each entry: Name (role, share%, IPI nnn).' },
+    ],
+  };
+  const xlsx = await buildXlsx([{ name: 'Tracks', headers: HEADERS, rows }, readme]);
 
   const csvFile = await archiveFile({
     orgId: opts.orgId, releaseId: opts.releaseId, platform: 'distributor',

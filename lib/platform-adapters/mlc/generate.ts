@@ -1,118 +1,139 @@
-// MLC adapter — produces a 4-tab XLSX workbook + a JSON dump of the same data.
+// MLC adapter — matches the structure of The MLC's published "Bulk Work
+// Registration Spreadsheet Template" (themlc.com).
+//
+// Structure:
+//   - One row per WORK (= composition)
+//   - Writer info in numbered columns: "Writer 1 First Name", "Writer 1 Last Name",
+//     "Writer 1 IPI", "Writer 1 Society", "Writer 1 Capacity", "Writer 1 Share %"
+//     ...repeating up to the maximum writer count for any work in this release.
+//   - Original Publisher info in numbered columns mirroring the writer block.
+//
+// We also emit a JSON dump and a README sheet inside the workbook.
 
 import type { ReleaseContext } from '@/lib/validation/catalog-validation';
 import { archiveFile } from '@/lib/files/workbookArchive';
-import { buildXlsx, fmtDuration, safeSlug, type Sheet } from '@/lib/export/spreadsheet';
+import {
+  buildXlsx, fmtDurationHHMMSS, mlcCapacityFromRole, safeSlug, splitName,
+  type Sheet,
+} from '@/lib/export/spreadsheet';
 import type { GeneratedFile } from '@/types/exports';
-
-const WORK_HEADERS = ['work_title', 'iswc', 'duration', 'language', 'instrumental', 'lyrics_excerpt'];
-const WRITER_HEADERS = ['work_title', 'legal_name', 'pro', 'ipi_number', 'role', 'share_percent', 'approval_status', 'country', 'email'];
-const PUBLISHER_HEADERS = ['work_title', 'publisher_name', 'pro', 'ipi_number', 'territory', 'share_percent', 'admin_company'];
-const RECORDING_HEADERS = ['work_title', 'recording_title', 'isrc', 'duration', 'release_title', 'release_date', 'label', 'upc', 'featured_artist'];
 
 function build(ctx: ReleaseContext) {
   const writerById = new Map(ctx.writers.map((w) => [w.id, w]));
   const publisherById = new Map(ctx.publishers.map((p) => [p.id, p]));
   const r = ctx.release;
 
-  const works: Record<string, unknown>[] = [];
-  const writers: Record<string, unknown>[] = [];
-  const publishers: Record<string, unknown>[] = [];
-  const recordings: Record<string, unknown>[] = [];
-
+  let maxWriters = 0;
+  let maxPublishers = 0;
   for (const t of ctx.tracks) {
-    works.push({
-      work_title: t.track_title,
-      iswc: t.iswc,
-      duration: fmtDuration(t.duration_ms),
-      language: t.language,
-      instrumental: t.instrumental,
-      lyrics_excerpt: (t.lyrics ?? '').slice(0, 200),
-    });
-
-    for (const tw of ctx.trackWriters.filter((x) => x.track_id === t.id)) {
-      const w = writerById.get(tw.writer_profile_id);
-      if (!w) continue;
-      writers.push({
-        work_title: t.track_title,
-        legal_name: w.legal_name,
-        pro: w.pro,
-        ipi_number: w.ipi_number,
-        role: tw.role,
-        share_percent: Number(tw.share_percent).toFixed(2),
-        approval_status: tw.approval_status,
-        country: w.country,
-        email: w.email,
-      });
-    }
-
-    for (const tp of ctx.trackPublishers.filter((x) => x.track_id === t.id)) {
-      const p = publisherById.get(tp.publisher_profile_id);
-      if (!p) continue;
-      publishers.push({
-        work_title: t.track_title,
-        publisher_name: p.publisher_name,
-        pro: p.pro,
-        ipi_number: p.ipi_number,
-        territory: p.territory ?? 'World',
-        share_percent: Number(tp.share_percent).toFixed(2),
-        admin_company: p.admin_company,
-      });
-    }
-
-    recordings.push({
-      work_title: t.track_title,
-      recording_title: t.track_title,
-      isrc: t.isrc,
-      duration: fmtDuration(t.duration_ms),
-      release_title: r.release_title,
-      release_date: r.release_date,
-      label: r.label_name,
-      upc: r.upc,
-      featured_artist: r.primary_artist,
-    });
+    maxWriters = Math.max(maxWriters, ctx.trackWriters.filter((x) => x.track_id === t.id).length);
+    maxPublishers = Math.max(maxPublishers, ctx.trackPublishers.filter((x) => x.track_id === t.id).length);
   }
 
-  const sheets: Sheet[] = [
-    { name: 'Works', headers: WORK_HEADERS, rows: works },
-    { name: 'Writers', headers: WRITER_HEADERS, rows: writers },
-    { name: 'Publishers', headers: PUBLISHER_HEADERS, rows: publishers },
-    { name: 'Recordings', headers: RECORDING_HEADERS, rows: recordings },
+  const baseHeaders = [
+    'Work Title', 'Alternate Titles', 'ISWC', 'Language', 'Instrumental (Y/N)',
+    'Duration (HH:MM:SS)', 'Recording Title', 'Recording Artist', 'ISRC',
+    'Release Title', 'Release Date', 'UPC', 'Label',
   ];
+  const writerHeaders: string[] = [];
+  for (let i = 1; i <= Math.max(maxWriters, 1); i++) {
+    writerHeaders.push(
+      `Writer ${i} First Name`, `Writer ${i} Middle Name`, `Writer ${i} Last Name`,
+      `Writer ${i} IPI`, `Writer ${i} Society`, `Writer ${i} Capacity (CA/C/A)`, `Writer ${i} Share %`,
+    );
+  }
+  const publisherHeaders: string[] = [];
+  for (let i = 1; i <= Math.max(maxPublishers, 1); i++) {
+    publisherHeaders.push(
+      `Original Publisher ${i} Name`, `Original Publisher ${i} IPI`,
+      `Original Publisher ${i} Society`, `Original Publisher ${i} Share %`,
+    );
+  }
+  const headers = [...baseHeaders, ...writerHeaders, ...publisherHeaders];
 
-  const json = {
-    generated_at: new Date().toISOString(),
-    release: {
-      title: r.release_title,
-      type: r.release_type,
-      artist: r.primary_artist,
-      release_date: r.release_date,
-      upc: r.upc,
-      label: r.label_name,
-    },
-    works,
-    writers,
-    publishers,
-    recordings,
+  const rows: Record<string, unknown>[] = [];
+  for (const t of ctx.tracks) {
+    const writers = ctx.trackWriters.filter((x) => x.track_id === t.id);
+    const publishers = ctx.trackPublishers.filter((x) => x.track_id === t.id);
+    const row: Record<string, unknown> = {
+      'Work Title': t.track_title,
+      'Alternate Titles': t.version ?? '',
+      'ISWC': t.iswc ?? '',
+      'Language': t.language ?? '',
+      'Instrumental (Y/N)': t.instrumental ? 'Y' : 'N',
+      'Duration (HH:MM:SS)': fmtDurationHHMMSS(t.duration_ms),
+      'Recording Title': t.track_title,
+      'Recording Artist': r.primary_artist ?? '',
+      'ISRC': t.isrc ?? '',
+      'Release Title': r.release_title,
+      'Release Date': r.release_date ?? '',
+      'UPC': r.upc ?? '',
+      'Label': r.label_name ?? '',
+    };
+    writers.forEach((tw, i) => {
+      const w = writerById.get(tw.writer_profile_id);
+      if (!w) return;
+      const { first, middle, last } = splitName(w.legal_name);
+      const n = i + 1;
+      row[`Writer ${n} First Name`] = first;
+      row[`Writer ${n} Middle Name`] = middle;
+      row[`Writer ${n} Last Name`] = last;
+      row[`Writer ${n} IPI`] = w.ipi_number ?? '';
+      row[`Writer ${n} Society`] = w.pro ?? '';
+      row[`Writer ${n} Capacity (CA/C/A)`] = mlcCapacityFromRole(tw.role);
+      row[`Writer ${n} Share %`] = Number(tw.share_percent).toFixed(2);
+    });
+    publishers.forEach((tp, i) => {
+      const p = publisherById.get(tp.publisher_profile_id);
+      if (!p) return;
+      const n = i + 1;
+      row[`Original Publisher ${n} Name`] = p.publisher_name;
+      row[`Original Publisher ${n} IPI`] = p.ipi_number ?? '';
+      row[`Original Publisher ${n} Society`] = p.pro ?? '';
+      row[`Original Publisher ${n} Share %`] = Number(tp.share_percent).toFixed(2);
+    });
+    rows.push(row);
+  }
+
+  const readme: Sheet = {
+    name: 'README',
+    headers: ['Field', 'Notes'],
+    rows: [
+      { Field: 'Source', Notes: `Generated by LevelUp Publishing on ${new Date().toISOString()}` },
+      { Field: 'Layout', Notes: 'Matches the structure of The MLC bulk Work Registration template — verify the latest version at themlc.com before uploading.' },
+      { Field: 'Capacity codes', Notes: 'CA = composer & author, C = composer (music only), A = author (lyrics only)' },
+      { Field: 'Duration', Notes: 'HH:MM:SS as required by MLC' },
+      { Field: 'Shares', Notes: 'Writer shares should sum to 100. Publisher shares should sum to 100.' },
+      { Field: 'Society', Notes: 'PRO affiliation: BMI, ASCAP, SESAC, GMR, or international equivalent' },
+    ],
   };
 
-  return { sheets, json };
+  return {
+    sheets: [{ name: 'Works', headers, rows }, readme] as Sheet[],
+    json: {
+      generated_at: new Date().toISOString(),
+      release: { title: r.release_title, artist: r.primary_artist, upc: r.upc, label: r.label_name },
+      works: rows,
+    },
+  };
 }
 
-export async function mlcGenerate(opts: { orgId: string; releaseId: string; createdBy: string | null; ctx: ReleaseContext }): Promise<GeneratedFile[]> {
+export async function mlcGenerate(opts: {
+  orgId: string; releaseId: string; createdBy: string | null; ctx: ReleaseContext;
+}): Promise<GeneratedFile[]> {
   const { sheets, json } = build(opts.ctx);
   const slug = safeSlug(opts.ctx.release.release_title);
   const xlsx = await buildXlsx(sheets);
 
   const xlsxFile = await archiveFile({
     orgId: opts.orgId, releaseId: opts.releaseId, platform: 'mlc',
-    fileName: `MLC_Work_Registration_${slug}.xlsx`, fileType: 'workbook_xlsx',
+    fileName: `MLC_Bulk_Work_Registration_${slug}.xlsx`, fileType: 'workbook_xlsx',
     buffer: xlsx, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    createdBy: opts.createdBy,
+    createdBy: opts.createdBy, notes: 'Matches MLC bulk work registration template layout.',
   });
   const jsonFile = await archiveFile({
     orgId: opts.orgId, releaseId: opts.releaseId, platform: 'mlc',
-    fileName: `MLC_Work_Registration_${slug}.json`, fileType: 'data_json',
+    fileName: `MLC_Bulk_Work_Registration_${slug}.json`, fileType: 'data_json',
     buffer: Buffer.from(JSON.stringify(json, null, 2), 'utf-8'),
     contentType: 'application/json; charset=utf-8',
     createdBy: opts.createdBy,
