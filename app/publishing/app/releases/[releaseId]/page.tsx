@@ -7,6 +7,7 @@ import { useOrg } from '../../_org-context';
 import { getBrowserClient } from '@/lib/supabase-publishing';
 import type { Release, Track } from '@/types/catalog';
 import { ArtworkUploader } from '@/components/music/ArtworkUploader';
+import { CustomFieldsRenderer } from '@/components/music/CustomFieldsRenderer';
 
 interface StepState {
   id: string;
@@ -131,6 +132,8 @@ export default function ReleaseDetailPage() {
               }}
             />
           </div>
+
+          <CustomFieldsRenderer orgId={activeOrgId} entityType="release" entityId={release.id} />
 
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 text-sm">
             <h2 className="font-heading text-lg font-semibold mb-3">Metadata</h2>

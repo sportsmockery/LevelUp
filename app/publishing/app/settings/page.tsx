@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useOrg } from '../_org-context';
 import { useAuth } from '@/contexts/AuthContext';
 import { GovernedStep } from '@/components/guided/GovernedStep';
+import { CustomFieldsEditor } from '@/components/music/CustomFieldsEditor';
+import { MembersSection } from '@/components/music/MembersSection';
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -116,6 +118,16 @@ export default function SettingsPage() {
             ))}
           </ul>
         )}
+      </section>
+
+      <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+        <h2 className="font-heading text-xl font-semibold mb-1">Custom fields</h2>
+        <p className="text-sm text-white/60 mb-5">Define extra fields on releases, tracks, writers, or publishers. Fields appear automatically on the relevant entity pages.</p>
+        <CustomFieldsEditor orgId={activeOrgId} />
+      </section>
+
+      <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
+        <MembersSection orgId={activeOrgId} />
       </section>
 
       <section className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 text-sm text-white/60">

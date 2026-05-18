@@ -98,6 +98,7 @@ function Sidebar({
     ['/publishing/app/releases', 'Releases'],
     ['/publishing/app/writers', 'Writers'],
     ['/publishing/app/isrc', 'ISRC ledger'],
+    ['/publishing/app/approvals', 'Approvals'],
     ['/publishing/app/exports', 'Exports'],
     ['/publishing/app/workbook-archive', 'Workbook archive'],
     ['/publishing/app/settings', 'Settings'],

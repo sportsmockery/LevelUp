@@ -14,7 +14,7 @@ const PLATFORMS = [
   { id: 'soundexchange', label: 'SoundExchange Repertoire',   desc: 'CSV + XLSX for digital performance royalty collection.', live: true },
   { id: 'copyright',     label: 'Copyright eCO Packet',       desc: 'Form PA + Form SR — PDF + .txt for US Copyright Office filings.', live: true },
   { id: 'distributor',   label: 'Distributor Metadata',       desc: 'CSV + XLSX matching common distributor templates.', live: true },
-  { id: 'master',        label: 'Master Workbook',            desc: '10-tab XLSX covering the entire catalog.', live: false },
+  { id: 'master',        label: 'Master Workbook',            desc: '10-tab XLSX covering the entire org catalog. No release required.', live: true },
 ];
 
 export default function ExportsPage() {
@@ -49,10 +49,16 @@ export default function ExportsPage() {
     setBusy(platform);
     setLastResult((prev) => ({ ...prev, [platform]: { ok: false, message: 'Generating…' } }));
     try {
-      const res = await fetch(`/api/publishing/releases/${selectedReleaseId}/exports/${platform}`, { method: 'POST' });
+      let res: Response;
+      if (platform === 'master') {
+        res = await fetch(`/api/publishing/orgs/${activeOrgId}/master-workbook`, { method: 'POST' });
+      } else {
+        res = await fetch(`/api/publishing/releases/${selectedReleaseId}/exports/${platform}`, { method: 'POST' });
+      }
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
-      const fileLabel = (json.files ?? []).map((f: any) => f.file_name).join(', ');
+      const files = json.files ?? (json.file ? [json.file] : []);
+      const fileLabel = files.map((f: any) => f.file_name).join(', ');
       setLastResult((prev) => ({ ...prev, [platform]: { ok: true, message: `Generated: ${fileLabel}` } }));
     } catch (e: any) {
       setLastResult((prev) => ({ ...prev, [platform]: { ok: false, message: e.message ?? String(e) } }));
@@ -102,7 +108,8 @@ export default function ExportsPage() {
           const platformIssues = issuesByPlatform[p.id] ?? [];
           const platformBlockers = platformIssues.filter((i) => i.blocking);
           const overallBlockers = issues.filter((i) => i.blocking);
-          const blocked = !p.live || overallBlockers.length > 0 || platformBlockers.length > 0;
+          // Master Workbook is org-scoped and doesn't depend on per-release validation.
+          const blocked = !p.live || (p.id !== 'master' && (overallBlockers.length > 0 || platformBlockers.length > 0));
           const result = lastResult[p.id];
           return (
             <div key={p.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
@@ -125,7 +132,7 @@ export default function ExportsPage() {
                   )}
                 </div>
                 <button
-                  disabled={blocked || busy === p.id || !selectedReleaseId}
+                  disabled={blocked || busy === p.id || (p.id !== 'master' && !selectedReleaseId)}
                   onClick={() => generate(p.id)}
                   className="rounded-full bg-emerald-400 text-black px-5 py-2 text-sm font-medium hover:bg-emerald-300 disabled:opacity-30 whitespace-nowrap"
                   title={blocked ? 'Fix blockers above first' : undefined}

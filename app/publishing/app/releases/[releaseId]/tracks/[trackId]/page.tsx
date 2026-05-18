@@ -8,6 +8,7 @@ import { getBrowserClient } from '@/lib/supabase-publishing';
 import type { Track, TrackWriter, TrackPublisher, WriterProfile, PublisherProfile, WriterRole, ApprovalStatus } from '@/types/catalog';
 import { GovernedStep } from '@/components/guided/GovernedStep';
 import { TrainingBlock } from '@/components/guided/TrainingBlock';
+import { CustomFieldsRenderer } from '@/components/music/CustomFieldsRenderer';
 
 export default function TrackDetailPage() {
   const params = useParams<{ releaseId: string; trackId: string }>();
@@ -51,6 +52,8 @@ export default function TrackDetailPage() {
       </header>
 
       <TrackMetadataSection track={track} onSaved={() => setRefreshKey((k) => k + 1)} />
+
+      <CustomFieldsRenderer orgId={activeOrgId} entityType="track" entityId={track.id} />
 
       <GovernedStep
         title="Writer splits — must sum to 100%"
