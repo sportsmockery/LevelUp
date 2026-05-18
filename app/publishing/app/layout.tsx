@@ -69,13 +69,15 @@ export default function ToolingLayout({ children }: { children: ReactNode }) {
       />
       <main className="md:pl-64 pt-4 pb-24">
         <div className="max-w-5xl mx-auto px-6">
-          {!activeOrgId && orgs.length === 0 ? (
-            <NoOrgPrompt />
-          ) : (
-            <OrgContext.Provider value={{ orgs, activeOrgId, setActiveOrgId }}>
-              {children}
-            </OrgContext.Provider>
-          )}
+          <OrgContext.Provider value={{ orgs, activeOrgId, setActiveOrgId }}>
+            {/* Show the welcome prompt only when the user has no orgs AND
+                isn't already on the settings page (which is where they create one). */}
+            {!activeOrgId && orgs.length === 0 && pathname !== '/publishing/app/settings' ? (
+              <NoOrgPrompt />
+            ) : (
+              children
+            )}
+          </OrgContext.Provider>
         </div>
       </main>
     </div>
