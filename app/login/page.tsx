@@ -1,13 +1,12 @@
 'use client';
 
 import { Suspense, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/contexts/AuthContext';
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const returnUrl = searchParams.get('returnUrl') || '/dashboard';
   const { signIn, loading: authLoading } = useAuth();
@@ -22,7 +21,21 @@ function LoginForm() {
     setError('');
     setSubmitting(true);
 
-    const { error: signInError } = await signIn(email, password);
+    // Race signIn against an 8s timeout so the button never sits forever.
+    let signInError: string | null = null;
+    try {
+      const result = await Promise.race([
+        signIn(email, password),
+        new Promise<{ error: string }>((_, reject) =>
+          setTimeout(() => reject(new Error('sign_in_timeout')), 8000),
+        ),
+      ]);
+      signInError = (result as { error: string | null }).error;
+    } catch (e: any) {
+      signInError = e?.message === 'sign_in_timeout'
+        ? 'Sign-in is taking longer than expected — refresh and try again.'
+        : (e?.message ?? String(e));
+    }
 
     if (signInError) {
       setError(signInError);
@@ -30,7 +43,9 @@ function LoginForm() {
       return;
     }
 
-    router.push(returnUrl);
+    // Hard navigation forces middleware to re-read cookies from the now-fresh
+    // session. router.push has been observed to stall here on first sign-in.
+    window.location.href = returnUrl;
   };
 
   return (
