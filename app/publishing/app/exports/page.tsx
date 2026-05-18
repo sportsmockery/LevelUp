@@ -9,11 +9,11 @@ import type { ValidationIssue } from '@/types/platforms';
 
 const PLATFORMS = [
   { id: 'bmi',           label: 'BMI Registration Packet',    desc: 'PDF + .txt for self-registration at BMI Songview.', live: true },
-  { id: 'mlc',           label: 'MLC Work Registration',      desc: 'Workbook + JSON for the Mechanical Licensing Collective.', live: false },
-  { id: 'songtrust',     label: 'Songtrust Catalog Upload',   desc: 'CSV + XLSX for Songtrust publishing admin.', live: false },
-  { id: 'soundexchange', label: 'SoundExchange Repertoire',   desc: 'CSV + XLSX for digital performance royalty collection.', live: false },
-  { id: 'copyright',     label: 'Copyright eCO Packet',       desc: 'PDF + .txt for US Copyright Office Form PA / SR filings.', live: false },
-  { id: 'distributor',   label: 'Distributor Metadata',       desc: 'CSV + XLSX matching common distributor templates.', live: false },
+  { id: 'mlc',           label: 'MLC Work Registration',      desc: '4-tab XLSX + JSON for the Mechanical Licensing Collective.', live: true },
+  { id: 'songtrust',     label: 'Songtrust Catalog Upload',   desc: 'CSV + XLSX for Songtrust publishing admin (template_pending).', live: true },
+  { id: 'soundexchange', label: 'SoundExchange Repertoire',   desc: 'CSV + XLSX for digital performance royalty collection.', live: true },
+  { id: 'copyright',     label: 'Copyright eCO Packet',       desc: 'Form PA + Form SR — PDF + .txt for US Copyright Office filings.', live: true },
+  { id: 'distributor',   label: 'Distributor Metadata',       desc: 'CSV + XLSX matching common distributor templates.', live: true },
   { id: 'master',        label: 'Master Workbook',            desc: '10-tab XLSX covering the entire catalog.', live: false },
 ];
 
