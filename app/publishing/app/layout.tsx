@@ -1,20 +1,23 @@
 'use client';
 
 // Tooling layout — sidebar nav, current-org selector, auth-gated.
-// Middleware ensures the user is signed in; client code reads/sets active org from localStorage.
+// Auth check is self-contained (does NOT depend on the wrestling AuthContext)
+// so the publishing app doesn't share any potential loading-state stalls with it.
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
 import { getBrowserClient } from '@/lib/supabase-publishing';
 import type { Organization } from '@/types/catalog';
 import { OrgContext, ACTIVE_ORG_KEY } from './_org-context';
 
+type Phase = 'checking' | 'unauthenticated' | 'ready' | 'error';
+
 export default function ToolingLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, loading } = useAuth();
+  const [phase, setPhase] = useState<Phase>('checking');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [activeOrgId, setActiveOrgIdState] = useState<string | null>(null);
 
@@ -27,33 +30,72 @@ export default function ToolingLayout({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    if (loading) return;
-    if (!user) return;
+    let cancelled = false;
     const supabase = getBrowserClient();
-    if (!supabase) return;
+    if (!supabase) {
+      setErrorMsg('Supabase client unavailable (missing env vars).');
+      setPhase('error');
+      return;
+    }
+
     (async () => {
-      const { data: members } = await supabase
-        .from('organization_members')
-        .select('org_id, organizations:org_id(*)')
-        .eq('user_id', user.id);
-      const list = (members ?? [])
-        .map((m: any) => m.organizations as Organization | null)
-        .filter((o): o is Organization => !!o);
-      setOrgs(list);
+      try {
+        // Bail if auth check takes longer than 8 s — avoids forever "Loading…".
+        const authPromise = supabase.auth.getUser();
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('auth_timeout')), 8000),
+        );
+        const result = await Promise.race([authPromise, timeoutPromise]);
+        if (cancelled) return;
+        const user = (result as Awaited<typeof authPromise>).data?.user ?? null;
+        if (!user) { setPhase('unauthenticated'); return; }
 
-      const stored = typeof window !== 'undefined' ? localStorage.getItem(ACTIVE_ORG_KEY) : null;
-      const valid = stored && list.some((o) => o.id === stored) ? stored : (list[0]?.id ?? null);
-      setActiveOrgIdState(valid);
+        // Fetch this user's org memberships. Same timeout guard.
+        const orgsPromise = supabase
+          .from('organization_members')
+          .select('org_id, organizations:org_id(*)')
+          .eq('user_id', user.id);
+        const orgs = await Promise.race([orgsPromise, timeoutPromise]);
+        if (cancelled) return;
+        const data = (orgs as Awaited<typeof orgsPromise>).data ?? [];
+        const list = data
+          .map((m: any) => m.organizations as Organization | null)
+          .filter((o): o is Organization => !!o);
+        setOrgs(list);
+
+        const stored = typeof window !== 'undefined' ? localStorage.getItem(ACTIVE_ORG_KEY) : null;
+        const valid = stored && list.some((o) => o.id === stored) ? stored : (list[0]?.id ?? null);
+        setActiveOrgIdState(valid);
+        setPhase('ready');
+      } catch (e: any) {
+        if (cancelled) return;
+        setErrorMsg(e?.message ?? String(e));
+        setPhase('error');
+      }
     })();
-  }, [user, loading]);
 
-  if (loading) {
+    return () => { cancelled = true; };
+  }, []);
+
+  if (phase === 'checking') {
     return <div className="min-h-screen bg-[#0A0A0A] text-white/60 flex items-center justify-center">Loading…</div>;
   }
 
-  if (!user) {
-    // Middleware should have redirected, but render a fallback.
-    return <div className="min-h-screen bg-[#0A0A0A] text-white/60 flex items-center justify-center">Not signed in.</div>;
+  if (phase === 'unauthenticated') {
+    if (typeof window !== 'undefined') {
+      window.location.href = `/login?returnUrl=${encodeURIComponent(pathname)}`;
+    }
+    return <div className="min-h-screen bg-[#0A0A0A] text-white/60 flex items-center justify-center">Redirecting to sign in…</div>;
+  }
+
+  if (phase === 'error') {
+    return (
+      <div className="min-h-screen bg-[#0A0A0A] text-white flex flex-col items-center justify-center p-8 gap-4">
+        <h1 className="font-heading text-xl">Something went wrong loading the publishing app.</h1>
+        <pre className="text-xs text-red-300 bg-black/40 p-3 rounded max-w-lg overflow-auto">{errorMsg}</pre>
+        <button onClick={() => window.location.reload()} className="rounded-full bg-emerald-400 text-black px-5 py-2 text-sm font-medium hover:bg-emerald-300">Reload</button>
+      </div>
+    );
   }
 
   return (
@@ -70,8 +112,6 @@ export default function ToolingLayout({ children }: { children: ReactNode }) {
       <main className="md:pl-64 pt-4 pb-24">
         <div className="max-w-5xl mx-auto px-6">
           <OrgContext.Provider value={{ orgs, activeOrgId, setActiveOrgId }}>
-            {/* Show the welcome prompt only when the user has no orgs AND
-                isn't already on the settings page (which is where they create one). */}
             {!activeOrgId && orgs.length === 0 && pathname !== '/publishing/app/settings' ? (
               <NoOrgPrompt />
             ) : (
@@ -151,7 +191,7 @@ function NoOrgPrompt() {
     <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-10 text-center mt-12">
       <h2 className="font-heading text-2xl font-semibold mb-2">Welcome to LevelUp Publishing</h2>
       <p className="text-white/70 mb-6 max-w-md mx-auto">
-        You don't belong to any publishing organizations yet. Create one to get started.
+        You don&apos;t belong to any publishing organizations yet. Create one to get started.
       </p>
       <Link href="/publishing/app/settings" className="inline-block rounded-full bg-emerald-400 text-black px-6 py-2.5 font-medium hover:bg-emerald-300">
         Create your first org
@@ -159,4 +199,3 @@ function NoOrgPrompt() {
     </div>
   );
 }
-
