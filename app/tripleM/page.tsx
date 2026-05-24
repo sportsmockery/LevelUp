@@ -339,35 +339,43 @@ export default function TripleMPage() {
   const selectedCar = selectedId ? inventoryWithApproval.find((c) => c.id === selectedId) ?? null : null;
 
   return (
-    <div className="relative min-h-screen w-full overflow-x-hidden bg-slate-950 text-slate-100 antialiased">
+    <div className="tripleM-page relative min-h-screen w-full overflow-x-hidden bg-slate-950 text-slate-100 antialiased">
+      {/* Mobile-friendly slider thumbs + small global tweaks */}
+      <CarIqStyles />
+
       {/* Atmospheric background */}
       <BackgroundFX />
 
-      {/* NAV */}
-      <header className="relative z-20 mx-auto flex max-w-7xl items-center justify-between px-6 py-6 lg:px-10">
-        <div className="flex items-center gap-3">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/tripleM/logo.png"
-            alt="Triple M Motors"
-            className="h-10 w-auto"
-          />
-          <div className="hidden leading-tight md:block">
-            <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">Saint John, IN</p>
-            <p className="text-xs font-semibold text-[#7B92D9]">Powered by CarIQ</p>
+      {/* NAV — sticky so Owner toggle stays reachable while scrolling */}
+      <header className="sticky top-0 z-30 border-b border-white/5 bg-slate-950/75 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4 lg:px-10">
+          <div className="flex items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/tripleM/logo.png"
+              alt="Triple M Motors"
+              className="h-8 w-auto sm:h-10"
+            />
+            <div className="hidden leading-tight md:block">
+              <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">Saint John, IN</p>
+              <p className="text-xs font-semibold text-[#7B92D9]">Powered by CarIQ</p>
+            </div>
           </div>
-        </div>
-        <nav className="hidden items-center gap-7 text-sm text-slate-300 md:flex">
-          <a className="hover:text-white">Inventory</a>
-          <a className="hover:text-white">Financing</a>
-          <a className="hover:text-white">CarIQ</a>
-          <a className="hover:text-white">Confidence Program</a>
-        </nav>
-        <div className="flex items-center gap-3">
-          <OwnerModeToggle on={ownerMode} onChange={setOwnerMode} />
-          <button className="hidden rounded-full border border-white/10 bg-white/5 px-5 py-2 text-sm font-semibold text-white backdrop-blur-xl transition-all duration-300 hover:bg-white/10 md:block">
-            (219) 555-0199
-          </button>
+          <nav className="hidden items-center gap-7 text-sm text-slate-300 lg:flex">
+            <a className="hover:text-white">Inventory</a>
+            <a className="hover:text-white">Financing</a>
+            <a className="hover:text-white">CarIQ</a>
+            <a className="hover:text-white">Confidence</a>
+          </nav>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <OwnerModeToggle on={ownerMode} onChange={setOwnerMode} />
+            <a
+              href="tel:+12195550199"
+              className="hidden rounded-full border border-white/10 bg-white/5 px-5 py-2 text-sm font-semibold text-white backdrop-blur-xl transition-all duration-300 hover:bg-white/10 lg:block"
+            >
+              (219) 555-0199
+            </a>
+          </div>
         </div>
       </header>
 
@@ -389,11 +397,11 @@ export default function TripleMPage() {
       <TrustBanner />
 
       {/* INVENTORY GRID */}
-      <section className="relative z-10 mx-auto max-w-7xl px-6 pb-24 lg:px-10">
-        <div className="mb-8 flex items-end justify-between">
+      <section className="relative z-10 mx-auto max-w-7xl px-4 pb-16 sm:px-6 sm:pb-24 lg:px-10">
+        <div className="mb-6 flex items-end justify-between sm:mb-8">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.28em] text-[#7B92D9]/80">Live Inventory · CarIQ Verified</p>
-            <h2 className="mt-2 text-3xl font-semibold tracking-tight text-white md:text-4xl">
+            <p className="text-[10px] uppercase tracking-[0.28em] text-[#7B92D9]/80 sm:text-[11px]">Live Inventory · CarIQ Verified</p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl md:text-4xl">
               Cars sorted by <span className="text-[#7B92D9]">your</span> approval likelihood
             </h2>
           </div>
@@ -488,15 +496,15 @@ function Hero({
                           { label: 'Building', tone: 'amber' };
 
   return (
-    <section className="relative z-10 mx-auto max-w-7xl px-6 pt-8 pb-20 lg:px-10">
-      <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1.15fr_1fr]">
+    <section className="relative z-10 mx-auto max-w-7xl px-4 pt-6 pb-14 sm:px-6 sm:pt-8 sm:pb-20 lg:px-10">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1.15fr_1fr] lg:gap-10">
         {/* LEFT */}
         <div>
           <div className="inline-flex items-center gap-2 rounded-full border border-[#4464BB]/20 bg-[#4464BB]/5 px-4 py-1.5 text-xs uppercase tracking-[0.22em] text-[#7B92D9] backdrop-blur-xl">
             <Sparkles className="h-3.5 w-3.5" />
             CarIQ · Approval-First Buying
           </div>
-          <h1 className="mt-6 text-5xl font-semibold leading-[1.02] tracking-tight text-white md:text-6xl lg:text-7xl">
+          <h1 className="mt-6 text-[40px] font-semibold leading-[1.02] tracking-tight text-white sm:text-5xl md:text-6xl lg:text-7xl">
             Don't shop by{' '}
             <span className="bg-gradient-to-r from-slate-400 to-slate-600 bg-clip-text text-transparent line-through decoration-rose-400/70 decoration-4">
               price
@@ -508,14 +516,14 @@ function Hero({
               APPROVAL.
             </span>
           </h1>
-          <p className="mt-6 max-w-xl text-lg text-slate-300">
+          <p className="mt-5 max-w-xl text-base text-slate-300 sm:text-lg">
             5-minute approval on any vehicle in stock. Move the dial below and watch the lot
             <span className="text-white"> re-rank itself </span>
             to the cars you can actually drive home today.
           </p>
 
           {/* FINANCING INTELLIGENCE CARD */}
-          <div className="mt-10 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl md:p-8 transition-all duration-300">
+          <div className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl transition-all duration-300 sm:p-6 md:p-8">
             <div className="grid grid-cols-3 gap-4">
               <div className="col-span-2">
                 <p className="text-xs uppercase tracking-[0.22em] text-slate-400">Financing Intelligence</p>
@@ -660,7 +668,7 @@ function HeroSpotlight({ cars }: { cars: ApprovedCar[] }) {
     <div className="relative">
       <div className="pointer-events-none absolute -inset-10 rounded-[40px] bg-gradient-to-br from-[#3653A5]/10 via-[#26386A]/5 to-transparent blur-3xl" />
       <div
-        className={`relative aspect-[5/6] rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-xl transition-all duration-300 ${accentGlow[lead.accent]}`}
+        className={`relative rounded-[28px] border border-white/10 bg-white/5 p-5 backdrop-blur-xl transition-all duration-300 sm:p-6 md:aspect-[5/6] ${accentGlow[lead.accent]}`}
         style={{ perspective: '1200px' }}
       >
         <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.2em] text-slate-400">
@@ -858,9 +866,9 @@ function VehicleDetailModal({
 }) {
   const { tier } = car.approvalState;
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-md">
-      <div className="min-h-full px-4 py-10 md:px-8">
-        <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[32px] border border-white/10 bg-gradient-to-br from-slate-900/95 to-slate-950/95 shadow-2xl backdrop-blur-2xl">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/85 backdrop-blur-md">
+      <div className="min-h-full px-3 py-5 sm:px-4 sm:py-10 md:px-8">
+        <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[20px] border border-white/10 bg-gradient-to-br from-slate-900/95 to-slate-950/95 shadow-2xl backdrop-blur-2xl sm:rounded-[32px]">
           {/* Glow */}
           <div
             className={`pointer-events-none absolute -top-32 left-1/2 h-[400px] w-[800px] -translate-x-1/2 rounded-full bg-gradient-to-br opacity-50 blur-3xl ${car.heroGradient}`}
@@ -874,25 +882,25 @@ function VehicleDetailModal({
           </button>
 
           {/* HEADER */}
-          <div className="relative px-8 pt-12 pb-6 md:px-12">
-            <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.28em] text-[#7B92D9]/80">CarIQ Vehicle Intelligence</p>
-                <h2 className="mt-2 text-4xl font-semibold tracking-tight text-white md:text-5xl">
+          <div className="relative px-5 pt-12 pb-5 sm:px-8 sm:pb-6 md:px-12">
+            <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+              <div className="pr-10 md:pr-0">
+                <p className="text-[10px] uppercase tracking-[0.28em] text-[#7B92D9]/80 sm:text-[11px]">CarIQ Vehicle Intelligence</p>
+                <h2 className="mt-2 text-2xl font-semibold leading-tight tracking-tight text-white sm:text-3xl md:text-5xl">
                   {car.year} {car.make} {car.model}
                 </h2>
-                <p className="mt-1 text-slate-400">
-                  {car.trim} · {car.exterior} on {car.interior} · {car.miles.toLocaleString()} miles
+                <p className="mt-1 text-xs text-slate-400 sm:text-sm">
+                  {car.trim} · {car.exterior} · {car.miles.toLocaleString()} mi
                 </p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2">
                 {car.smartBuy && (
-                  <div className="flex items-center gap-2 rounded-full bg-gradient-to-r from-[#4464BB] to-[#26386A] px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-slate-950 shadow-[0_0_30px_-8px_rgba(68,100,187,0.65)]">
-                    <Sparkles className="h-3.5 w-3.5" /> Smart Buy
+                  <div className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#4464BB] to-[#26386A] px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-950 shadow-[0_0_30px_-8px_rgba(68,100,187,0.65)] sm:px-4 sm:py-2 sm:text-xs">
+                    <Sparkles className="h-3 w-3 sm:h-3.5 sm:w-3.5" /> Smart Buy
                   </div>
                 )}
-                <div className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">
-                  <BadgeCheck className="mr-1 inline h-3.5 w-3.5" /> M³ Confidence
+                <div className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-300 sm:px-4 sm:py-2 sm:text-xs">
+                  <BadgeCheck className="mr-1 inline h-3 w-3 sm:h-3.5 sm:w-3.5" /> M³ Confidence
                 </div>
               </div>
             </div>
@@ -942,12 +950,12 @@ function VehicleDetailModal({
           </div>
 
           {/* MARKET PRICE OVERLAY */}
-          <div className="relative px-8 pb-8 md:px-12">
+          <div className="relative px-5 pb-6 sm:px-8 sm:pb-8 md:px-12">
             <MarketPriceOverlay car={car} />
           </div>
 
           {/* AI ANALYSIS */}
-          <div className="relative px-8 pb-8 md:px-12">
+          <div className="relative px-5 pb-6 sm:px-8 sm:pb-8 md:px-12">
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
               <div className="flex items-center gap-3">
                 <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-[#4464BB]/30 to-[#26386A]/30 ring-1 ring-white/10">
@@ -969,7 +977,7 @@ function VehicleDetailModal({
           </div>
 
           {/* CTA STRIP */}
-          <div className="relative grid grid-cols-1 gap-3 border-t border-white/5 bg-black/30 px-8 py-6 md:grid-cols-3 md:px-12">
+          <div className="relative grid grid-cols-1 gap-3 border-t border-white/5 bg-black/30 px-5 py-5 sm:px-8 sm:py-6 md:grid-cols-3 md:px-12">
             <button className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#4464BB] to-[#26386A] px-6 py-4 text-sm font-semibold text-slate-950 shadow-lg transition hover:opacity-90">
               <CheckCircle2 className="h-4 w-4" /> Get Approved Now · 5 min
             </button>
@@ -1418,25 +1426,27 @@ function CarCoach({
   return (
     <>
       {!open && (
-        <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-2">
+        <div className="fixed bottom-4 right-4 z-40 flex max-w-[calc(100vw-2rem)] flex-col items-end gap-2 sm:bottom-6 sm:right-6">
           {ownerMode && <BdcAnalyticsPill />}
           <button
             onClick={() => setOpen(true)}
-            className="flex items-center gap-3 rounded-full border border-white/10 bg-gradient-to-r from-[#4464BB] to-[#26386A] px-5 py-3 text-sm font-semibold text-slate-950 shadow-[0_0_40px_-10px_rgba(68,100,187,0.6)] transition-all duration-300 hover:opacity-90"
+            aria-label="Open Car Coach"
+            className="flex items-center gap-3 rounded-full border border-white/10 bg-gradient-to-r from-[#4464BB] to-[#26386A] px-4 py-3 text-sm font-semibold text-slate-950 shadow-[0_0_40px_-10px_rgba(68,100,187,0.6)] transition-all duration-300 hover:opacity-90 sm:px-5"
           >
             <div className="relative grid h-7 w-7 place-items-center rounded-full bg-slate-950 text-[#7B92D9]">
               <MessageCircle className="h-4 w-4" />
               <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-400 ring-2 ring-slate-950" />
             </div>
-            Car Coach · EN/ES
+            <span className="hidden sm:inline">Car Coach · EN/ES</span>
+            <span className="sm:hidden">Car Coach</span>
           </button>
         </div>
       )}
 
       {open && (
-        <div className="fixed bottom-6 right-6 z-40 flex w-[360px] max-w-[calc(100vw-2rem)] flex-col items-end gap-2">
+        <div className="fixed bottom-4 right-4 z-40 flex w-[360px] max-w-[calc(100vw-2rem)] flex-col items-end gap-2 sm:bottom-6 sm:right-6">
           {ownerMode && <BdcAnalyticsPill />}
-          <div className="w-full overflow-hidden rounded-3xl border border-white/10 bg-slate-900/90 shadow-2xl backdrop-blur-2xl">
+          <div className="flex max-h-[min(70vh,640px)] w-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-slate-900/90 shadow-2xl backdrop-blur-2xl">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-white/5 bg-gradient-to-r from-[#3653A5]/20 to-[#26386A]/20 px-4 py-3">
             <div className="flex items-center gap-2.5">
@@ -1477,7 +1487,7 @@ function CarCoach({
           </div>
 
           {/* Message stream */}
-          <div className="space-y-3 px-4 py-4">
+          <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
             <div className="flex items-start gap-2">
               <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#4464BB]/30 to-[#26386A]/30 ring-1 ring-white/10">
                 <Brain className="h-3.5 w-3.5 text-[#7B92D9]" />
@@ -1598,12 +1608,12 @@ function OwnerRoiPanel({ open }: { open: boolean }) {
   return (
     <div
       className={`relative z-10 overflow-hidden transition-all duration-500 ease-out ${
-        open ? 'max-h-[800px] opacity-100' : 'max-h-0 opacity-0'
+        open ? 'max-h-[2400px] opacity-100' : 'max-h-0 opacity-0'
       }`}
       aria-hidden={!open}
     >
-      <div className="mx-auto max-w-7xl px-6 pb-8 pt-2 lg:px-10">
-        <div className="relative overflow-hidden rounded-[28px] border border-emerald-300/20 bg-gradient-to-br from-slate-900/95 to-slate-950/95 p-6 backdrop-blur-2xl md:p-8 shadow-[0_0_60px_-20px_rgba(16,185,129,0.5)]">
+      <div className="mx-auto max-w-7xl px-4 pb-6 pt-2 sm:px-6 sm:pb-8 lg:px-10">
+        <div className="relative overflow-hidden rounded-[24px] border border-emerald-300/20 bg-gradient-to-br from-slate-900/95 to-slate-950/95 p-4 backdrop-blur-2xl shadow-[0_0_60px_-20px_rgba(16,185,129,0.5)] sm:rounded-[28px] sm:p-6 md:p-8">
           <div className="pointer-events-none absolute -top-24 right-0 h-[300px] w-[500px] rounded-full bg-emerald-500/10 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-24 left-0 h-[300px] w-[500px] rounded-full bg-[#3653A5]/10 blur-3xl" />
 
@@ -1613,10 +1623,10 @@ function OwnerRoiPanel({ open }: { open: boolean }) {
               <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-400/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-300">
                 <Lock className="h-3 w-3" /> Internal · Owner View
               </div>
-              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-white md:text-3xl">
+              <h2 className="mt-3 text-xl font-semibold tracking-tight text-white sm:text-2xl md:text-3xl">
                 Where your $5,000/mo is actually going.
               </h2>
-              <p className="mt-1 text-sm text-slate-400">
+              <p className="mt-1 text-xs text-slate-400 sm:text-sm">
                 CarIQ Strategy vs. your current third-party lead spend · 90-day rolling
               </p>
             </div>
@@ -1627,7 +1637,7 @@ function OwnerRoiPanel({ open }: { open: boolean }) {
           </div>
 
           {/* Headline KPI row */}
-          <div className="relative mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="relative mt-5 grid grid-cols-2 gap-2.5 sm:mt-6 sm:gap-3 md:grid-cols-4">
             <KpiTile label="Monthly Ad Spend" value="$5,000" delta="−$3,600/mo" tone="emerald" sub="vs. current Cars.com bill" />
             <KpiTile label="Cost Per Sale" value="$294" delta="−61%" tone="emerald" sub="vs. $748 third-party" />
             <KpiTile label="Close Rate" value="25%" delta="+13 pts" tone="emerald" sub="owned channel" />
@@ -1711,18 +1721,18 @@ function KpiTile({
 }) {
   const isUp = tone === 'emerald';
   return (
-    <div className="rounded-2xl border border-white/10 bg-black/30 p-4 backdrop-blur-xl">
-      <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tracking-tight text-white">{value}</p>
+    <div className="rounded-2xl border border-white/10 bg-black/30 p-3 backdrop-blur-xl sm:p-4">
+      <p className="text-[9px] uppercase tracking-[0.22em] text-slate-400 sm:text-[10px]">{label}</p>
+      <p className="mt-1 text-xl font-semibold tracking-tight text-white sm:text-2xl">{value}</p>
       <p
-        className={`mt-1 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider ${
+        className={`mt-1 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider sm:text-[11px] ${
           isUp ? 'text-emerald-300' : 'text-rose-300'
         }`}
       >
         {isUp ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
         {delta}
       </p>
-      <p className="text-[10px] text-slate-500">{sub}</p>
+      <p className="hidden text-[10px] text-slate-500 sm:block">{sub}</p>
     </div>
   );
 }
@@ -1919,6 +1929,58 @@ function PrequalApproved({ car, onClose }: { car: ApprovedCar; onClose: () => vo
 /* ─────────────────────────────────────────────────────────────────────────
    BACKGROUND FX
    ───────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Inline <style> for things Tailwind can't easily express:
+ *   - bigger, brand-colored slider thumbs (touch-friendly on phones)
+ *   - hide the scrollbar in horizontally-scrolling sections
+ *   - prevent body horizontal-scroll bounce on iOS
+ */
+function CarIqStyles() {
+  return (
+    <style>{`
+      .tripleM-page input[type="range"] {
+        -webkit-appearance: none;
+        appearance: none;
+        height: 24px;
+        background: transparent;
+      }
+      .tripleM-page input[type="range"]::-webkit-slider-runnable-track {
+        height: 6px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.08);
+      }
+      .tripleM-page input[type="range"]::-moz-range-track {
+        height: 6px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.08);
+      }
+      .tripleM-page input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        height: 22px;
+        width: 22px;
+        margin-top: -8px;
+        border-radius: 999px;
+        background: #4464BB;
+        border: 2px solid #ffffff;
+        box-shadow: 0 0 0 3px rgba(68,100,187,0.25), 0 2px 6px rgba(0,0,0,0.4);
+        cursor: pointer;
+      }
+      .tripleM-page input[type="range"]::-moz-range-thumb {
+        height: 22px;
+        width: 22px;
+        border-radius: 999px;
+        background: #4464BB;
+        border: 2px solid #ffffff;
+        box-shadow: 0 0 0 3px rgba(68,100,187,0.25), 0 2px 6px rgba(0,0,0,0.4);
+        cursor: pointer;
+      }
+      .tripleM-page .no-scrollbar::-webkit-scrollbar { display: none; }
+      .tripleM-page .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    `}</style>
+  );
+}
 
 function BackgroundFX() {
   return (
