@@ -88,7 +88,7 @@ const INVENTORY: Car[] = [
     marketAvg: 18446,
     aiAnalysis:
       'Executive luxury without the depreciation hit. Perfect for the professional wanting a premium commute. Meticulous service records indicate a well-maintained turbo engine.',
-    heroGradient: 'from-cyan-500/30 via-sky-500/10 to-transparent',
+    heroGradient: 'from-[#3653A5]/30 via-sky-500/10 to-transparent',
     accent: 'cyan',
     image: '/tripleM/bmw-530i.jpg',
   },
@@ -142,7 +142,7 @@ const INVENTORY: Car[] = [
     marketAvg: 16400,
     aiAnalysis:
       'The car we recommend to anyone with a teenager or a 90-mile commute. Original drivetrain, no transmission concerns on the 6-speed auto. Every Toyota tech we partner with says the same thing: drive it to 250k.',
-    heroGradient: 'from-violet-500/30 via-purple-500/10 to-transparent',
+    heroGradient: 'from-[#7C3AED]/30 via-purple-500/10 to-transparent',
     accent: 'violet',
     image: '/tripleM/rav4-xle.jpg',
   },
@@ -247,21 +247,21 @@ function monthlyPaymentFor(price: number, downPct = 0.1, apr = 0.08, termMonths 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US');
 
 const accentText: Record<string, string> = {
-  cyan: 'text-cyan-300',
+  cyan: 'text-[#7B92D9]',
   rose: 'text-rose-300',
   violet: 'text-violet-300',
   amber: 'text-amber-300',
   emerald: 'text-emerald-300',
 };
 const accentDot: Record<string, string> = {
-  cyan: 'bg-cyan-400',
+  cyan: 'bg-[#4464BB]',
   rose: 'bg-rose-400',
   violet: 'bg-violet-400',
   amber: 'bg-amber-400',
   emerald: 'bg-emerald-400',
 };
 const accentGlow: Record<string, string> = {
-  cyan: 'shadow-[0_0_60px_-15px_rgba(34,211,238,0.55)]',
+  cyan: 'shadow-[0_0_60px_-15px_rgba(68,100,187,0.55)]',
   rose: 'shadow-[0_0_60px_-15px_rgba(244,63,94,0.55)]',
   violet: 'shadow-[0_0_60px_-15px_rgba(139,92,246,0.55)]',
   amber: 'shadow-[0_0_60px_-15px_rgba(245,158,11,0.55)]',
@@ -346,12 +346,15 @@ export default function TripleMPage() {
       {/* NAV */}
       <header className="relative z-20 mx-auto flex max-w-7xl items-center justify-between px-6 py-6 lg:px-10">
         <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-cyan-400/30 to-violet-500/30 ring-1 ring-white/10 backdrop-blur-xl">
-            <span className="text-lg font-black tracking-tight">M³</span>
-          </div>
-          <div className="leading-tight">
-            <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Triple M Motors</p>
-            <p className="text-sm font-semibold text-white">Saint John, IN · Powered by CarIQ</p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/tripleM/logo.png"
+            alt="Triple M Motors"
+            className="h-10 w-auto"
+          />
+          <div className="hidden leading-tight md:block">
+            <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">Saint John, IN</p>
+            <p className="text-xs font-semibold text-[#7B92D9]">Powered by CarIQ</p>
           </div>
         </div>
         <nav className="hidden items-center gap-7 text-sm text-slate-300 md:flex">
@@ -389,9 +392,9 @@ export default function TripleMPage() {
       <section className="relative z-10 mx-auto max-w-7xl px-6 pb-24 lg:px-10">
         <div className="mb-8 flex items-end justify-between">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.28em] text-cyan-300/80">Live Inventory · CarIQ Verified</p>
+            <p className="text-[11px] uppercase tracking-[0.28em] text-[#7B92D9]/80">Live Inventory · CarIQ Verified</p>
             <h2 className="mt-2 text-3xl font-semibold tracking-tight text-white md:text-4xl">
-              Cars sorted by <span className="text-cyan-300">your</span> approval likelihood
+              Cars sorted by <span className="text-[#7B92D9]">your</span> approval likelihood
             </h2>
           </div>
           <div className="hidden items-center gap-2 text-xs text-slate-400 md:flex">
@@ -422,11 +425,9 @@ export default function TripleMPage() {
       <footer className="relative z-10 border-t border-white/5 bg-black/40 px-6 py-12 backdrop-blur-xl lg:px-10">
         <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-6 md:flex-row md:items-center">
           <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-cyan-400/30 to-violet-500/30 ring-1 ring-white/10">
-              <span className="text-lg font-black">M³</span>
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/tripleM/logo.png" alt="Triple M Motors" className="h-9 w-auto" />
             <div className="text-sm leading-tight">
-              <p className="font-semibold text-white">Triple M Motors</p>
               <p className="text-slate-400">9501 Wicker Ave · Saint John, IN 46373</p>
             </div>
           </div>
@@ -491,7 +492,7 @@ function Hero({
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1.15fr_1fr]">
         {/* LEFT */}
         <div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/5 px-4 py-1.5 text-xs uppercase tracking-[0.22em] text-cyan-300 backdrop-blur-xl">
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#4464BB]/20 bg-[#4464BB]/5 px-4 py-1.5 text-xs uppercase tracking-[0.22em] text-[#7B92D9] backdrop-blur-xl">
             <Sparkles className="h-3.5 w-3.5" />
             CarIQ · Approval-First Buying
           </div>
@@ -503,7 +504,7 @@ function Hero({
             .
             <br />
             Shop by{' '}
-            <span className="bg-gradient-to-r from-cyan-300 via-sky-400 to-violet-400 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-[#7B92D9] via-[#4464BB] to-[#26386A] bg-clip-text text-transparent">
               APPROVAL.
             </span>
           </h1>
@@ -522,7 +523,7 @@ function Hero({
               </div>
               <div className="text-right">
                 <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">In Your Budget</p>
-                <p className="mt-1 text-3xl font-semibold tracking-tight text-cyan-300">
+                <p className="mt-1 text-3xl font-semibold tracking-tight text-[#7B92D9]">
                   {inBudgetCount}<span className="text-slate-500"> / {cars.length}</span>
                 </p>
                 <p className="text-[10px] text-slate-400">{approvedCount} pre-approved</p>
@@ -530,10 +531,10 @@ function Hero({
             </div>
 
             {/* Shop by Monthly Payment — primary slider */}
-            <div className="mt-6 rounded-2xl border border-cyan-300/20 bg-gradient-to-br from-cyan-400/10 to-violet-500/10 p-4 transition-all duration-300">
+            <div className="mt-6 rounded-2xl border border-[#7B92D9]/20 bg-gradient-to-br from-[#4464BB]/10 to-[#26386A]/10 p-4 transition-all duration-300">
               <div className="flex items-end justify-between">
                 <div>
-                  <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-200">
+                  <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#A4B5DD]">
                     <Wallet className="h-3.5 w-3.5" /> Shop by Monthly Payment
                   </p>
                   <p className="mt-1 text-3xl font-semibold tracking-tight text-white">
@@ -551,7 +552,7 @@ function Hero({
                 step={5}
                 value={monthlyBudget}
                 onChange={(e) => setMonthlyBudget(Number(e.target.value))}
-                className="mt-3 w-full accent-cyan-300"
+                className="mt-3 w-full accent-[#7B92D9]"
               />
               <div className="mt-1 flex justify-between text-[10px] uppercase tracking-wider text-slate-500">
                 <span>$250</span>
@@ -583,7 +584,7 @@ function Hero({
                 step={100}
                 value={downPayment}
                 onChange={(e) => setDownPayment(Number(e.target.value))}
-                className="mt-3 w-full accent-cyan-400"
+                className="mt-3 w-full accent-[#4464BB]"
               />
               <div className="mt-1 flex justify-between text-[10px] uppercase tracking-wider text-slate-500">
                 <span>$0</span>
@@ -617,7 +618,7 @@ function Hero({
                 step={10}
                 value={creditScore}
                 onChange={(e) => setCreditScore(Number(e.target.value))}
-                className="mt-3 w-full accent-violet-400"
+                className="mt-3 w-full accent-[#26386A]"
               />
               <div className="mt-1 flex justify-between text-[10px] uppercase tracking-wider text-slate-500">
                 <span>500</span>
@@ -646,7 +647,7 @@ function Hero({
 function Pill({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
     <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-300">
-      <span className="text-cyan-300">{icon}</span>
+      <span className="text-[#7B92D9]">{icon}</span>
       {label}
     </div>
   );
@@ -657,7 +658,7 @@ function HeroSpotlight({ cars }: { cars: ApprovedCar[] }) {
   const { tier } = lead.approvalState;
   return (
     <div className="relative">
-      <div className="pointer-events-none absolute -inset-10 rounded-[40px] bg-gradient-to-br from-cyan-500/10 via-violet-500/5 to-transparent blur-3xl" />
+      <div className="pointer-events-none absolute -inset-10 rounded-[40px] bg-gradient-to-br from-[#3653A5]/10 via-[#26386A]/5 to-transparent blur-3xl" />
       <div
         className={`relative aspect-[5/6] rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-xl transition-all duration-300 ${accentGlow[lead.accent]}`}
         style={{ perspective: '1200px' }}
@@ -688,7 +689,7 @@ function HeroSpotlight({ cars }: { cars: ApprovedCar[] }) {
             {lead.year} · {lead.make}
           </div>
           {lead.smartBuy && (
-            <div className="absolute right-4 top-4 flex items-center gap-1.5 rounded-full bg-gradient-to-r from-cyan-400 to-violet-500 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-950 shadow-lg">
+            <div className="absolute right-4 top-4 flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#4464BB] to-[#26386A] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-950 shadow-lg">
               <Sparkles className="h-3 w-3" /> Smart Buy
             </div>
           )}
@@ -716,7 +717,7 @@ function HeroSpotlight({ cars }: { cars: ApprovedCar[] }) {
           </div>
         </div>
 
-        <button className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-400 to-violet-500 py-3 text-sm font-semibold text-slate-950 shadow-lg transition hover:opacity-90">
+        <button className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#4464BB] to-[#26386A] py-3 text-sm font-semibold text-slate-950 shadow-lg transition hover:opacity-90">
           Get Approved in 5 Minutes <ChevronRight className="h-4 w-4" />
         </button>
       </div>
@@ -775,7 +776,7 @@ function VehicleCard({
           </div>
         )}
         {car.smartBuy && (
-          <div className="absolute bottom-3 left-3 flex items-center gap-1 rounded-full bg-gradient-to-r from-cyan-400 to-violet-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.15em] text-slate-950">
+          <div className="absolute bottom-3 left-3 flex items-center gap-1 rounded-full bg-gradient-to-r from-[#4464BB] to-[#26386A] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.15em] text-slate-950">
             <Sparkles className="h-2.5 w-2.5" /> Smart Buy
           </div>
         )}
@@ -813,7 +814,7 @@ function VehicleCard({
       <div className="relative mt-3 flex items-center justify-between text-xs text-slate-400">
         <span className={`font-semibold uppercase tracking-wider ${accentText[tier.tone]}`}>{tier.label}</span>
         <span className="flex items-center gap-1 text-[11px] text-slate-300">
-          <Wallet className="h-3 w-3 text-cyan-300" />
+          <Wallet className="h-3 w-3 text-[#7B92D9]" />
           <span className="font-semibold text-white">${car.monthlyPayment}</span>
           <span className="text-slate-500">/mo est.</span>
         </span>
@@ -825,7 +826,7 @@ function VehicleCard({
           e.stopPropagation();
           onPrequal();
         }}
-        className="group/btn relative mt-4 flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-r from-cyan-400 to-violet-500 px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-950 shadow-[0_0_30px_-10px_rgba(34,211,238,0.7)] transition-all duration-300 hover:opacity-95 hover:shadow-[0_0_40px_-8px_rgba(139,92,246,0.7)]"
+        className="group/btn relative mt-4 flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-r from-[#4464BB] to-[#26386A] px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-950 shadow-[0_0_30px_-10px_rgba(68,100,187,0.7)] transition-all duration-300 hover:opacity-95 hover:shadow-[0_0_40px_-8px_rgba(139,92,246,0.7)]"
       >
         <Zap className="h-4 w-4" />
         Get Prequalified Instantly
@@ -876,7 +877,7 @@ function VehicleDetailModal({
           <div className="relative px-8 pt-12 pb-6 md:px-12">
             <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
               <div>
-                <p className="text-[11px] uppercase tracking-[0.28em] text-cyan-300/80">CarIQ Vehicle Intelligence</p>
+                <p className="text-[11px] uppercase tracking-[0.28em] text-[#7B92D9]/80">CarIQ Vehicle Intelligence</p>
                 <h2 className="mt-2 text-4xl font-semibold tracking-tight text-white md:text-5xl">
                   {car.year} {car.make} {car.model}
                 </h2>
@@ -886,7 +887,7 @@ function VehicleDetailModal({
               </div>
               <div className="flex items-center gap-3">
                 {car.smartBuy && (
-                  <div className="flex items-center gap-2 rounded-full bg-gradient-to-r from-cyan-400 to-violet-500 px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-slate-950 shadow-[0_0_30px_-8px_rgba(34,211,238,0.65)]">
+                  <div className="flex items-center gap-2 rounded-full bg-gradient-to-r from-[#4464BB] to-[#26386A] px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-slate-950 shadow-[0_0_30px_-8px_rgba(68,100,187,0.65)]">
                     <Sparkles className="h-3.5 w-3.5" /> Smart Buy
                   </div>
                 )}
@@ -949,11 +950,11 @@ function VehicleDetailModal({
           <div className="relative px-8 pb-8 md:px-12">
             <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
               <div className="flex items-center gap-3">
-                <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-cyan-400/30 to-violet-500/30 ring-1 ring-white/10">
-                  <Brain className="h-5 w-5 text-cyan-300" />
+                <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-[#4464BB]/30 to-[#26386A]/30 ring-1 ring-white/10">
+                  <Brain className="h-5 w-5 text-[#7B92D9]" />
                 </div>
                 <div>
-                  <p className="text-[11px] uppercase tracking-[0.22em] text-cyan-300/80">Why we bought this vehicle</p>
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-[#7B92D9]/80">Why we bought this vehicle</p>
                   <p className="text-sm text-slate-400">CarIQ AI Acquisition Memo · transparent reasoning</p>
                 </div>
               </div>
@@ -969,7 +970,7 @@ function VehicleDetailModal({
 
           {/* CTA STRIP */}
           <div className="relative grid grid-cols-1 gap-3 border-t border-white/5 bg-black/30 px-8 py-6 md:grid-cols-3 md:px-12">
-            <button className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-400 to-violet-500 px-6 py-4 text-sm font-semibold text-slate-950 shadow-lg transition hover:opacity-90">
+            <button className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#4464BB] to-[#26386A] px-6 py-4 text-sm font-semibold text-slate-950 shadow-lg transition hover:opacity-90">
               <CheckCircle2 className="h-4 w-4" /> Get Approved Now · 5 min
             </button>
             <button className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-sm font-semibold text-white backdrop-blur-xl transition hover:bg-white/10">
@@ -1082,7 +1083,7 @@ function ApprovalModule({
       </div>
       <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/5">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-violet-500"
+          className="h-full rounded-full bg-gradient-to-r from-[#4464BB] to-[#26386A]"
           style={{ width: `${approval}%` }}
         />
       </div>
@@ -1111,7 +1112,7 @@ function PredictiveCostModule({ car }: { car: Car }) {
     <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl">
       <div className="flex items-center justify-between">
         <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">5-Year Ownership Forecast</p>
-        <TrendingDown className="h-4 w-4 text-cyan-300" />
+        <TrendingDown className="h-4 w-4 text-[#7B92D9]" />
       </div>
       <p className="mt-4 text-3xl font-semibold text-white">{fmt(car.fiveYearCost)}</p>
       <p className="text-xs text-slate-400">≈ {fmt(yearly)}/yr · all-in</p>
@@ -1144,7 +1145,7 @@ function MarketPriceOverlay({ car }: { car: Car }) {
     <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 backdrop-blur-xl transition-all duration-300">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-[11px] uppercase tracking-[0.22em] text-cyan-300/80">Market Price Overlay</p>
+          <p className="text-[11px] uppercase tracking-[0.22em] text-[#7B92D9]/80">Market Price Overlay</p>
           <p className="mt-1 text-sm text-slate-400">Indexed against 14,000+ comparable Chicago-area listings.</p>
         </div>
         <div
@@ -1213,13 +1214,13 @@ function BarRow({ icon, label, value, pct }: { icon: React.ReactNode; label: str
     <div>
       <div className="flex items-center justify-between text-[11px] text-slate-300">
         <span className="flex items-center gap-1.5 text-slate-400">
-          <span className="text-cyan-300">{icon}</span>
+          <span className="text-[#7B92D9]">{icon}</span>
           {label}
         </span>
         <span className="font-semibold text-white">{value}</span>
       </div>
       <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/5">
-        <div className="h-full rounded-full bg-gradient-to-r from-cyan-400/80 to-violet-500/80" style={{ width: `${pct}%` }} />
+        <div className="h-full rounded-full bg-gradient-to-r from-[#4464BB]/80 to-[#26386A]/80" style={{ width: `${pct}%` }} />
       </div>
     </div>
   );
@@ -1251,11 +1252,11 @@ function TrustBanner() {
   return (
     <section className="relative z-10 mx-auto max-w-7xl px-6 pb-16 lg:px-10">
       <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-white/5 p-6 backdrop-blur-xl md:p-8">
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-emerald-500/[0.06] via-cyan-500/[0.04] to-violet-500/[0.06]" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-emerald-500/[0.06] via-[#3653A5]/[0.04] to-[#26386A]/[0.06]" />
 
         <div className="relative grid grid-cols-1 gap-6 md:grid-cols-[auto_1fr]">
           <div className="flex items-center gap-3 md:max-w-[260px]">
-            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-emerald-400/30 to-cyan-500/30 ring-1 ring-white/10 text-emerald-200">
+            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-emerald-400/30 to-[#3653A5]/30 ring-1 ring-white/10 text-emerald-200">
               <BadgeCheck className="h-6 w-6" />
             </div>
             <div className="leading-tight">
@@ -1275,7 +1276,7 @@ function TrustBanner() {
                 className="group rounded-2xl border border-white/10 bg-black/30 p-4 backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:border-white/20 hover:bg-black/40"
               >
                 <div className="flex items-center gap-2">
-                  <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-cyan-400/20 to-violet-500/20 ring-1 ring-white/10 text-cyan-300 transition-all duration-300 group-hover:scale-105">
+                  <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-[#4464BB]/20 to-[#26386A]/20 ring-1 ring-white/10 text-[#7B92D9] transition-all duration-300 group-hover:scale-105">
                     {p.icon}
                   </div>
                   <p className="text-sm font-semibold text-white">{p.title}</p>
@@ -1298,7 +1299,7 @@ function ConfidenceProgram() {
   return (
     <section className="relative z-10 mx-auto max-w-7xl px-6 pb-24 lg:px-10">
       <div className="relative overflow-hidden rounded-[32px] border border-white/10 bg-gradient-to-br from-slate-900/80 to-slate-950/80 p-8 backdrop-blur-2xl md:p-12">
-        <div className="pointer-events-none absolute -top-24 right-0 h-[400px] w-[600px] rounded-full bg-gradient-to-br from-violet-500/20 to-cyan-500/10 blur-3xl" />
+        <div className="pointer-events-none absolute -top-24 right-0 h-[400px] w-[600px] rounded-full bg-gradient-to-br from-[#26386A]/20 to-[#3653A5]/10 blur-3xl" />
 
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1.1fr_1fr]">
           <div>
@@ -1308,7 +1309,7 @@ function ConfidenceProgram() {
             <h2 className="mt-5 text-4xl font-semibold tracking-tight text-white md:text-5xl">
               We don't disappear after the sale.
               <br />
-              <span className="bg-gradient-to-r from-emerald-300 to-cyan-300 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-emerald-300 to-[#7B92D9] bg-clip-text text-transparent">
                 We follow up like we mean it.
               </span>
             </h2>
@@ -1347,7 +1348,7 @@ function ConfidenceRow({
 }) {
   return (
     <div className="flex items-start gap-4 rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-xl transition hover:bg-white/10">
-      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-emerald-400/20 to-cyan-500/20 ring-1 ring-white/10 text-emerald-300">
+      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-emerald-400/20 to-[#3653A5]/20 ring-1 ring-white/10 text-emerald-300">
         {icon}
       </div>
       <div>
@@ -1378,7 +1379,7 @@ function WhyStrip() {
             key={it.title}
             className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/10"
           >
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-cyan-400/20 to-violet-500/20 ring-1 ring-white/10 text-cyan-300">
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-[#4464BB]/20 to-[#26386A]/20 ring-1 ring-white/10 text-[#7B92D9]">
               {it.icon}
             </div>
             <p className="mt-4 text-sm font-semibold text-white">{it.title}</p>
@@ -1421,9 +1422,9 @@ function CarCoach({
           {ownerMode && <BdcAnalyticsPill />}
           <button
             onClick={() => setOpen(true)}
-            className="flex items-center gap-3 rounded-full border border-white/10 bg-gradient-to-r from-cyan-400 to-violet-500 px-5 py-3 text-sm font-semibold text-slate-950 shadow-[0_0_40px_-10px_rgba(34,211,238,0.6)] transition-all duration-300 hover:opacity-90"
+            className="flex items-center gap-3 rounded-full border border-white/10 bg-gradient-to-r from-[#4464BB] to-[#26386A] px-5 py-3 text-sm font-semibold text-slate-950 shadow-[0_0_40px_-10px_rgba(68,100,187,0.6)] transition-all duration-300 hover:opacity-90"
           >
-            <div className="relative grid h-7 w-7 place-items-center rounded-full bg-slate-950 text-cyan-300">
+            <div className="relative grid h-7 w-7 place-items-center rounded-full bg-slate-950 text-[#7B92D9]">
               <MessageCircle className="h-4 w-4" />
               <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-400 ring-2 ring-slate-950" />
             </div>
@@ -1437,10 +1438,10 @@ function CarCoach({
           {ownerMode && <BdcAnalyticsPill />}
           <div className="w-full overflow-hidden rounded-3xl border border-white/10 bg-slate-900/90 shadow-2xl backdrop-blur-2xl">
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-white/5 bg-gradient-to-r from-cyan-500/20 to-violet-500/20 px-4 py-3">
+          <div className="flex items-center justify-between border-b border-white/5 bg-gradient-to-r from-[#3653A5]/20 to-[#26386A]/20 px-4 py-3">
             <div className="flex items-center gap-2.5">
               <div className="grid h-9 w-9 place-items-center rounded-full bg-slate-950 ring-1 ring-white/10">
-                <Brain className="h-4 w-4 text-cyan-300" />
+                <Brain className="h-4 w-4 text-[#7B92D9]" />
               </div>
               <div className="leading-tight">
                 <p className="text-sm font-semibold text-white">Marco · Car Coach</p>
@@ -1478,8 +1479,8 @@ function CarCoach({
           {/* Message stream */}
           <div className="space-y-3 px-4 py-4">
             <div className="flex items-start gap-2">
-              <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gradient-to-br from-cyan-400/30 to-violet-500/30 ring-1 ring-white/10">
-                <Brain className="h-3.5 w-3.5 text-cyan-300" />
+              <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#4464BB]/30 to-[#26386A]/30 ring-1 ring-white/10">
+                <Brain className="h-3.5 w-3.5 text-[#7B92D9]" />
               </div>
               <div className="max-w-[85%] rounded-2xl rounded-tl-sm border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-200">
                 {greeting}
@@ -1498,12 +1499,12 @@ function CarCoach({
           <div className="flex items-center gap-2 border-t border-white/5 bg-black/30 px-3 py-3">
             <input
               placeholder={lang === 'en' ? 'Ask Marco anything…' : 'Pregúntale a Marco…'}
-              className="flex-1 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-400/40"
+              className="flex-1 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-[#4464BB]/40"
             />
             <button className="grid h-9 w-9 place-items-center rounded-full bg-white/5 text-slate-300 hover:bg-white/10">
               <Mic className="h-4 w-4" />
             </button>
-            <button className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-r from-cyan-400 to-violet-500 text-slate-950">
+            <button className="grid h-9 w-9 place-items-center rounded-full bg-gradient-to-r from-[#4464BB] to-[#26386A] text-slate-950">
               <Send className="h-4 w-4" />
             </button>
           </div>
@@ -1552,7 +1553,7 @@ function QuickReply({
     <button
       className={
         highlight
-          ? `${base} border border-cyan-300/40 bg-gradient-to-r from-cyan-400/15 to-violet-500/15 text-cyan-100 hover:from-cyan-400/30 hover:to-violet-500/30 hover:text-white`
+          ? `${base} border border-[#7B92D9]/40 bg-gradient-to-r from-[#4464BB]/15 to-[#26386A]/15 text-[#D4DEEF] hover:from-[#4464BB]/30 hover:to-[#26386A]/30 hover:text-white`
           : `${base} border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white`
       }
     >
@@ -1604,7 +1605,7 @@ function OwnerRoiPanel({ open }: { open: boolean }) {
       <div className="mx-auto max-w-7xl px-6 pb-8 pt-2 lg:px-10">
         <div className="relative overflow-hidden rounded-[28px] border border-emerald-300/20 bg-gradient-to-br from-slate-900/95 to-slate-950/95 p-6 backdrop-blur-2xl md:p-8 shadow-[0_0_60px_-20px_rgba(16,185,129,0.5)]">
           <div className="pointer-events-none absolute -top-24 right-0 h-[300px] w-[500px] rounded-full bg-emerald-500/10 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-24 left-0 h-[300px] w-[500px] rounded-full bg-cyan-500/10 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 left-0 h-[300px] w-[500px] rounded-full bg-[#3653A5]/10 blur-3xl" />
 
           {/* Header */}
           <div className="relative flex flex-col items-start justify-between gap-3 md:flex-row md:items-end">
@@ -1683,7 +1684,7 @@ function OwnerRoiPanel({ open }: { open: boolean }) {
             </div>
             <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
               <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">Break-even</p>
-              <p className="mt-1 flex items-center gap-2 text-2xl font-semibold text-cyan-300">
+              <p className="mt-1 flex items-center gap-2 text-2xl font-semibold text-[#7B92D9]">
                 <Timer className="h-5 w-5" /> 42 days
               </p>
               <p className="text-[11px] text-slate-400">CarIQ pays for itself month 2</p>
@@ -1796,7 +1797,7 @@ function PrequalModal({
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/85 p-4 backdrop-blur-md">
       <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-slate-900/95 to-slate-950/95 shadow-2xl backdrop-blur-2xl">
-        <div className="pointer-events-none absolute -top-24 left-1/2 h-[300px] w-[500px] -translate-x-1/2 rounded-full bg-gradient-to-br from-cyan-500/20 to-violet-500/20 blur-3xl" />
+        <div className="pointer-events-none absolute -top-24 left-1/2 h-[300px] w-[500px] -translate-x-1/2 rounded-full bg-gradient-to-br from-[#3653A5]/20 to-[#26386A]/20 blur-3xl" />
 
         <button
           onClick={onClose}
@@ -1806,7 +1807,7 @@ function PrequalModal({
         </button>
 
         <div className="relative px-7 pt-8 pb-6">
-          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-300">CarIQ · Soft-Pull Prequalification</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#7B92D9]">CarIQ · Soft-Pull Prequalification</p>
           <h3 className="mt-2 text-2xl font-semibold tracking-tight text-white">
             {car.year} {car.make} {car.model}
           </h3>
@@ -1824,7 +1825,7 @@ function PrequalModal({
                   key={s.label}
                   className={`flex items-center gap-3 rounded-2xl border p-4 transition-all duration-300 ${
                     isActive
-                      ? 'border-cyan-300/40 bg-cyan-400/10 shadow-[0_0_30px_-10px_rgba(34,211,238,0.6)]'
+                      ? 'border-[#7B92D9]/40 bg-[#4464BB]/10 shadow-[0_0_30px_-10px_rgba(68,100,187,0.6)]'
                       : isDone
                       ? 'border-emerald-300/30 bg-emerald-400/5'
                       : 'border-white/10 bg-white/[0.03] opacity-50'
@@ -1833,7 +1834,7 @@ function PrequalModal({
                   <div
                     className={`grid h-10 w-10 place-items-center rounded-xl ring-1 ring-white/10 ${
                       isActive
-                        ? 'bg-cyan-400/20 text-cyan-300'
+                        ? 'bg-[#4464BB]/20 text-[#7B92D9]'
                         : isDone
                         ? 'bg-emerald-400/20 text-emerald-300'
                         : 'bg-white/5 text-slate-400'
@@ -1859,7 +1860,7 @@ function PrequalModal({
               );
             })}
             <div className="flex items-center gap-2 px-1 pt-2 text-[11px] text-slate-500">
-              <ShieldCheck className="h-3.5 w-3.5 text-cyan-300" />
+              <ShieldCheck className="h-3.5 w-3.5 text-[#7B92D9]" />
               Soft pull · zero impact on credit score · encrypted end-to-end
             </div>
           </div>
@@ -1874,7 +1875,7 @@ function PrequalModal({
 function PrequalApproved({ car, onClose }: { car: ApprovedCar; onClose: () => void }) {
   return (
     <div className="relative px-7 pb-8">
-      <div className="relative rounded-2xl border border-emerald-300/40 bg-gradient-to-br from-emerald-400/15 to-cyan-400/10 p-6 shadow-[0_0_60px_-15px_rgba(16,185,129,0.7)]">
+      <div className="relative rounded-2xl border border-emerald-300/40 bg-gradient-to-br from-emerald-400/15 to-[#4464BB]/10 p-6 shadow-[0_0_60px_-15px_rgba(16,185,129,0.7)]">
         <div className="pointer-events-none absolute inset-0 rounded-2xl bg-[radial-gradient(ellipse_at_top,_rgba(16,185,129,0.18),_transparent_60%)]" />
         <div className="relative flex items-center gap-3">
           <div className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-400/30 ring-1 ring-emerald-300/40 text-emerald-100">
@@ -1900,7 +1901,7 @@ function PrequalApproved({ car, onClose }: { car: ApprovedCar; onClose: () => vo
         </div>
 
         <div className="relative mt-5 flex flex-col gap-2 md:flex-row">
-          <button className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 shadow-lg transition-all duration-300 hover:opacity-90">
+          <button className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-[#4464BB] px-4 py-3 text-sm font-semibold text-slate-950 shadow-lg transition-all duration-300 hover:opacity-90">
             <CalendarCheck className="h-4 w-4" /> Schedule Pickup
           </button>
           <button
@@ -1923,7 +1924,7 @@ function BackgroundFX() {
   return (
     <>
       {/* Base radial */}
-      <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top,_rgba(34,211,238,0.10)_0%,_transparent_55%),radial-gradient(ellipse_at_bottom_right,_rgba(139,92,246,0.10)_0%,_transparent_55%)]" />
+      <div className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top,_rgba(68,100,187,0.12)_0%,_transparent_55%),radial-gradient(ellipse_at_bottom_right,_rgba(38,56,106,0.16)_0%,_transparent_55%)]" />
       {/* Grid */}
       <div
         className="pointer-events-none absolute inset-0 z-0 opacity-[0.07]"
@@ -1936,8 +1937,8 @@ function BackgroundFX() {
         }}
       />
       {/* Soft orbs */}
-      <div className="pointer-events-none absolute -top-32 left-1/4 z-0 h-[500px] w-[500px] rounded-full bg-cyan-500/10 blur-3xl" />
-      <div className="pointer-events-none absolute top-1/2 right-0 z-0 h-[600px] w-[600px] rounded-full bg-violet-500/10 blur-3xl" />
+      <div className="pointer-events-none absolute -top-32 left-1/4 z-0 h-[500px] w-[500px] rounded-full bg-[#3653A5]/10 blur-3xl" />
+      <div className="pointer-events-none absolute top-1/2 right-0 z-0 h-[600px] w-[600px] rounded-full bg-[#26386A]/10 blur-3xl" />
     </>
   );
 }
