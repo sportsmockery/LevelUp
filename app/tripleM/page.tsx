@@ -1,12 +1,15 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Sparkles,
   ShieldCheck,
   Gauge,
   Brain,
   TrendingDown,
+  TrendingUp,
+  ArrowUpRight,
+  ArrowDownRight,
   Flame,
   Fuel,
   Wrench,
@@ -23,6 +26,11 @@ import {
   BadgeCheck,
   Mic,
   Send,
+  Zap,
+  Loader2,
+  Wallet,
+  Bot,
+  Timer,
 } from 'lucide-react';
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -82,8 +90,7 @@ const INVENTORY: Car[] = [
       'Executive luxury without the depreciation hit. Perfect for the professional wanting a premium commute. Meticulous service records indicate a well-maintained turbo engine.',
     heroGradient: 'from-cyan-500/30 via-sky-500/10 to-transparent',
     accent: 'cyan',
-    image:
-      'https://images.unsplash.com/photo-1555215695-3004980ad54e?auto=format&fit=crop&q=80&w=800',
+    image: '/tripleM/bmw-530i.jpg',
   },
   {
     id: 'silverado-2016',
@@ -94,7 +101,7 @@ const INVENTORY: Car[] = [
     bodyType: 'Truck',
     price: 17246,
     miles: 131542,
-    exterior: 'Burgundy',
+    exterior: 'Victory Red',
     interior: 'Charcoal',
     engine: '5.3L V8',
     fuel: 'Gasoline',
@@ -110,8 +117,7 @@ const INVENTORY: Car[] = [
       'Workhorse from a regional contractor. 5.3 V8 with the AFM lifter delete already performed at 95k — the single biggest risk on this platform is gone. Clean frame, undercoated annually. Pulls 9,400 lb.',
     heroGradient: 'from-rose-500/30 via-red-500/10 to-transparent',
     accent: 'rose',
-    image:
-      'https://images.unsplash.com/photo-1559416523-140ddc3d238c?auto=format&fit=crop&q=80&w=800',
+    image: '/tripleM/silverado-1500.jpg',
   },
   {
     id: 'rav4-2016',
@@ -122,7 +128,7 @@ const INVENTORY: Car[] = [
     bodyType: 'SUV',
     price: 15246,
     miles: 137258,
-    exterior: 'Charcoal',
+    exterior: 'Pearl White',
     interior: 'Gray',
     engine: '2.5L I4',
     fuel: 'Gasoline',
@@ -138,8 +144,7 @@ const INVENTORY: Car[] = [
       'The car we recommend to anyone with a teenager or a 90-mile commute. Original drivetrain, no transmission concerns on the 6-speed auto. Every Toyota tech we partner with says the same thing: drive it to 250k.',
     heroGradient: 'from-violet-500/30 via-purple-500/10 to-transparent',
     accent: 'violet',
-    image:
-      'https://images.unsplash.com/photo-1623910271167-73b306a4b1ba?auto=format&fit=crop&q=80&w=800',
+    image: '/tripleM/rav4-xle.jpg',
   },
   {
     id: 'f350-2008',
@@ -166,8 +171,7 @@ const INVENTORY: Car[] = [
       'The 6.4 Power Stroke gets a bad rap — this one has the EGR cooler delete and updated radiator already done. We bought it because the work is already in the truck. Lariat leather is in 8/10 condition. Honest farm truck.',
     heroGradient: 'from-amber-500/30 via-orange-500/10 to-transparent',
     accent: 'amber',
-    image:
-      'https://images.unsplash.com/photo-1596401057416-090c2eb2e008?auto=format&fit=crop&q=80&w=800',
+    image: '/tripleM/f350-lariat.jpg',
   },
 ];
 
@@ -222,7 +226,23 @@ function approvalStateFor(car: Car, down: number, credit: number) {
 }
 
 type ApprovalState = ReturnType<typeof approvalStateFor>;
-type ApprovedCar = Car & { approval: number; approvalState: ApprovalState };
+type ApprovedCar = Car & {
+  approval: number;
+  approvalState: ApprovalState;
+  monthlyPayment: number;
+  withinBudget: boolean;
+};
+
+/**
+ * Standard amortized monthly payment.
+ * Mockup defaults: 10% down, 8% APR, 60-month term.
+ */
+function monthlyPaymentFor(price: number, downPct = 0.1, apr = 0.08, termMonths = 60) {
+  const principal = price * (1 - downPct);
+  const r = apr / 12;
+  const factor = (r * Math.pow(1 + r, termMonths)) / (Math.pow(1 + r, termMonths) - 1);
+  return Math.round(principal * factor);
+}
 
 const fmt = (n: number) => '$' + n.toLocaleString('en-US');
 
@@ -255,24 +275,44 @@ const accentGlow: Record<string, string> = {
 export default function TripleMPage() {
   const [downPayment, setDownPayment] = useState(1500);
   const [creditScore, setCreditScore] = useState(680);
+  const [monthlyBudget, setMonthlyBudget] = useState(537);
+  const [ownerMode, setOwnerMode] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [coachOpen, setCoachOpen] = useState(false);
   const [coachLang, setCoachLang] = useState<'en' | 'es'>('en');
+  const [prequalCarId, setPrequalCarId] = useState<string | null>(null);
+  const [prequalStep, setPrequalStep] = useState<0 | 1 | 2 | 3>(0);
 
-  const inventoryWithApproval = useMemo(
+  // Advance the simulated prequal flow on a timer.
+  useEffect(() => {
+    if (prequalStep === 1 || prequalStep === 2) {
+      const t = setTimeout(() => setPrequalStep((s) => (s < 3 ? ((s + 1) as 1 | 2 | 3) : s)), 1500);
+      return () => clearTimeout(t);
+    }
+  }, [prequalStep]);
+
+  const inventoryWithApproval = useMemo<ApprovedCar[]>(
     () =>
       INVENTORY.map((c) => {
         const state = approvalStateFor(c, downPayment, creditScore);
-        return { ...c, approval: state.pct, approvalState: state };
+        const monthlyPayment = monthlyPaymentFor(c.price);
+        return {
+          ...c,
+          approval: state.pct,
+          approvalState: state,
+          monthlyPayment,
+          withinBudget: monthlyPayment <= monthlyBudget,
+        };
       }),
-    [downPayment, creditScore]
+    [downPayment, creditScore, monthlyBudget]
   );
 
-  // Pre-Approved cars float to the front; remaining cars are sorted by how
-  // little more down payment they need so the demo always feels actionable.
+  // Within-budget, pre-approved cars come first; out-of-budget cars drop to
+  // the back of the line so the demo grid always leads with actionable rows.
   const sortedCars = useMemo(
     () =>
       [...inventoryWithApproval].sort((a, b) => {
+        if (a.withinBudget !== b.withinBudget) return a.withinBudget ? -1 : 1;
         if (a.approvalState.approved !== b.approvalState.approved) {
           return a.approvalState.approved ? -1 : 1;
         }
@@ -281,6 +321,20 @@ export default function TripleMPage() {
       }),
     [inventoryWithApproval]
   );
+
+  const prequalCar = prequalCarId
+    ? inventoryWithApproval.find((c) => c.id === prequalCarId) ?? null
+    : null;
+
+  function openPrequal(carId: string) {
+    setPrequalCarId(carId);
+    setPrequalStep(1);
+  }
+
+  function closePrequal() {
+    setPrequalCarId(null);
+    setPrequalStep(0);
+  }
 
   const selectedCar = selectedId ? inventoryWithApproval.find((c) => c.id === selectedId) ?? null : null;
 
@@ -306,10 +360,16 @@ export default function TripleMPage() {
           <a className="hover:text-white">CarIQ</a>
           <a className="hover:text-white">Confidence Program</a>
         </nav>
-        <button className="rounded-full border border-white/10 bg-white/5 px-5 py-2 text-sm font-semibold text-white backdrop-blur-xl transition hover:bg-white/10">
-          (219) 555-0199
-        </button>
+        <div className="flex items-center gap-3">
+          <OwnerModeToggle on={ownerMode} onChange={setOwnerMode} />
+          <button className="hidden rounded-full border border-white/10 bg-white/5 px-5 py-2 text-sm font-semibold text-white backdrop-blur-xl transition-all duration-300 hover:bg-white/10 md:block">
+            (219) 555-0199
+          </button>
+        </div>
       </header>
+
+      {/* OWNER MODE ROI DASHBOARD (slides down over hero when active) */}
+      <OwnerRoiPanel open={ownerMode} />
 
       {/* HERO */}
       <Hero
@@ -317,6 +377,8 @@ export default function TripleMPage() {
         setDownPayment={setDownPayment}
         creditScore={creditScore}
         setCreditScore={setCreditScore}
+        monthlyBudget={monthlyBudget}
+        setMonthlyBudget={setMonthlyBudget}
         cars={sortedCars}
       />
 
@@ -339,7 +401,13 @@ export default function TripleMPage() {
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
           {sortedCars.map((car, i) => (
-            <VehicleCard key={car.id} car={car} index={i} onClick={() => setSelectedId(car.id)} />
+            <VehicleCard
+              key={car.id}
+              car={car}
+              index={i}
+              onClick={() => setSelectedId(car.id)}
+              onPrequal={() => openPrequal(car.id)}
+            />
           ))}
         </div>
       </section>
@@ -371,8 +439,20 @@ export default function TripleMPage() {
       {/* VEHICLE DETAIL MODAL */}
       {selectedCar && <VehicleDetailModal car={selectedCar} onClose={() => setSelectedId(null)} />}
 
+      {/* PREQUALIFICATION MODAL */}
+      {prequalCar && (
+        <PrequalModal car={prequalCar} step={prequalStep} onClose={closePrequal} />
+      )}
+
       {/* FLOATING CAR COACH */}
-      <CarCoach open={coachOpen} setOpen={setCoachOpen} lang={coachLang} setLang={setCoachLang} car={selectedCar} />
+      <CarCoach
+        open={coachOpen}
+        setOpen={setCoachOpen}
+        lang={coachLang}
+        setLang={setCoachLang}
+        car={selectedCar}
+        ownerMode={ownerMode}
+      />
     </div>
   );
 }
@@ -386,15 +466,20 @@ function Hero({
   setDownPayment,
   creditScore,
   setCreditScore,
+  monthlyBudget,
+  setMonthlyBudget,
   cars,
 }: {
   downPayment: number;
   setDownPayment: (n: number) => void;
   creditScore: number;
   setCreditScore: (n: number) => void;
+  monthlyBudget: number;
+  setMonthlyBudget: (n: number) => void;
   cars: ApprovedCar[];
 }) {
   const approvedCount = cars.filter((c) => c.approvalState.approved).length;
+  const inBudgetCount = cars.filter((c) => c.withinBudget).length;
   const creditTier =
     creditScore >= 740 ? { label: 'Excellent', tone: 'emerald' } :
     creditScore >= 670 ? { label: 'Good', tone: 'cyan' } :
@@ -436,11 +521,48 @@ function Hero({
                 <p className="mt-1 text-lg font-semibold text-white">Tune the dials — the lot re-ranks itself.</p>
               </div>
               <div className="text-right">
-                <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">Pre-Approved</p>
-                <p className="mt-1 text-3xl font-semibold tracking-tight text-emerald-300">
-                  {approvedCount}<span className="text-slate-500"> / {cars.length}</span>
+                <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">In Your Budget</p>
+                <p className="mt-1 text-3xl font-semibold tracking-tight text-cyan-300">
+                  {inBudgetCount}<span className="text-slate-500"> / {cars.length}</span>
                 </p>
+                <p className="text-[10px] text-slate-400">{approvedCount} pre-approved</p>
               </div>
+            </div>
+
+            {/* Shop by Monthly Payment — primary slider */}
+            <div className="mt-6 rounded-2xl border border-cyan-300/20 bg-gradient-to-br from-cyan-400/10 to-violet-500/10 p-4 transition-all duration-300">
+              <div className="flex items-end justify-between">
+                <div>
+                  <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-200">
+                    <Wallet className="h-3.5 w-3.5" /> Shop by Monthly Payment
+                  </p>
+                  <p className="mt-1 text-3xl font-semibold tracking-tight text-white">
+                    ${monthlyBudget}<span className="text-sm text-slate-400">/mo</span>
+                  </p>
+                </div>
+                <span className="rounded-full border border-white/10 bg-black/30 px-2.5 py-0.5 text-[10px] uppercase tracking-wider text-slate-300">
+                  US avg · $537
+                </span>
+              </div>
+              <input
+                type="range"
+                min={250}
+                max={800}
+                step={5}
+                value={monthlyBudget}
+                onChange={(e) => setMonthlyBudget(Number(e.target.value))}
+                className="mt-3 w-full accent-cyan-300"
+              />
+              <div className="mt-1 flex justify-between text-[10px] uppercase tracking-wider text-slate-500">
+                <span>$250</span>
+                <span>$400</span>
+                <span>$537</span>
+                <span>$650</span>
+                <span>$800</span>
+              </div>
+              <p className="mt-2 text-[10px] text-slate-400">
+                Math: 10% down · 8.0% APR · 60-month term. Cars above your budget dim automatically.
+              </p>
             </div>
 
             {/* Down payment slider */}
@@ -610,19 +732,22 @@ function VehicleCard({
   car,
   index,
   onClick,
+  onPrequal,
 }: {
   car: ApprovedCar;
   index: number;
   onClick: () => void;
+  onPrequal: () => void;
 }) {
   const { tier, approved, shortfall } = car.approvalState;
   const approvedGlow = approved
     ? 'shadow-[0_0_40px_-8px_rgba(16,185,129,0.55)] ring-1 ring-emerald-400/30'
     : '';
+  const budgetMute = car.withinBudget ? '' : 'opacity-55 saturate-50';
   return (
-    <button
+    <div
       onClick={onClick}
-      className={`group relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] p-5 text-left backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:bg-white/[0.06] ${accentGlow[car.accent]} ${approvedGlow}`}
+      className={`group relative cursor-pointer overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] p-5 text-left backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:bg-white/[0.06] ${accentGlow[car.accent]} ${approvedGlow} ${budgetMute}`}
       style={{ animationDelay: `${index * 80}ms` }}
     >
       <div
@@ -687,11 +812,35 @@ function VehicleCard({
 
       <div className="relative mt-3 flex items-center justify-between text-xs text-slate-400">
         <span className={`font-semibold uppercase tracking-wider ${accentText[tier.tone]}`}>{tier.label}</span>
-        <span className="flex items-center gap-1 text-slate-300 transition group-hover:text-white">
-          CarIQ Detail <ChevronRight className="h-3.5 w-3.5" />
+        <span className="flex items-center gap-1 text-[11px] text-slate-300">
+          <Wallet className="h-3 w-3 text-cyan-300" />
+          <span className="font-semibold text-white">${car.monthlyPayment}</span>
+          <span className="text-slate-500">/mo est.</span>
         </span>
       </div>
-    </button>
+
+      {/* PRIMARY CTA — soft-pull prequalification */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onPrequal();
+        }}
+        className="group/btn relative mt-4 flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-r from-cyan-400 to-violet-500 px-4 py-3 text-xs font-bold uppercase tracking-wider text-slate-950 shadow-[0_0_30px_-10px_rgba(34,211,238,0.7)] transition-all duration-300 hover:opacity-95 hover:shadow-[0_0_40px_-8px_rgba(139,92,246,0.7)]"
+      >
+        <Zap className="h-4 w-4" />
+        Get Prequalified Instantly
+        <span className="hidden text-[10px] font-semibold opacity-80 md:inline">· No SSN Required</span>
+      </button>
+
+      <div className="relative mt-2 flex items-center justify-between text-[10px] text-slate-500">
+        <span className="flex items-center gap-1">
+          <ShieldCheck className="h-3 w-3 text-emerald-400" /> Soft pull · no credit hit
+        </span>
+        <span className="flex items-center gap-1 transition-all duration-300 group-hover:text-white">
+          CarIQ Detail <ChevronRight className="h-3 w-3" />
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -1251,12 +1400,14 @@ function CarCoach({
   lang,
   setLang,
   car,
+  ownerMode,
 }: {
   open: boolean;
   setOpen: (b: boolean) => void;
   lang: 'en' | 'es';
   setLang: (l: 'en' | 'es') => void;
   car: (Car & { approval: number }) | null;
+  ownerMode: boolean;
 }) {
   const greeting =
     lang === 'en'
@@ -1266,20 +1417,25 @@ function CarCoach({
   return (
     <>
       {!open && (
-        <button
-          onClick={() => setOpen(true)}
-          className="fixed bottom-6 right-6 z-40 flex items-center gap-3 rounded-full border border-white/10 bg-gradient-to-r from-cyan-400 to-violet-500 px-5 py-3 text-sm font-semibold text-slate-950 shadow-[0_0_40px_-10px_rgba(34,211,238,0.6)] transition hover:opacity-90"
-        >
-          <div className="relative grid h-7 w-7 place-items-center rounded-full bg-slate-950 text-cyan-300">
-            <MessageCircle className="h-4 w-4" />
-            <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-400 ring-2 ring-slate-950" />
-          </div>
-          Car Coach · EN/ES
-        </button>
+        <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-2">
+          {ownerMode && <BdcAnalyticsPill />}
+          <button
+            onClick={() => setOpen(true)}
+            className="flex items-center gap-3 rounded-full border border-white/10 bg-gradient-to-r from-cyan-400 to-violet-500 px-5 py-3 text-sm font-semibold text-slate-950 shadow-[0_0_40px_-10px_rgba(34,211,238,0.6)] transition-all duration-300 hover:opacity-90"
+          >
+            <div className="relative grid h-7 w-7 place-items-center rounded-full bg-slate-950 text-cyan-300">
+              <MessageCircle className="h-4 w-4" />
+              <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-400 ring-2 ring-slate-950" />
+            </div>
+            Car Coach · EN/ES
+          </button>
+        </div>
       )}
 
       {open && (
-        <div className="fixed bottom-6 right-6 z-40 w-[360px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-3xl border border-white/10 bg-slate-900/90 shadow-2xl backdrop-blur-2xl">
+        <div className="fixed bottom-6 right-6 z-40 flex w-[360px] max-w-[calc(100vw-2rem)] flex-col items-end gap-2">
+          {ownerMode && <BdcAnalyticsPill />}
+          <div className="w-full overflow-hidden rounded-3xl border border-white/10 bg-slate-900/90 shadow-2xl backdrop-blur-2xl">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-white/5 bg-gradient-to-r from-cyan-500/20 to-violet-500/20 px-4 py-3">
             <div className="flex items-center gap-2.5">
@@ -1351,9 +1507,31 @@ function CarCoach({
               <Send className="h-4 w-4" />
             </button>
           </div>
+          </div>
         </div>
       )}
     </>
+  );
+}
+
+function BdcAnalyticsPill() {
+  return (
+    <div className="group/pill relative w-full max-w-[340px] overflow-hidden rounded-2xl border border-emerald-300/30 bg-gradient-to-br from-slate-900/95 to-slate-950/95 px-4 py-3 shadow-[0_0_30px_-10px_rgba(16,185,129,0.6)] backdrop-blur-2xl">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(16,185,129,0.15),_transparent_60%)]" />
+      <div className="relative flex items-start gap-3">
+        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-400/15 ring-1 ring-emerald-300/30 text-emerald-200">
+          <Bot className="h-4 w-4" />
+        </div>
+        <div className="leading-tight">
+          <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-300">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+            AI BDC · Active
+          </p>
+          <p className="mt-1 text-sm font-semibold text-white">14 dead leads filtered this week</p>
+          <p className="text-[11px] text-slate-400">11 hours of sales staff time saved</p>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1380,6 +1558,360 @@ function QuickReply({
     >
       {lang === 'en' ? en : es}
     </button>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   OWNER MODE — discreet nav toggle + sliding ROI dashboard
+   ───────────────────────────────────────────────────────────────────────── */
+
+function OwnerModeToggle({ on, onChange }: { on: boolean; onChange: (b: boolean) => void }) {
+  return (
+    <button
+      onClick={() => onChange(!on)}
+      className={`group flex items-center gap-2 rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider backdrop-blur-xl transition-all duration-300 ${
+        on
+          ? 'border-emerald-300/40 bg-emerald-400/15 text-emerald-200 shadow-[0_0_20px_-4px_rgba(16,185,129,0.6)]'
+          : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white'
+      }`}
+      aria-pressed={on}
+    >
+      <span className="hidden sm:inline">{on ? 'Owner Analytics · On' : 'Enable Owner Analytics'}</span>
+      <span className="sm:hidden">{on ? 'Owner · On' : 'Owner'}</span>
+      <span
+        className={`relative inline-flex h-4 w-7 items-center rounded-full transition-all duration-300 ${
+          on ? 'bg-emerald-400/80' : 'bg-white/20'
+        }`}
+      >
+        <span
+          className={`absolute h-3 w-3 rounded-full bg-white shadow-md transition-all duration-300 ${
+            on ? 'translate-x-3.5' : 'translate-x-0.5'
+          }`}
+        />
+      </span>
+    </button>
+  );
+}
+
+function OwnerRoiPanel({ open }: { open: boolean }) {
+  return (
+    <div
+      className={`relative z-10 overflow-hidden transition-all duration-500 ease-out ${
+        open ? 'max-h-[800px] opacity-100' : 'max-h-0 opacity-0'
+      }`}
+      aria-hidden={!open}
+    >
+      <div className="mx-auto max-w-7xl px-6 pb-8 pt-2 lg:px-10">
+        <div className="relative overflow-hidden rounded-[28px] border border-emerald-300/20 bg-gradient-to-br from-slate-900/95 to-slate-950/95 p-6 backdrop-blur-2xl md:p-8 shadow-[0_0_60px_-20px_rgba(16,185,129,0.5)]">
+          <div className="pointer-events-none absolute -top-24 right-0 h-[300px] w-[500px] rounded-full bg-emerald-500/10 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 left-0 h-[300px] w-[500px] rounded-full bg-cyan-500/10 blur-3xl" />
+
+          {/* Header */}
+          <div className="relative flex flex-col items-start justify-between gap-3 md:flex-row md:items-end">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-400/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-300">
+                <Lock className="h-3 w-3" /> Internal · Owner View
+              </div>
+              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-white md:text-3xl">
+                Where your $5,000/mo is actually going.
+              </h2>
+              <p className="mt-1 text-sm text-slate-400">
+                CarIQ Strategy vs. your current third-party lead spend · 90-day rolling
+              </p>
+            </div>
+            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-black/30 px-3 py-1.5 text-[10px] uppercase tracking-wider text-slate-300 backdrop-blur">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+              Live · synced 4 min ago
+            </div>
+          </div>
+
+          {/* Headline KPI row */}
+          <div className="relative mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+            <KpiTile label="Monthly Ad Spend" value="$5,000" delta="−$3,600/mo" tone="emerald" sub="vs. current Cars.com bill" />
+            <KpiTile label="Cost Per Sale" value="$294" delta="−61%" tone="emerald" sub="vs. $748 third-party" />
+            <KpiTile label="Close Rate" value="25%" delta="+13 pts" tone="emerald" sub="owned channel" />
+            <KpiTile label="Projected ROI" value="3.4×" delta="+2.1×" tone="emerald" sub="90-day forecast" />
+          </div>
+
+          {/* Side-by-side comparison */}
+          <div className="relative mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <StrategyColumn
+              title="Current Strategy"
+              subtitle="Third-Party Rented Leads"
+              source="Cars.com · CarGurus · TrueCar"
+              tone="rose"
+              bullets={[
+                { label: 'Close Rate', value: '12%', tone: 'rose' },
+                { label: 'Cost Per Lead', value: '$89', tone: 'rose' },
+                { label: 'Cost Per Sale', value: '$748', tone: 'rose' },
+                { label: 'Lead Ownership', value: '0% — rented', tone: 'rose' },
+                { label: 'Avg Response Time', value: '2h 14m', tone: 'rose' },
+              ]}
+              footnote="Same leads sold to 3+ competitors. Margin erodes monthly."
+            />
+            <StrategyColumn
+              title="CarIQ Strategy"
+              subtitle="Owned Digital Channels"
+              source="CarIQ Site · AI BDC · Approval-First Funnel"
+              tone="emerald"
+              bullets={[
+                { label: 'Close Rate', value: '25%', tone: 'emerald' },
+                { label: 'Cost Per Lead', value: '$31', tone: 'emerald' },
+                { label: 'Cost Per Sale', value: '$294', tone: 'emerald' },
+                { label: 'Lead Ownership', value: '100% — owned', tone: 'emerald' },
+                { label: 'Avg Response Time', value: '47 seconds', tone: 'emerald' },
+              ]}
+              footnote="Compounds — every month builds your own funnel asset."
+            />
+          </div>
+
+          {/* Bottom strip — projection */}
+          <div className="relative mt-6 grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+              <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">Net Monthly Gain</p>
+              <p className="mt-1 flex items-center gap-2 text-2xl font-semibold text-emerald-300">
+                <ArrowUpRight className="h-5 w-5" /> +$11,420
+              </p>
+              <p className="text-[11px] text-slate-400">5 extra sales · avg $2,284 gross</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+              <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">Annual Lift</p>
+              <p className="mt-1 flex items-center gap-2 text-2xl font-semibold text-emerald-300">
+                <TrendingUp className="h-5 w-5" /> +$137,040
+              </p>
+              <p className="text-[11px] text-slate-400">Conservative · no growth assumed</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+              <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">Break-even</p>
+              <p className="mt-1 flex items-center gap-2 text-2xl font-semibold text-cyan-300">
+                <Timer className="h-5 w-5" /> 42 days
+              </p>
+              <p className="text-[11px] text-slate-400">CarIQ pays for itself month 2</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function KpiTile({
+  label,
+  value,
+  delta,
+  tone,
+  sub,
+}: {
+  label: string;
+  value: string;
+  delta: string;
+  tone: 'emerald' | 'rose';
+  sub: string;
+}) {
+  const isUp = tone === 'emerald';
+  return (
+    <div className="rounded-2xl border border-white/10 bg-black/30 p-4 backdrop-blur-xl">
+      <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">{label}</p>
+      <p className="mt-1 text-2xl font-semibold tracking-tight text-white">{value}</p>
+      <p
+        className={`mt-1 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider ${
+          isUp ? 'text-emerald-300' : 'text-rose-300'
+        }`}
+      >
+        {isUp ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+        {delta}
+      </p>
+      <p className="text-[10px] text-slate-500">{sub}</p>
+    </div>
+  );
+}
+
+function StrategyColumn({
+  title,
+  subtitle,
+  source,
+  tone,
+  bullets,
+  footnote,
+}: {
+  title: string;
+  subtitle: string;
+  source: string;
+  tone: 'emerald' | 'rose';
+  bullets: { label: string; value: string; tone: 'emerald' | 'rose' }[];
+  footnote: string;
+}) {
+  const ring =
+    tone === 'emerald'
+      ? 'border-emerald-300/30 shadow-[0_0_30px_-10px_rgba(16,185,129,0.6)]'
+      : 'border-rose-300/30 shadow-[0_0_30px_-10px_rgba(244,63,94,0.45)]';
+  const accent = tone === 'emerald' ? 'text-emerald-300' : 'text-rose-300';
+  const Arrow = tone === 'emerald' ? ArrowUpRight : ArrowDownRight;
+  return (
+    <div className={`relative rounded-2xl border ${ring} bg-white/[0.03] p-5 backdrop-blur-xl`}>
+      <div className="flex items-center justify-between">
+        <div>
+          <p className={`text-[10px] font-bold uppercase tracking-[0.22em] ${accent}`}>{title}</p>
+          <p className="mt-1 text-lg font-semibold text-white">{subtitle}</p>
+          <p className="text-[11px] text-slate-400">{source}</p>
+        </div>
+        <Arrow className={`h-6 w-6 ${accent}`} />
+      </div>
+      <div className="mt-4 space-y-2">
+        {bullets.map((b) => (
+          <div
+            key={b.label}
+            className="flex items-center justify-between border-b border-white/5 pb-2 text-xs last:border-0"
+          >
+            <span className="text-slate-400">{b.label}</span>
+            <span className={`font-semibold ${b.tone === 'emerald' ? 'text-emerald-300' : 'text-rose-300'}`}>
+              {b.value}
+            </span>
+          </div>
+        ))}
+      </div>
+      <p className="mt-4 text-[11px] italic text-slate-400">{footnote}</p>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   PREQUALIFICATION MODAL — simulated 3-step soft-pull flow
+   ───────────────────────────────────────────────────────────────────────── */
+
+function PrequalModal({
+  car,
+  step,
+  onClose,
+}: {
+  car: ApprovedCar;
+  step: 0 | 1 | 2 | 3;
+  onClose: () => void;
+}) {
+  const steps = [
+    { icon: <Lock className="h-5 w-5" />, label: 'Securely connecting to DealerTrack / 700Credit API…' },
+    { icon: <Activity className="h-5 w-5" />, label: 'Running soft credit analysis…' },
+    { icon: <CheckCircle2 className="h-5 w-5" />, label: 'Approved — building your offer' },
+  ];
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-slate-950/85 p-4 backdrop-blur-md">
+      <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-slate-900/95 to-slate-950/95 shadow-2xl backdrop-blur-2xl">
+        <div className="pointer-events-none absolute -top-24 left-1/2 h-[300px] w-[500px] -translate-x-1/2 rounded-full bg-gradient-to-br from-cyan-500/20 to-violet-500/20 blur-3xl" />
+
+        <button
+          onClick={onClose}
+          className="absolute right-4 top-4 z-10 grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-black/40 text-white backdrop-blur-xl transition-all duration-300 hover:bg-white/10"
+        >
+          <X className="h-4 w-4" />
+        </button>
+
+        <div className="relative px-7 pt-8 pb-6">
+          <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-300">CarIQ · Soft-Pull Prequalification</p>
+          <h3 className="mt-2 text-2xl font-semibold tracking-tight text-white">
+            {car.year} {car.make} {car.model}
+          </h3>
+          <p className="text-sm text-slate-400">{car.trim} · {fmt(car.price)} · No SSN required</p>
+        </div>
+
+        {step < 3 ? (
+          <div className="relative space-y-3 px-7 pb-8">
+            {steps.slice(0, 2).map((s, idx) => {
+              const stepIdx = idx + 1; // 1 or 2
+              const isActive = step === stepIdx;
+              const isDone = step > stepIdx;
+              return (
+                <div
+                  key={s.label}
+                  className={`flex items-center gap-3 rounded-2xl border p-4 transition-all duration-300 ${
+                    isActive
+                      ? 'border-cyan-300/40 bg-cyan-400/10 shadow-[0_0_30px_-10px_rgba(34,211,238,0.6)]'
+                      : isDone
+                      ? 'border-emerald-300/30 bg-emerald-400/5'
+                      : 'border-white/10 bg-white/[0.03] opacity-50'
+                  }`}
+                >
+                  <div
+                    className={`grid h-10 w-10 place-items-center rounded-xl ring-1 ring-white/10 ${
+                      isActive
+                        ? 'bg-cyan-400/20 text-cyan-300'
+                        : isDone
+                        ? 'bg-emerald-400/20 text-emerald-300'
+                        : 'bg-white/5 text-slate-400'
+                    }`}
+                  >
+                    {isActive ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : isDone ? (
+                      <CheckCircle2 className="h-5 w-5" />
+                    ) : (
+                      s.icon
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <p className={`text-sm font-semibold ${isActive ? 'text-white' : isDone ? 'text-emerald-200' : 'text-slate-400'}`}>
+                      {s.label}
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      {isActive ? 'Working…' : isDone ? 'Complete' : 'Queued'}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+            <div className="flex items-center gap-2 px-1 pt-2 text-[11px] text-slate-500">
+              <ShieldCheck className="h-3.5 w-3.5 text-cyan-300" />
+              Soft pull · zero impact on credit score · encrypted end-to-end
+            </div>
+          </div>
+        ) : (
+          <PrequalApproved car={car} onClose={onClose} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PrequalApproved({ car, onClose }: { car: ApprovedCar; onClose: () => void }) {
+  return (
+    <div className="relative px-7 pb-8">
+      <div className="relative rounded-2xl border border-emerald-300/40 bg-gradient-to-br from-emerald-400/15 to-cyan-400/10 p-6 shadow-[0_0_60px_-15px_rgba(16,185,129,0.7)]">
+        <div className="pointer-events-none absolute inset-0 rounded-2xl bg-[radial-gradient(ellipse_at_top,_rgba(16,185,129,0.18),_transparent_60%)]" />
+        <div className="relative flex items-center gap-3">
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-400/30 ring-1 ring-emerald-300/40 text-emerald-100">
+            <CheckCircle2 className="h-6 w-6" />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-emerald-300">Approved</p>
+            <p className="text-xl font-semibold text-white">You're cleared to drive home today.</p>
+          </div>
+        </div>
+
+        <div className="relative mt-5 grid grid-cols-2 gap-3">
+          <div className="rounded-xl border border-white/10 bg-black/30 p-3">
+            <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">Est. Monthly Payment</p>
+            <p className="mt-1 text-3xl font-semibold text-white">${car.monthlyPayment}<span className="text-sm text-slate-400">/mo</span></p>
+            <p className="text-[10px] text-slate-500">60 mo · 8.0% APR · 10% down</p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-black/30 p-3">
+            <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">Lenders Matched</p>
+            <p className="mt-1 text-3xl font-semibold text-emerald-300">7</p>
+            <p className="text-[10px] text-slate-500">Best rate locked in for 72 hours</p>
+          </div>
+        </div>
+
+        <div className="relative mt-5 flex flex-col gap-2 md:flex-row">
+          <button className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 shadow-lg transition-all duration-300 hover:opacity-90">
+            <CalendarCheck className="h-4 w-4" /> Schedule Pickup
+          </button>
+          <button
+            onClick={onClose}
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white backdrop-blur-xl transition-all duration-300 hover:bg-white/10"
+          >
+            Keep Browsing
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
