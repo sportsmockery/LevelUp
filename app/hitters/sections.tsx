@@ -9,7 +9,7 @@ import {
   Menu, X, ChevronRight, ArrowRight, MapPin, Calendar, Trophy, Users,
   TrendingUp, Brain, Quote, Star, Shield, Target, Gauge, ChevronLeft,
 } from 'lucide-react';
-import { Glass, RedButton, GhostButton, Reveal, HittersLogo, StatNumber, SectionEyebrow } from './ui';
+import { Glass, RedButton, GhostButton, Reveal, HittersLogo, StatNumber, SectionEyebrow, Photo, PlayerAvatar } from './ui';
 import { PLAYERS, TEAMS, GAMES, TRYOUTS, NEWS, TESTIMONIALS, type Player, type Team } from './data';
 import { cn } from '@/lib/utils';
 
@@ -108,6 +108,16 @@ export function Navbar({ onLaunch }: { onLaunch: () => void }) {
 export function Hero({ onLaunch }: { onLaunch: () => void }) {
   return (
     <section id="top" className="relative flex min-h-screen items-center overflow-hidden pt-20">
+      {/* Optional real team photo backdrop — drop file at public/team/hero.jpg */}
+      <div className="pointer-events-none absolute inset-0">
+        <Photo
+          src="/team/hero.jpg"
+          alt="Upper Deck Cougars team"
+          className="absolute inset-0 size-full object-cover opacity-[0.22] grayscale"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#0A0A0A] via-[#0A0A0A]/85 to-[#0A0A0A]/40" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-transparent to-[#0A0A0A]/60" />
+      </div>
       {/* Background gradient + glows */}
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -left-40 top-20 size-[520px] rounded-full bg-[#C9CDD2]/20 blur-[140px]" />
@@ -419,9 +429,7 @@ export function FeaturedPlayers() {
             >
               <Glass className="h-full p-5 transition-all duration-300 group-hover:-translate-y-1 group-hover:border-white/20" >
                 <div className="flex items-center justify-between">
-                  <div className="flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#34343a] to-[#0c0c0e] ring-1 ring-white/15 font-heading text-xl font-bold text-white">
-                    {p.name.split(' ').map((n) => n[0]).join('')}
-                  </div>
+                  <PlayerAvatar id={p.id} name={p.name} className="size-14 rounded-2xl" textClassName="text-xl" />
                   <span className={cn('rounded-lg px-2.5 py-1 text-xs font-bold', gradeColor(p.aiGrade))}>AI {p.aiGrade}</span>
                 </div>
                 <div className="mt-4 text-base font-bold text-white">{p.name}</div>
@@ -467,9 +475,7 @@ function PlayerModal({ player, onClose }: { player: Player | null; onClose: () =
             <Glass className="p-7">
               <button onClick={onClose} className="absolute right-4 top-4 rounded-lg p-1.5 text-white/50 hover:bg-white/10 hover:text-white"><X className="size-5" /></button>
               <div className="flex items-center gap-4">
-                <div className="flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#34343a] to-[#0c0c0e] ring-1 ring-white/15 font-heading text-2xl font-bold text-white">
-                  {player.name.split(' ').map((n) => n[0]).join('')}
-                </div>
+                <PlayerAvatar id={player.id} name={player.name} className="size-16 shrink-0 rounded-2xl" textClassName="text-2xl" />
                 <div>
                   <h3 className="font-heading text-2xl font-bold text-white">{player.name}</h3>
                   <div className="text-sm text-white/55">{player.position} · {player.team} · Class of {player.gradYear}</div>
