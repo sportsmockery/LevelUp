@@ -6,6 +6,11 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '10mb',
     },
   },
+  // Bundle the ffmpeg-static binary with the OLIQ server-side frame extractor
+  // so the executable is present in the serverless function at runtime.
+  outputFileTracingIncludes: {
+    '/api/ol/extract': ['./node_modules/ffmpeg-static/ffmpeg'],
+  },
   async rewrites() {
     return [
       // Serve College Scout SPA at /scout (no redirect needed because the

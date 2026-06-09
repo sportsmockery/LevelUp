@@ -158,10 +158,6 @@ function extractFrames(file: File, count: number): Promise<string[]> {
   });
 }
 
-function extractFramesFromUrl(url: string, count: number): Promise<string[]> {
-  return extractFramesFromSource(url, count, { crossOrigin: true, revoke: false });
-}
-
 function athleteSummary(a: Athlete): string {
   const parts = [
     a.classYear && `Class of ${a.classYear}`,
@@ -248,10 +244,26 @@ export default function OLIQPage() {
     try {
       setStatusMessage('Extracting key frames...');
       setProgress(10);
-      const frames =
-        inputMode === 'upload'
-          ? await extractFrames(file as File, FRAME_COUNT)
-          : await extractFramesFromUrl(trimmedUrl, FRAME_COUNT);
+      let frames: string[];
+      if (inputMode === 'upload') {
+        frames = await extractFrames(file as File, FRAME_COUNT);
+      } else {
+        // Direct video links are extracted on the server with ffmpeg, which can
+        // read formats/streams (e.g. HLS .m3u8) the browser can't.
+        const exRes = await fetch('/api/ol/extract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: trimmedUrl }),
+        });
+        const exData = await exRes.json();
+        if (!exRes.ok) {
+          throw new Error(exData.error || `Could not read video from link (${exRes.status})`);
+        }
+        frames = exData.frames;
+        if (!Array.isArray(frames) || frames.length === 0) {
+          throw new Error('No frames could be extracted from that link.');
+        }
+      }
       setProgress(30);
 
       let pdfPayload: { name: string; data: string } | undefined;
@@ -522,12 +534,13 @@ export default function OLIQPage() {
                   setVideoUrl(e.target.value);
                   setError('');
                 }}
-                placeholder="https://example.com/film/play.mp4"
+                placeholder="https://example.com/film/play.mp4  (.mp4 / .mov / .m3u8)"
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-sky-500/60"
               />
               <p className="text-zinc-500 text-xs mt-2">
-                Must link directly to a CORS-enabled video file (.mp4/.mov). Embed/watch pages
-                (YouTube, Hudl) can&apos;t be read in-browser — upload those instead.
+                Works with direct video/stream links (.mp4, .mov, .m3u8) — these are read on our
+                server. Player/embed pages that need a login (YouTube, Hudl) can&apos;t be opened —
+                download the clip and use Upload instead.
               </p>
             </div>
           )}
