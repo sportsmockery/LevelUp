@@ -79,55 +79,91 @@ export function SectionEyebrow({ children }: { children: React.ReactNode }) {
 }
 
 // ----------------------------------------------------------------------------
-// UDC Logo — premium SVG wordmark with home-plate / cougar motif
+// Hitters Baseball logo
+// Uses the real raster at /hitters-logo.png when present; falls back to a
+// black & white SVG recreation (gradients preserved) if the file is missing.
+// To use the official artwork, add it at: public/hitters-logo.png
 // ----------------------------------------------------------------------------
-export function UDCLogo({ className }: { className?: string }) {
+export function HittersLogo({ className }: { className?: string }) {
+  const [useRaster, setUseRaster] = React.useState(true);
+  if (useRaster) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src="/hitters-logo.png"
+        alt="Hitters Baseball — Feel the Power"
+        className={cn('w-auto object-contain', className)}
+        onError={() => setUseRaster(false)}
+      />
+    );
+  }
+  return <HittersMark className={className} />;
+}
+
+function HittersMark({ className }: { className?: string }) {
   return (
-    <div className={cn('flex items-center gap-3', className)}>
-      <svg
-        viewBox="0 0 64 64"
-        className="size-10 shrink-0"
-        role="img"
-        aria-label="Upper Deck Cougars logo"
-      >
-        <defs>
-          <linearGradient id="udc-plate" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#F8FAFC" />
-            <stop offset="100%" stopColor="#C7D2E0" />
-          </linearGradient>
-        </defs>
-        {/* home plate */}
-        <path
-          d="M32 4 L56 18 V44 L32 60 L8 44 V18 Z"
-          fill="url(#udc-plate)"
-          stroke="#C8102E"
-          strokeWidth="2.5"
-        />
-        {/* stylized UDC monogram */}
-        <text
-          x="32"
-          y="40"
-          textAnchor="middle"
-          fontFamily="'Space Grotesk', sans-serif"
-          fontWeight="700"
-          fontSize="20"
-          fill="#0B1D36"
-          letterSpacing="-1"
-        >
-          UDC
-        </text>
-        {/* seam accent */}
-        <path d="M16 28 Q32 22 48 28" fill="none" stroke="#C8102E" strokeWidth="1.6" strokeLinecap="round" />
-      </svg>
-      <div className="leading-none">
-        <div className="font-heading text-[15px] font-bold tracking-tight text-white">
-          UPPER DECK COUGARS
-        </div>
-        <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#C8102E]">
-          Hitters UDC · Est. 1992
-        </div>
-      </div>
-    </div>
+    <svg
+      viewBox="0 0 300 200"
+      className={cn('w-auto', className)}
+      role="img"
+      aria-label="Hitters Baseball — Feel the Power"
+    >
+      <defs>
+        {/* baseball sphere — white to gray radial */}
+        <radialGradient id="h-ball" cx="40%" cy="34%" r="78%">
+          <stop offset="0%" stopColor="#ffffff" />
+          <stop offset="55%" stopColor="#e4e4e4" />
+          <stop offset="100%" stopColor="#9b9b9b" />
+        </radialGradient>
+        {/* dark disc / band — grayscale linear */}
+        <linearGradient id="h-band" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#525252" />
+          <stop offset="48%" stopColor="#2b2b2b" />
+          <stop offset="100%" stopColor="#0d0d0d" />
+        </linearGradient>
+        {/* script fill — grayscale linear for depth */}
+        <linearGradient id="h-script" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#5c5c5c" />
+          <stop offset="45%" stopColor="#262626" />
+          <stop offset="100%" stopColor="#000000" />
+        </linearGradient>
+        <filter id="h-shadow" x="-20%" y="-25%" width="140%" height="150%">
+          <feDropShadow dx="2" dy="3" stdDeviation="2" floodColor="#000000" floodOpacity="0.45" />
+        </filter>
+        {/* text baselines */}
+        <path id="h-top" d="M 56 28 A 150 9 0 0 1 244 28" fill="none" />
+        <path id="h-bot" d="M 60 168 A 104 22 0 0 0 240 168" fill="none" />
+      </defs>
+
+      {/* dark disc */}
+      <ellipse cx="150" cy="100" rx="146" ry="98" fill="url(#h-band)" stroke="#000000" strokeWidth="2" />
+      <ellipse cx="150" cy="100" rx="146" ry="98" fill="none" stroke="#6e6e6e" strokeWidth="1" opacity="0.5" />
+
+      {/* baseball */}
+      <circle cx="150" cy="100" r="74" fill="url(#h-ball)" stroke="#7c7c7c" strokeWidth="1.5" />
+
+      {/* seams + stitches (grayscale) */}
+      <g fill="none" stroke="#4a4a4a" strokeLinecap="round">
+        <path d="M 100 38 Q 150 100 116 162" strokeWidth="2" />
+        <path d="M 200 38 Q 150 100 184 162" strokeWidth="2" />
+        <path d="M 100 38 Q 150 100 116 162" strokeWidth="8" strokeDasharray="1 10" opacity="0.65" />
+        <path d="M 200 38 Q 150 100 184 162" strokeWidth="8" strokeDasharray="1 10" opacity="0.65" />
+      </g>
+
+      {/* curved banners */}
+      <text fontFamily="'Space Grotesk', sans-serif" fontWeight="700" fontSize="15" letterSpacing="2.5" fill="#f5f5f5">
+        <textPath href="#h-top" xlinkHref="#h-top" startOffset="50%" textAnchor="middle">FEEL THE POWER!</textPath>
+      </text>
+      <text fontFamily="'Space Grotesk', sans-serif" fontWeight="700" fontSize="19" letterSpacing="7" fill="#f5f5f5">
+        <textPath href="#h-bot" xlinkHref="#h-bot" startOffset="50%" textAnchor="middle">BASEBALL</textPath>
+      </text>
+
+      {/* Hitters wordmark — outlined script look */}
+      <g filter="url(#h-shadow)">
+        <text x="150" y="124" textAnchor="middle" fontFamily="Georgia, 'Times New Roman', serif" fontStyle="italic" fontWeight="700" fontSize="74" strokeLinejoin="round" stroke="#ffffff" strokeWidth="6" fill="none">Hitters</text>
+        <text x="150" y="124" textAnchor="middle" fontFamily="Georgia, 'Times New Roman', serif" fontStyle="italic" fontWeight="700" fontSize="74" fill="url(#h-script)">Hitters</text>
+      </g>
+    </svg>
   );
 }
 

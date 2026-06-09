@@ -9,7 +9,7 @@ import {
   Menu, X, ChevronRight, ArrowRight, MapPin, Calendar, Trophy, Users,
   TrendingUp, Brain, Quote, Star, Shield, Target, Gauge, ChevronLeft,
 } from 'lucide-react';
-import { Glass, RedButton, GhostButton, Reveal, UDCLogo, StatNumber, SectionEyebrow } from './ui';
+import { Glass, RedButton, GhostButton, Reveal, HittersLogo, StatNumber, SectionEyebrow } from './ui';
 import { PLAYERS, TEAMS, GAMES, TRYOUTS, NEWS, TESTIMONIALS, type Player, type Team } from './data';
 import { cn } from '@/lib/utils';
 
@@ -44,7 +44,7 @@ export function Navbar({ onLaunch }: { onLaunch: () => void }) {
       )}
     >
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3.5">
-        <a href="#top" aria-label="UDC home"><UDCLogo /></a>
+        <a href="#top" aria-label="Hitters Baseball home"><HittersLogo className="h-12" /></a>
 
         <div className="hidden items-center gap-1 lg:flex">
           {NAV_LINKS.map((l) => (
@@ -742,7 +742,7 @@ export function Footer() {
       <div className="mx-auto max-w-7xl px-5 py-14">
         <div className="grid gap-10 lg:grid-cols-[1.4fr_1fr_1fr]">
           <div>
-            <UDCLogo />
+            <HittersLogo className="h-20" />
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-white/55">
               Chicagoland&apos;s premier travel baseball organization. Developing elite players and
               great people since 1992 — blue-collar grit, AI-powered intelligence.
