@@ -71,8 +71,8 @@ export function Glass({
 // ----------------------------------------------------------------------------
 export function SectionEyebrow({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-[#C8102E]/40 bg-[#C8102E]/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-[#F8FAFC]">
-      <span className="size-1.5 rounded-full bg-[#C8102E]" />
+    <span className="inline-flex items-center gap-2 rounded-full border border-[#C9CDD2]/40 bg-[#C9CDD2]/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-[#F8FAFC]">
+      <span className="size-1.5 rounded-full bg-[#C9CDD2]" />
       {children}
     </span>
   );
@@ -178,10 +178,11 @@ export function RedButton({
   return (
     <button
       className={cn(
-        'group inline-flex items-center justify-center gap-2 rounded-xl bg-[#C8102E] px-6 py-3 text-sm font-bold text-white',
-        'shadow-[0_8px_30px_-8px_rgba(200,16,46,0.7)] transition-all duration-300',
-        'hover:bg-[#E11D3A] hover:shadow-[0_10px_40px_-6px_rgba(200,16,46,0.85)] hover:-translate-y-0.5',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C8102E] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B1D36]',
+        'group inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-bold text-black',
+        'bg-[linear-gradient(180deg,#ffffff_0%,#dfe2e6_55%,#b3b8bf_100%)]',
+        'shadow-[0_8px_30px_-8px_rgba(255,255,255,0.35),inset_0_1px_0_rgba(255,255,255,0.9)] transition-all duration-300',
+        'hover:-translate-y-0.5 hover:shadow-[0_12px_44px_-8px_rgba(255,255,255,0.5),inset_0_1px_0_rgba(255,255,255,0.95)] hover:brightness-105',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A0A0A]',
         'disabled:opacity-50 disabled:pointer-events-none',
         className
       )}

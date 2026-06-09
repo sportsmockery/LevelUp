@@ -32,12 +32,12 @@ export function IntelligenceHub({ id }: { id?: string }) {
     <section id={id} className="relative py-24 sm:py-32">
       <div className="mx-auto max-w-6xl px-5">
         <div className="text-center">
-          <span className="inline-flex items-center gap-2 rounded-full border border-[#C8102E]/40 bg-[#C8102E]/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-white">
-            <Sparkles className="size-3.5 text-[#C8102E]" /> Intelligence Hub
+          <span className="inline-flex items-center gap-2 rounded-full border border-[#C9CDD2]/40 bg-[#C9CDD2]/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-white">
+            <Sparkles className="size-3.5 text-[#C9CDD2]" /> Intelligence Hub
           </span>
           <h2 className="mx-auto mt-6 max-w-3xl font-heading text-4xl font-bold leading-tight text-white sm:text-5xl">
             The most advanced youth baseball{' '}
-            <span className="text-[#C8102E]">intelligence platform</span> in the country
+            <span className="h-chrome-text">intelligence platform</span> in the country
           </h2>
           <p className="mx-auto mt-5 max-w-2xl text-base text-white/60">
             Three AI engines built into every UDC experience — evaluate prospects, generate
@@ -57,14 +57,14 @@ export function IntelligenceHub({ id }: { id?: string }) {
                 className={cn(
                   'group flex items-center gap-3 rounded-2xl border p-4 text-left transition-all duration-300',
                   active
-                    ? 'border-[#C8102E] bg-[#C8102E]/10 shadow-[0_8px_30px_-10px_rgba(200,16,46,0.6)]'
+                    ? 'border-[#C9CDD2] bg-[#C9CDD2]/10 shadow-[0_8px_30px_-10px_rgba(255,255,255,0.12)]'
                     : 'border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]'
                 )}
               >
                 <span
                   className={cn(
                     'flex size-11 shrink-0 items-center justify-center rounded-xl transition-colors',
-                    active ? 'bg-[#C8102E] text-white' : 'bg-white/10 text-white/70'
+                    active ? 'bg-white text-black' : 'bg-white/10 text-white/70'
                   )}
                 >
                   <Icon className="size-5" />
@@ -139,7 +139,7 @@ function ScoutPanel() {
       {/* Inputs */}
       <Glass className="p-6">
         <h3 className="flex items-center gap-2 font-heading text-lg font-bold text-white">
-          <Crosshair className="size-5 text-[#C8102E]" /> Build a Prospect
+          <Crosshair className="size-5 text-[#C9CDD2]" /> Build a Prospect
         </h3>
         <p className="mt-1 text-sm text-white/50">Load a preset or dial in the tools.</p>
 
@@ -148,7 +148,7 @@ function ScoutPanel() {
             <button
               key={p.label}
               onClick={() => { setInput(p.input); setReport(null); }}
-              className="rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/80 transition hover:border-[#C8102E] hover:text-white"
+              className="rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/80 transition hover:border-[#C9CDD2] hover:text-white"
             >
               {p.label}
             </button>
@@ -177,7 +177,7 @@ function ScoutPanel() {
             <div key={key}>
               <div className="mb-1.5 flex items-center justify-between text-sm">
                 <span className="font-medium text-white/80">{label}</span>
-                <span className="font-mono font-bold text-[#C8102E]">{input.tools[key]}</span>
+                <span className="font-mono font-bold text-[#C9CDD2]">{input.tools[key]}</span>
               </div>
               <input
                 type="range"
@@ -187,9 +187,9 @@ function ScoutPanel() {
                 onChange={(e) =>
                   setInput((s) => ({ ...s, tools: { ...s.tools, [key]: Number(e.target.value) } }))
                 }
-                className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-white/15 accent-[#C8102E]"
+                className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-white/15 accent-[#C9CDD2]"
                 style={{
-                  background: `linear-gradient(90deg, #C8102E ${((input.tools[key] - 40) / 59) * 100}%, rgba(255,255,255,0.15) ${((input.tools[key] - 40) / 59) * 100}%)`,
+                  background: `linear-gradient(90deg, #C9CDD2 ${((input.tools[key] - 40) / 59) * 100}%, rgba(255,255,255,0.15) ${((input.tools[key] - 40) / 59) * 100}%)`,
                 }}
               />
             </div>
@@ -209,13 +209,13 @@ function ScoutPanel() {
             <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex h-full min-h-[460px] flex-col items-center justify-center">
               <div className="relative size-16">
                 <div className="absolute inset-0 rounded-full border-2 border-white/10" />
-                <div className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-[#C8102E]" />
-                <Brain className="absolute inset-0 m-auto size-7 text-[#C8102E]" />
+                <div className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-[#C9CDD2]" />
+                <Brain className="absolute inset-0 m-auto size-7 text-[#C9CDD2]" />
               </div>
               <div className="mt-6 h-5 text-sm font-medium text-white/70">{LOAD_STEPS[loadStep]}</div>
               <div className="mt-3 flex gap-1.5">
                 {LOAD_STEPS.map((_, i) => (
-                  <div key={i} className={cn('h-1 w-8 rounded-full transition-colors', i <= loadStep ? 'bg-[#C8102E]' : 'bg-white/15')} />
+                  <div key={i} className={cn('h-1 w-8 rounded-full transition-colors', i <= loadStep ? 'bg-[#C9CDD2]' : 'bg-white/15')} />
                 ))}
               </div>
             </motion.div>
@@ -243,7 +243,7 @@ function ScoutReportCard({ report, input }: { report: ScoutReport; input: ScoutI
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-widest text-[#C8102E]">
+          <div className="text-xs font-semibold uppercase tracking-widest text-[#C9CDD2]">
             Scout AI · {input.ageGroup} {input.position}
           </div>
           <h3 className="mt-1 font-heading text-2xl font-bold text-white">Scouting Report Card</h3>
@@ -253,7 +253,7 @@ function ScoutReportCard({ report, input }: { report: ScoutReport; input: ScoutI
             <div className="font-heading text-4xl font-bold leading-none text-white">{report.overall}</div>
             <div className="text-[10px] font-semibold uppercase tracking-wider text-white/50">Overall</div>
           </div>
-          <div className="flex size-14 flex-col items-center justify-center rounded-xl bg-[#C8102E] text-white">
+          <div className="flex size-14 flex-col items-center justify-center rounded-xl bg-white text-black">
             <Trophy className="size-5" />
           </div>
         </div>
@@ -261,14 +261,14 @@ function ScoutReportCard({ report, input }: { report: ScoutReport; input: ScoutI
 
       <div className="mt-5 grid gap-5 md:grid-cols-2">
         {/* Radar */}
-        <div className="rounded-xl border border-white/10 bg-[#081325]/60 p-3">
+        <div className="rounded-xl border border-white/10 bg-[#141416]/60 p-3">
           <div className="mb-1 text-xs font-semibold text-white/60">Tool Grades vs Age Average</div>
           <ResponsiveContainer width="100%" height={230}>
             <RadarChart data={report.radar} outerRadius="72%">
               <PolarGrid stroke="rgba(255,255,255,0.12)" />
               <PolarAngleAxis dataKey="tool" tick={{ fill: 'rgba(255,255,255,0.7)', fontSize: 11 }} />
               <Radar name="League Avg" dataKey="league" stroke="rgba(255,255,255,0.35)" fill="rgba(255,255,255,0.08)" fillOpacity={0.6} />
-              <Radar name="Prospect" dataKey="value" stroke="#C8102E" fill="#C8102E" fillOpacity={0.45} />
+              <Radar name="Prospect" dataKey="value" stroke="#C9CDD2" fill="#C9CDD2" fillOpacity={0.45} />
             </RadarChart>
           </ResponsiveContainer>
         </div>
@@ -280,11 +280,11 @@ function ScoutReportCard({ report, input }: { report: ScoutReport; input: ScoutI
           <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
             <div className="mb-1.5 flex items-center justify-between text-xs">
               <span className="font-semibold text-white/70">Projection Confidence</span>
-              <span className="font-bold text-[#10B981]">{report.ceilingPct}%</span>
+              <span className="font-bold text-[#E6E8EB]">{report.ceilingPct}%</span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-white/10">
               <motion.div
-                className="h-full rounded-full bg-gradient-to-r from-[#C8102E] to-[#10B981]"
+                className="h-full rounded-full bg-gradient-to-r from-[#C9CDD2] to-[#E6E8EB]"
                 initial={{ width: 0 }}
                 animate={{ width: `${report.ceilingPct}%` }}
                 transition={{ duration: 1, delay: 0.2 }}
@@ -295,7 +295,7 @@ function ScoutReportCard({ report, input }: { report: ScoutReport; input: ScoutI
             <div className="mb-1 text-xs font-semibold text-white/70">Comparable Profiles</div>
             <div className="flex flex-wrap gap-1.5">
               {report.comps.map((c) => (
-                <span key={c} className="rounded-full bg-[#C8102E]/15 px-2.5 py-1 text-[11px] font-medium text-white/90">{c}</span>
+                <span key={c} className="rounded-full bg-[#C9CDD2]/15 px-2.5 py-1 text-[11px] font-medium text-white/90">{c}</span>
               ))}
             </div>
           </div>
@@ -304,23 +304,23 @@ function ScoutReportCard({ report, input }: { report: ScoutReport; input: ScoutI
 
       {/* Strengths & priorities */}
       <div className="mt-5 grid gap-4 md:grid-cols-2">
-        <div className="rounded-xl border border-[#10B981]/25 bg-[#10B981]/[0.06] p-4">
-          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-[#10B981]">
+        <div className="rounded-xl border border-[#E6E8EB]/25 bg-[#E6E8EB]/[0.06] p-4">
+          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-[#E6E8EB]">
             <Zap className="size-4" /> Strengths
           </div>
           <ul className="space-y-2">
             {report.strengths.map((s) => (
-              <li key={s} className="flex gap-2 text-sm text-white/75"><ChevronRight className="mt-0.5 size-4 shrink-0 text-[#10B981]" />{s}</li>
+              <li key={s} className="flex gap-2 text-sm text-white/75"><ChevronRight className="mt-0.5 size-4 shrink-0 text-[#E6E8EB]" />{s}</li>
             ))}
           </ul>
         </div>
-        <div className="rounded-xl border border-[#C8102E]/25 bg-[#C8102E]/[0.06] p-4">
-          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-[#C8102E]">
+        <div className="rounded-xl border border-[#C9CDD2]/25 bg-[#C9CDD2]/[0.06] p-4">
+          <div className="mb-2 flex items-center gap-2 text-sm font-bold text-[#C9CDD2]">
             <Target className="size-4" /> Development Priorities
           </div>
           <ul className="space-y-2">
             {report.priorities.map((s) => (
-              <li key={s} className="flex gap-2 text-sm text-white/75"><ChevronRight className="mt-0.5 size-4 shrink-0 text-[#C8102E]" />{s}</li>
+              <li key={s} className="flex gap-2 text-sm text-white/75"><ChevronRight className="mt-0.5 size-4 shrink-0 text-[#C9CDD2]" />{s}</li>
             ))}
           </ul>
         </div>
@@ -345,7 +345,7 @@ function ScoutReportCard({ report, input }: { report: ScoutReport; input: ScoutI
 function MetricRow({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
   return (
     <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-      <span className="flex size-9 items-center justify-center rounded-lg bg-[#C8102E]/15 text-[#C8102E]"><Icon className="size-4.5" /></span>
+      <span className="flex size-9 items-center justify-center rounded-lg bg-[#C9CDD2]/15 text-[#C9CDD2]"><Icon className="size-4.5" /></span>
       <div>
         <div className="text-[11px] font-semibold uppercase tracking-wider text-white/45">{label}</div>
         <div className="text-sm font-semibold text-white">{value}</div>
@@ -374,7 +374,7 @@ function TrainPanel() {
     <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
       <Glass className="p-6">
         <h3 className="flex items-center gap-2 font-heading text-lg font-bold text-white">
-          <Dumbbell className="size-5 text-[#C8102E]" /> Build a Plan
+          <Dumbbell className="size-5 text-[#C9CDD2]" /> Build a Plan
         </h3>
         <p className="mt-1 text-sm text-white/50">Generate a personalized development block.</p>
 
@@ -393,7 +393,7 @@ function TrainPanel() {
                 onClick={() => setInput((s) => ({ ...s, focus: f }))}
                 className={cn(
                   'rounded-full px-3.5 py-1.5 text-xs font-semibold transition',
-                  input.focus === f ? 'bg-[#C8102E] text-white' : 'border border-white/15 bg-white/5 text-white/70 hover:text-white'
+                  input.focus === f ? 'bg-white text-black' : 'border border-white/15 bg-white/5 text-white/70 hover:text-white'
                 )}
               >
                 {f}
@@ -405,13 +405,13 @@ function TrainPanel() {
         <div className="mt-6">
           <div className="mb-1.5 flex items-center justify-between text-sm">
             <span className="font-medium text-white/80">Program Length</span>
-            <span className="font-mono font-bold text-[#C8102E]">{input.weeks} weeks</span>
+            <span className="font-mono font-bold text-[#C9CDD2]">{input.weeks} weeks</span>
           </div>
           <input
             type="range" min={4} max={6} value={input.weeks}
             onChange={(e) => setInput((s) => ({ ...s, weeks: Number(e.target.value) }))}
-            className="h-1.5 w-full cursor-pointer appearance-none rounded-full accent-[#C8102E]"
-            style={{ background: `linear-gradient(90deg, #C8102E ${((input.weeks - 4) / 2) * 100}%, rgba(255,255,255,0.15) ${((input.weeks - 4) / 2) * 100}%)` }}
+            className="h-1.5 w-full cursor-pointer appearance-none rounded-full accent-[#C9CDD2]"
+            style={{ background: `linear-gradient(90deg, #C9CDD2 ${((input.weeks - 4) / 2) * 100}%, rgba(255,255,255,0.15) ${((input.weeks - 4) / 2) * 100}%)` }}
           />
         </div>
 
@@ -426,15 +426,15 @@ function TrainPanel() {
           {loading ? (
             <motion.div key="l" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex h-full min-h-[400px] items-center justify-center">
               <div className="relative size-14">
-                <div className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-[#C8102E] border-white/10" />
-                <Dumbbell className="absolute inset-0 m-auto size-6 text-[#C8102E]" />
+                <div className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-[#C9CDD2] border-white/10" />
+                <Dumbbell className="absolute inset-0 m-auto size-6 text-[#C9CDD2]" />
               </div>
             </motion.div>
           ) : plan ? (
             <motion.div key="p" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
               <div className="mb-4 flex items-center justify-between">
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-widest text-[#C8102E]">Train AI · {input.focus}</div>
+                  <div className="text-xs font-semibold uppercase tracking-widest text-[#C9CDD2]">Train AI · {input.focus}</div>
                   <h3 className="mt-1 font-heading text-xl font-bold text-white">{input.weeks}-Week Development Plan · {input.position}</h3>
                 </div>
               </div>
@@ -448,12 +448,12 @@ function TrainPanel() {
                     className="rounded-xl border border-white/10 bg-white/[0.03] p-4"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="flex size-7 items-center justify-center rounded-lg bg-[#C8102E] text-xs font-bold text-white">{w.week}</span>
+                      <span className="flex size-7 items-center justify-center rounded-lg bg-white text-xs font-bold text-black">{w.week}</span>
                       <span className="text-sm font-bold text-white">{w.theme}</span>
                     </div>
                     <ul className="mt-3 space-y-1.5">
                       {w.blocks.map((b) => (
-                        <li key={b} className="flex gap-2 text-[13px] text-white/65"><span className="mt-1.5 size-1 shrink-0 rounded-full bg-[#C8102E]" />{b}</li>
+                        <li key={b} className="flex gap-2 text-[13px] text-white/65"><span className="mt-1.5 size-1 shrink-0 rounded-full bg-[#C9CDD2]" />{b}</li>
                       ))}
                     </ul>
                   </motion.div>
@@ -491,7 +491,7 @@ function PredictPanel() {
     <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
       <Glass className="p-6">
         <h3 className="flex items-center gap-2 font-heading text-lg font-bold text-white">
-          <Activity className="size-5 text-[#C8102E]" /> Forecast a Matchup
+          <Activity className="size-5 text-[#C9CDD2]" /> Forecast a Matchup
         </h3>
         <p className="mt-1 text-sm text-white/50">Project the outcome of an upcoming game.</p>
 
@@ -515,19 +515,19 @@ function PredictPanel() {
           {loading ? (
             <motion.div key="l" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex h-full min-h-[400px] items-center justify-center">
               <div className="relative size-14">
-                <div className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-[#C8102E] border-white/10" />
-                <Activity className="absolute inset-0 m-auto size-6 text-[#C8102E]" />
+                <div className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-[#C9CDD2] border-white/10" />
+                <Activity className="absolute inset-0 m-auto size-6 text-[#C9CDD2]" />
               </div>
             </motion.div>
           ) : result ? (
             <motion.div key="r" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-              <div className="text-xs font-semibold uppercase tracking-widest text-[#C8102E]">Predict AI · Game Forecast</div>
+              <div className="text-xs font-semibold uppercase tracking-widest text-[#C9CDD2]">Predict AI · Game Forecast</div>
               <h3 className="mt-1 font-heading text-xl font-bold text-white">
                 {TEAMS.find((t) => t.id === teamId)?.name} vs {opp}
               </h3>
 
               <div className="mt-6 grid gap-4 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
-                <WinDial label="UDC Win Prob." pct={result.winPct} accent="#C8102E" />
+                <WinDial label="UDC Win Prob." pct={result.winPct} accent="#C9CDD2" />
                 <div className="text-center">
                   <div className="font-heading text-3xl font-bold text-white">{result.projScore.us}–{result.projScore.them}</div>
                   <div className="text-[11px] uppercase tracking-wider text-white/45">Proj. Score</div>
@@ -540,15 +540,15 @@ function PredictPanel() {
                 <div className="mb-2 text-sm font-bold text-white">Key Factors</div>
                 <ul className="space-y-2">
                   {result.keyFactors.map((f) => (
-                    <li key={f} className="flex gap-2 text-sm text-white/70"><ChevronRight className="mt-0.5 size-4 shrink-0 text-[#C8102E]" />{f}</li>
+                    <li key={f} className="flex gap-2 text-sm text-white/70"><ChevronRight className="mt-0.5 size-4 shrink-0 text-[#C9CDD2]" />{f}</li>
                   ))}
                 </ul>
               </div>
 
-              <div className="mt-4 flex items-start gap-3 rounded-xl border border-[#C8102E]/25 bg-[#C8102E]/[0.06] p-4">
-                <Zap className="mt-0.5 size-5 shrink-0 text-[#C8102E]" />
+              <div className="mt-4 flex items-start gap-3 rounded-xl border border-[#C9CDD2]/25 bg-[#C9CDD2]/[0.06] p-4">
+                <Zap className="mt-0.5 size-5 shrink-0 text-[#C9CDD2]" />
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-wider text-[#C8102E]">X-Factor</div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-[#C9CDD2]">X-Factor</div>
                   <div className="text-sm text-white/80">{result.xFactor}</div>
                 </div>
               </div>
@@ -613,10 +613,10 @@ function Select({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full appearance-none rounded-xl border border-white/15 bg-[#081325] px-3.5 py-2.5 text-sm font-medium text-white outline-none transition focus:border-[#C8102E]"
+        className="w-full appearance-none rounded-xl border border-white/15 bg-[#141416] px-3.5 py-2.5 text-sm font-medium text-white outline-none transition focus:border-[#C9CDD2]"
       >
         {options.map((o) => (
-          <option key={o} value={o} className="bg-[#081325] text-white">{labels?.[o] ?? o}</option>
+          <option key={o} value={o} className="bg-[#141416] text-white">{labels?.[o] ?? o}</option>
         ))}
       </select>
       <ChevronRight className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 rotate-90 text-white/40" />
