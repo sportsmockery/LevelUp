@@ -12,8 +12,24 @@ const FRAME_COUNT = 16;
 const TARGET_W = 768;
 const FFMPEG_TIMEOUT_MS = 120_000;
 const MAX_HTML_BYTES = 2 * 1024 * 1024;
+const BROWSER_UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 const ffmpegPath = (ffmpegStatic as unknown as string) || 'ffmpeg';
+
+type Auth = { cookie: string; referer: string };
+
+// HTTP options ffmpeg should apply to every request for an input (manifest +
+// every HLS segment). Passing the browser session cookie + referer lets it
+// read a private, login-gated stream the user is authorized to view.
+function ffmpegInputPrefix(auth: Auth): string[] {
+  const headerLines: string[] = [];
+  if (auth.cookie) headerLines.push(`Cookie: ${auth.cookie}`);
+  if (auth.referer) headerLines.push(`Referer: ${auth.referer}`);
+  const prefix = ['-user_agent', BROWSER_UA];
+  if (headerLines.length > 0) prefix.push('-headers', headerLines.join('\r\n') + '\r\n');
+  return prefix;
+}
 
 type RunResult = { code: number | null; stdout: Buffer; stderr: string };
 
@@ -66,11 +82,15 @@ function isHttpUrl(value: string): boolean {
 // Best-effort: if the URL serves an HTML page, look for a directly-playable
 // media URL (.m3u8 / .mp4) embedded in it. This will NOT defeat sites that
 // gate their streams behind authentication (e.g. Hudl player pages).
-async function resolveMediaUrl(url: string): Promise<{ mediaUrl: string; note?: string }> {
+async function resolveMediaUrl(url: string, auth: Auth): Promise<{ mediaUrl: string; note?: string }> {
+  const fetchHeaders: Record<string, string> = { 'User-Agent': BROWSER_UA, Accept: '*/*' };
+  if (auth.cookie) fetchHeaders.Cookie = auth.cookie;
+  if (auth.referer) fetchHeaders.Referer = auth.referer;
+
   let res: Response;
   try {
     res = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 OLIQ/1.0', Accept: '*/*' },
+      headers: fetchHeaders,
       redirect: 'follow',
     });
   } catch {
@@ -103,7 +123,7 @@ async function resolveMediaUrl(url: string): Promise<{ mediaUrl: string; note?: 
 }
 
 export async function POST(request: NextRequest) {
-  let body: { url?: string };
+  let body: { url?: string; cookie?: string; referer?: string };
   try {
     body = await request.json();
   } catch {
@@ -115,9 +135,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Provide a valid http(s) video URL.' }, { status: 400 });
   }
 
+  // Optional auth for private/login-gated streams. The cookie is used only for
+  // this request and never stored or logged.
+  let referer = typeof body.referer === 'string' ? body.referer.trim() : '';
+  if (!referer) {
+    try {
+      const u = new URL(url);
+      referer = `${u.protocol}//${u.host}/`;
+    } catch {
+      referer = '';
+    }
+  }
+  const auth: Auth = {
+    cookie: typeof body.cookie === 'string' ? body.cookie.trim() : '',
+    referer,
+  };
+
   let mediaUrl = url;
   try {
-    const resolved = await resolveMediaUrl(url);
+    const resolved = await resolveMediaUrl(url, auth);
     mediaUrl = resolved.mediaUrl;
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Could not resolve the link.';
@@ -127,7 +163,7 @@ export async function POST(request: NextRequest) {
   // Probe duration (ffmpeg prints it to stderr; exits non-zero with no output).
   let duration: number | null = null;
   try {
-    const probe = await runFfmpeg(['-hide_banner', '-i', mediaUrl]);
+    const probe = await runFfmpeg(['-hide_banner', ...ffmpegInputPrefix(auth), '-i', mediaUrl]);
     duration = parseDuration(probe.stderr);
     if (duration == null && /Server returned 4\d\d|403|401|Invalid data|No such|not found/i.test(probe.stderr)) {
       return NextResponse.json(
@@ -154,6 +190,7 @@ export async function POST(request: NextRequest) {
       '-hide_banner',
       '-loglevel',
       'error',
+      ...ffmpegInputPrefix(auth),
       '-i',
       mediaUrl,
       '-vf',
