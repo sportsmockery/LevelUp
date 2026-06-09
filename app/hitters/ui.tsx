@@ -79,9 +79,28 @@ export function SectionEyebrow({ children }: { children: React.ReactNode }) {
 }
 
 // ----------------------------------------------------------------------------
-// Hitters Baseball logo — black & white recreation, gradients preserved
+// Hitters Baseball logo
+// Uses the real raster at /hitters-logo.png when present; falls back to a
+// black & white SVG recreation (gradients preserved) if the file is missing.
+// To use the official artwork, add it at: public/hitters-logo.png
 // ----------------------------------------------------------------------------
 export function HittersLogo({ className }: { className?: string }) {
+  const [useRaster, setUseRaster] = React.useState(true);
+  if (useRaster) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src="/hitters-logo.png"
+        alt="Hitters Baseball — Feel the Power"
+        className={cn('w-auto object-contain', className)}
+        onError={() => setUseRaster(false)}
+      />
+    );
+  }
+  return <HittersMark className={className} />;
+}
+
+function HittersMark({ className }: { className?: string }) {
   return (
     <svg
       viewBox="0 0 300 200"
