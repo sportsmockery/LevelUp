@@ -5,6 +5,63 @@ import { cn } from '@/lib/utils';
 import * as React from 'react';
 
 // ----------------------------------------------------------------------------
+// Photo — renders an <img> from /public; on load error shows `fallback`.
+// Lets real team photos drop into public/ paths with graceful degradation.
+// ----------------------------------------------------------------------------
+export function Photo({
+  src,
+  alt,
+  className,
+  fallback = null,
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+  fallback?: React.ReactNode;
+}) {
+  const [err, setErr] = React.useState(false);
+  if (err) return <>{fallback}</>;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={alt}
+      loading="lazy"
+      className={className}
+      onError={() => setErr(true)}
+    />
+  );
+}
+
+// Player headshot/action photo with monochrome jersey-number fallback.
+export function PlayerAvatar({
+  id,
+  name,
+  number,
+  className,
+  textClassName,
+}: {
+  id: string;
+  name: string;
+  number?: number;
+  className?: string;
+  textClassName?: string;
+}) {
+  const label = number != null ? number : name.split(' ').map((n) => n[0]).join('');
+  const mono = (
+    <div className="flex size-full items-center justify-center bg-gradient-to-br from-[#34343a] to-[#0c0c0e] font-heading font-bold text-white">
+      <span className={cn('italic', textClassName)}>{label}</span>
+    </div>
+  );
+  return (
+    <div className={cn('relative overflow-hidden ring-1 ring-white/15', className)}>
+      <div className="absolute inset-0">{mono}</div>
+      <Photo src={`/players/${id}.jpg`} alt={name} className="relative size-full object-cover object-top" fallback={null} />
+    </div>
+  );
+}
+
+// ----------------------------------------------------------------------------
 // Motion helpers
 // ----------------------------------------------------------------------------
 export const fadeUp: Variants = {

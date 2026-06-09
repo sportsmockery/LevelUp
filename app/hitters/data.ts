@@ -30,6 +30,7 @@ export type ToolGrades = {
 export type Player = {
   id: string;
   name: string;
+  number: number;
   position: Position;
   age: number;
   gradYear: number;
@@ -56,7 +57,7 @@ export type Team = {
   coach: string;
   aiGrade: number;
   highlight: string;
-  roster: { name: string; pos: Position; grad: number; note: string }[];
+  roster: { name: string; number?: number; pos: Position; grad: number; note: string }[];
   spotlight?: boolean;
 };
 
@@ -74,70 +75,113 @@ export type Game = {
 // ----------------------------------------------------------------------------
 // Players
 // ----------------------------------------------------------------------------
+// Hitters Black 2035 — real roster (names + jersey numbers).
+// NOTE: positions and all metrics below are illustrative sample/demo data,
+// dialed to age-appropriate ranges for a Class of 2035 (≈10U) team.
 export const PLAYERS: Player[] = [
   {
-    id: 'p1', name: 'Marcus Delgado', position: 'SS', age: 14, gradYear: 2029,
-    team: '14U Upper Deck Cougars', bats: 'R', throws: 'R', height: "5'9\"",
-    avg: 0.412, obp: 0.489, ops: 1.121, exitVeloMax: 88, sixtyYard: 7.21,
-    tools: { hit: 78, power: 70, speed: 82, arm: 80, field: 84, iq: 86 },
-    aiGrade: 91, insight: 'Elite barrel control trending up — swing efficiency +18% since March.',
-    trend: [{ m: 'Jan', ev: 79 }, { m: 'Feb', ev: 81 }, { m: 'Mar', ev: 83 }, { m: 'Apr', ev: 86 }, { m: 'May', ev: 88 }],
+    id: 'p1', name: 'Cade Burhans', number: 21, position: 'SS', age: 10, gradYear: 2035,
+    team: 'Hitters Black 2035', bats: 'R', throws: 'R', height: "4'11\"",
+    avg: 0.486, obp: 0.572, ops: 1.318, exitVeloMax: 62, sixtyYard: 8.74,
+    tools: { hit: 84, power: 72, speed: 82, arm: 80, field: 86, iq: 88 },
+    aiGrade: 93, insight: 'Team leader with elite barrel control for his age — swing path tightening every month.',
+    trend: [{ m: 'Jan', ev: 54 }, { m: 'Feb', ev: 56 }, { m: 'Mar', ev: 58 }, { m: 'Apr', ev: 60 }, { m: 'May', ev: 62 }],
   },
   {
-    id: 'p2', name: 'Tyler Brennan', position: '1B', age: 15, gradYear: 2028,
-    team: '16U Hitters Black', bats: 'L', throws: 'L', height: "6'1\"",
-    avg: 0.367, obp: 0.451, ops: 1.205, exitVeloMax: 96, sixtyYard: 7.68,
-    tools: { hit: 74, power: 90, speed: 60, arm: 72, field: 76, iq: 80 },
-    aiGrade: 89, insight: 'Top-end raw power — 96 mph max EV ranks in 95th percentile for age.',
-    trend: [{ m: 'Jan', ev: 89 }, { m: 'Feb', ev: 90 }, { m: 'Mar', ev: 92 }, { m: 'Apr', ev: 94 }, { m: 'May', ev: 96 }],
+    id: 'p2', name: 'Anakin Aguilera', number: 10, position: 'CF', age: 10, gradYear: 2035,
+    team: 'Hitters Black 2035', bats: 'R', throws: 'R', height: "4'9\"",
+    avg: 0.441, obp: 0.531, ops: 1.142, exitVeloMax: 55, sixtyYard: 8.52,
+    tools: { hit: 80, power: 60, speed: 90, arm: 74, field: 86, iq: 82 },
+    aiGrade: 88, insight: 'Sparkplug runner — fastest on the team with plus range in center.',
+    trend: [{ m: 'Jan', ev: 48 }, { m: 'Feb', ev: 50 }, { m: 'Mar', ev: 51 }, { m: 'Apr', ev: 53 }, { m: 'May', ev: 55 }],
   },
   {
-    id: 'p3', name: 'Jaylen Carter', position: 'CF', age: 14, gradYear: 2029,
-    team: '14U Upper Deck Cougars', bats: 'S', throws: 'R', height: "5'8\"",
-    avg: 0.388, obp: 0.470, ops: 1.044, exitVeloMax: 84, sixtyYard: 6.91,
-    tools: { hit: 80, power: 64, speed: 92, arm: 76, field: 88, iq: 82 },
-    aiGrade: 88, insight: '6.91 sixty is plus-plus speed — elite range and first-step quickness.',
-    trend: [{ m: 'Jan', ev: 78 }, { m: 'Feb', ev: 80 }, { m: 'Mar', ev: 81 }, { m: 'Apr', ev: 83 }, { m: 'May', ev: 84 }],
+    id: 'p3', name: 'Brody Roach', number: 13, position: '3B', age: 10, gradYear: 2035,
+    team: 'Hitters Black 2035', bats: 'R', throws: 'R', height: "4'10\"",
+    avg: 0.419, obp: 0.498, ops: 1.087, exitVeloMax: 60, sixtyYard: 9.05,
+    tools: { hit: 78, power: 76, speed: 64, arm: 84, field: 80, iq: 80 },
+    aiGrade: 86, insight: 'Strong hands at the hot corner — drives the ball hard to the pull side.',
+    trend: [{ m: 'Jan', ev: 52 }, { m: 'Feb', ev: 54 }, { m: 'Mar', ev: 56 }, { m: 'Apr', ev: 58 }, { m: 'May', ev: 60 }],
   },
   {
-    id: 'p4', name: 'Owen Petrakis', position: 'P', age: 16, gradYear: 2027,
-    team: '17U Hitters Black', bats: 'R', throws: 'R', height: "6'3\"",
-    avg: 0.301, obp: 0.388, ops: 0.842, exitVeloMax: 91, sixtyYard: 7.45,
-    tools: { hit: 66, power: 78, speed: 66, arm: 94, field: 78, iq: 85 },
-    aiGrade: 90, insight: 'Projectable RHP — fastball touched 87, plus spin profile on the slider.',
-    trend: [{ m: 'Jan', ev: 85 }, { m: 'Feb', ev: 87 }, { m: 'Mar', ev: 88 }, { m: 'Apr', ev: 90 }, { m: 'May', ev: 91 }],
+    id: 'p4', name: 'Camden Phillips', number: 7, position: 'P', age: 10, gradYear: 2035,
+    team: 'Hitters Black 2035', bats: 'R', throws: 'R', height: "4'10\"",
+    avg: 0.372, obp: 0.471, ops: 0.951, exitVeloMax: 56, sixtyYard: 9.12,
+    tools: { hit: 70, power: 66, speed: 68, arm: 88, field: 80, iq: 86 },
+    aiGrade: 87, insight: 'Strike-thrower with a quick arm — competes in the zone and fields his position well.',
+    trend: [{ m: 'Jan', ev: 49 }, { m: 'Feb', ev: 51 }, { m: 'Mar', ev: 52 }, { m: 'Apr', ev: 54 }, { m: 'May', ev: 56 }],
   },
   {
-    id: 'p5', name: 'Diego Ramirez', position: 'C', age: 15, gradYear: 2028,
-    team: '16U Hitters Black', bats: 'R', throws: 'R', height: "5'11\"",
-    avg: 0.344, obp: 0.428, ops: 0.961, exitVeloMax: 90, sixtyYard: 7.55,
-    tools: { hit: 76, power: 80, speed: 62, arm: 88, field: 86, iq: 90 },
-    aiGrade: 90, insight: 'Premium game-caller — 1.92 pop time and elite framing metrics behind the dish.',
-    trend: [{ m: 'Jan', ev: 84 }, { m: 'Feb', ev: 86 }, { m: 'Mar', ev: 87 }, { m: 'Apr', ev: 89 }, { m: 'May', ev: 90 }],
+    id: 'p5', name: 'Camden Wittmayer', number: 4, position: '2B', age: 10, gradYear: 2035,
+    team: 'Hitters Black 2035', bats: 'L', throws: 'R', height: "4'8\"",
+    avg: 0.408, obp: 0.515, ops: 1.064, exitVeloMax: 52, sixtyYard: 8.66,
+    tools: { hit: 82, power: 56, speed: 84, arm: 70, field: 84, iq: 86 },
+    aiGrade: 85, insight: 'Steady glove up the middle with a patient, contact-first approach.',
+    trend: [{ m: 'Jan', ev: 45 }, { m: 'Feb', ev: 47 }, { m: 'Mar', ev: 48 }, { m: 'Apr', ev: 50 }, { m: 'May', ev: 52 }],
   },
   {
-    id: 'p6', name: 'Cole Whitaker', position: '3B', age: 14, gradYear: 2029,
-    team: '14U Upper Deck Cougars', bats: 'R', throws: 'R', height: "5'10\"",
-    avg: 0.356, obp: 0.441, ops: 1.012, exitVeloMax: 87, sixtyYard: 7.38,
-    tools: { hit: 78, power: 76, speed: 70, arm: 84, field: 80, iq: 84 },
-    aiGrade: 86, insight: 'Advanced approach — chase rate down 22%, hard-hit rate climbing fast.',
-    trend: [{ m: 'Jan', ev: 81 }, { m: 'Feb', ev: 82 }, { m: 'Mar', ev: 84 }, { m: 'Apr', ev: 85 }, { m: 'May', ev: 87 }],
+    id: 'p6', name: 'Cameron Sevedge', number: 3, position: 'C', age: 10, gradYear: 2035,
+    team: 'Hitters Black 2035', bats: 'R', throws: 'R', height: "4'9\"",
+    avg: 0.366, obp: 0.462, ops: 0.944, exitVeloMax: 57, sixtyYard: 9.34,
+    tools: { hit: 74, power: 72, speed: 58, arm: 86, field: 84, iq: 88 },
+    aiGrade: 86, insight: 'Tough backstop and vocal leader — blocks well and controls the run game.',
+    trend: [{ m: 'Jan', ev: 50 }, { m: 'Feb', ev: 52 }, { m: 'Mar', ev: 53 }, { m: 'Apr', ev: 55 }, { m: 'May', ev: 57 }],
   },
   {
-    id: 'p7', name: 'Sam Okafor', position: '2B', age: 13, gradYear: 2030,
-    team: '12U Cougars', bats: 'R', throws: 'R', height: "5'6\"",
-    avg: 0.398, obp: 0.479, ops: 1.066, exitVeloMax: 78, sixtyYard: 7.62,
-    tools: { hit: 82, power: 58, speed: 78, arm: 70, field: 84, iq: 88 },
-    aiGrade: 84, insight: 'High-feel infielder — elite hand-eye and one of the best pure hitters in 12U.',
-    trend: [{ m: 'Jan', ev: 72 }, { m: 'Feb', ev: 74 }, { m: 'Mar', ev: 75 }, { m: 'Apr', ev: 77 }, { m: 'May', ev: 78 }],
+    id: 'p7', name: 'Dominik Wilk', number: 23, position: '1B', age: 10, gradYear: 2035,
+    team: 'Hitters Black 2035', bats: 'L', throws: 'L', height: "5'0\"",
+    avg: 0.398, obp: 0.486, ops: 1.121, exitVeloMax: 64, sixtyYard: 9.48,
+    tools: { hit: 76, power: 82, speed: 54, arm: 74, field: 78, iq: 80 },
+    aiGrade: 87, insight: 'Biggest raw power on the roster — when he squares it up, it travels.',
+    trend: [{ m: 'Jan', ev: 56 }, { m: 'Feb', ev: 58 }, { m: 'Mar', ev: 60 }, { m: 'Apr', ev: 62 }, { m: 'May', ev: 64 }],
   },
   {
-    id: 'p8', name: 'Nico Vance', position: 'RF', age: 16, gradYear: 2027,
-    team: '17U Hitters Black', bats: 'L', throws: 'L', height: "6'0\"",
-    avg: 0.329, obp: 0.412, ops: 0.998, exitVeloMax: 93, sixtyYard: 7.02,
-    tools: { hit: 76, power: 84, speed: 84, arm: 86, field: 82, iq: 80 },
-    aiGrade: 88, insight: 'Loud five-tool profile — rare power/speed blend with a plus throwing arm.',
-    trend: [{ m: 'Jan', ev: 87 }, { m: 'Feb', ev: 88 }, { m: 'Mar', ev: 90 }, { m: 'Apr', ev: 92 }, { m: 'May', ev: 93 }],
+    id: 'p8', name: 'Izaac Combs', number: 16, position: 'RF', age: 10, gradYear: 2035,
+    team: 'Hitters Black 2035', bats: 'R', throws: 'R', height: "4'9\"",
+    avg: 0.381, obp: 0.479, ops: 1.003, exitVeloMax: 54, sixtyYard: 8.89,
+    tools: { hit: 78, power: 64, speed: 80, arm: 82, field: 80, iq: 80 },
+    aiGrade: 84, insight: 'Athletic outfielder with a strong, accurate arm from right.',
+    trend: [{ m: 'Jan', ev: 47 }, { m: 'Feb', ev: 49 }, { m: 'Mar', ev: 50 }, { m: 'Apr', ev: 52 }, { m: 'May', ev: 54 }],
+  },
+  {
+    id: 'p9', name: 'Jay S.', number: 28, position: 'LF', age: 10, gradYear: 2035,
+    team: 'Hitters Black 2035', bats: 'R', throws: 'R', height: "4'8\"",
+    avg: 0.355, obp: 0.458, ops: 0.912, exitVeloMax: 51, sixtyYard: 9.02,
+    tools: { hit: 74, power: 58, speed: 78, arm: 72, field: 78, iq: 82 },
+    aiGrade: 82, insight: 'Energy guy who runs every ball out and takes great at-bats.',
+    trend: [{ m: 'Jan', ev: 44 }, { m: 'Feb', ev: 46 }, { m: 'Mar', ev: 47 }, { m: 'Apr', ev: 49 }, { m: 'May', ev: 51 }],
+  },
+  {
+    id: 'p10', name: 'Logan Lovell', number: 8, position: 'SS', age: 10, gradYear: 2035,
+    team: 'Hitters Black 2035', bats: 'R', throws: 'R', height: "4'10\"",
+    avg: 0.403, obp: 0.492, ops: 1.058, exitVeloMax: 56, sixtyYard: 8.71,
+    tools: { hit: 80, power: 64, speed: 82, arm: 82, field: 86, iq: 84 },
+    aiGrade: 87, insight: 'Smooth infield actions and clean transfers — projectable up-the-middle defender.',
+    trend: [{ m: 'Jan', ev: 49 }, { m: 'Feb', ev: 51 }, { m: 'Mar', ev: 52 }, { m: 'Apr', ev: 54 }, { m: 'May', ev: 56 }],
+  },
+  {
+    id: 'p11', name: 'Logan Miller', number: 18, position: 'P', age: 10, gradYear: 2035,
+    team: 'Hitters Black 2035', bats: 'R', throws: 'R', height: "4'11\"",
+    avg: 0.347, obp: 0.444, ops: 0.901, exitVeloMax: 55, sixtyYard: 9.21,
+    tools: { hit: 70, power: 66, speed: 66, arm: 86, field: 80, iq: 84 },
+    aiGrade: 85, insight: 'Competitive on the mound with repeatable mechanics and a developing breaking ball.',
+    trend: [{ m: 'Jan', ev: 48 }, { m: 'Feb', ev: 50 }, { m: 'Mar', ev: 51 }, { m: 'Apr', ev: 53 }, { m: 'May', ev: 55 }],
+  },
+  {
+    id: 'p12', name: 'Lucas Strzykalski', number: 14, position: 'CF', age: 10, gradYear: 2035,
+    team: 'Hitters Black 2035', bats: 'L', throws: 'R', height: "4'9\"",
+    avg: 0.412, obp: 0.508, ops: 1.079, exitVeloMax: 53, sixtyYard: 8.58,
+    tools: { hit: 82, power: 58, speed: 88, arm: 74, field: 84, iq: 84 },
+    aiGrade: 86, insight: 'Left-handed table-setter — covers ground and gets on base at a high clip.',
+    trend: [{ m: 'Jan', ev: 46 }, { m: 'Feb', ev: 48 }, { m: 'Mar', ev: 49 }, { m: 'Apr', ev: 51 }, { m: 'May', ev: 53 }],
+  },
+  {
+    id: 'p13', name: 'Luke Porter', number: 12, position: '3B', age: 10, gradYear: 2035,
+    team: 'Hitters Black 2035', bats: 'R', throws: 'R', height: "4'10\"",
+    avg: 0.389, obp: 0.481, ops: 1.022, exitVeloMax: 58, sixtyYard: 9.06,
+    tools: { hit: 78, power: 74, speed: 66, arm: 84, field: 82, iq: 82 },
+    aiGrade: 85, insight: 'Reliable defender with pop in the bat — drives in runs in the middle of the order.',
+    trend: [{ m: 'Jan', ev: 51 }, { m: 'Feb', ev: 53 }, { m: 'Mar', ev: 54 }, { m: 'Apr', ev: 56 }, { m: 'May', ev: 58 }],
   },
 ];
 
@@ -173,15 +217,23 @@ export const TEAMS: Team[] = [
     ],
   },
   {
-    id: 't4', name: '14U Upper Deck Cougars', age: '14U', record: '41-5', coach: 'Coach Delgado',
-    aiGrade: 92, highlight: 'PG WWBA Midwest — Champions',
+    id: 't4', name: 'Hitters Black 2035', age: '10U', record: '38-6', coach: 'UDC Staff',
+    aiGrade: 91, highlight: 'Flagship Class of 2035 travel team',
     spotlight: true,
     roster: [
-      { name: 'Marcus Delgado', pos: 'SS', grad: 2029, note: 'Flagship prospect — 91 AI grade' },
-      { name: 'Jaylen Carter', pos: 'CF', grad: 2029, note: 'Plus-plus speed' },
-      { name: 'Cole Whitaker', pos: '3B', grad: 2029, note: 'Advanced approach' },
-      { name: 'Ryan Halverson', pos: 'P', grad: 2029, note: 'Projectable arm' },
-      { name: 'Drew Castellano', pos: 'C', grad: 2029, note: 'Elite blocker' },
+      { name: 'Cade Burhans', number: 21, pos: 'SS', grad: 2035, note: 'Team leader — 93 AI development grade' },
+      { name: 'Anakin Aguilera', number: 10, pos: 'CF', grad: 2035, note: 'Fastest on the team' },
+      { name: 'Brody Roach', number: 13, pos: '3B', grad: 2035, note: 'Strong hands at the hot corner' },
+      { name: 'Camden Phillips', number: 7, pos: 'P', grad: 2035, note: 'Strike-thrower, quick arm' },
+      { name: 'Camden Wittmayer', number: 4, pos: '2B', grad: 2035, note: 'Steady glove up the middle' },
+      { name: 'Cameron Sevedge', number: 3, pos: 'C', grad: 2035, note: 'Vocal leader behind the dish' },
+      { name: 'Dominik Wilk', number: 23, pos: '1B', grad: 2035, note: 'Biggest raw power on the roster' },
+      { name: 'Izaac Combs', number: 16, pos: 'RF', grad: 2035, note: 'Strong, accurate arm' },
+      { name: 'Jay S.', number: 28, pos: 'LF', grad: 2035, note: 'Energy guy, great at-bats' },
+      { name: 'Logan Lovell', number: 8, pos: 'SS', grad: 2035, note: 'Smooth infield actions' },
+      { name: 'Logan Miller', number: 18, pos: 'P', grad: 2035, note: 'Repeatable mechanics' },
+      { name: 'Lucas Strzykalski', number: 14, pos: 'CF', grad: 2035, note: 'Left-handed table-setter' },
+      { name: 'Luke Porter', number: 12, pos: '3B', grad: 2035, note: 'Pop in the bat, RBI threat' },
     ],
   },
   {
@@ -232,7 +284,7 @@ export const TRYOUTS = [
 // News
 // ----------------------------------------------------------------------------
 export const NEWS = [
-  { tag: 'Championship', title: '14U Upper Deck Cougars Capture PG WWBA Midwest Crown', date: 'Jun 2, 2026', body: 'A complete-team effort powered the 14U Cougars to a 7-3 title-game win over the Indiana Bulls behind Marcus Delgado\'s 3-hit night.' },
+  { tag: 'Champions', title: 'Hitters Black 2035 Win Summer Kickoff Behind Team-Wide Effort', date: 'Jun 2, 2026', body: 'The Class of 2035 squad strung together quality at-bats top to bottom — with Cade Burhans setting the table — to bring home another hardware weekend.' },
   { tag: 'Recruiting', title: '6 Hitters Black Players Earn College Commitments', date: 'May 24, 2026', body: 'The 2027 and 2028 classes continue to deliver, with six athletes announcing their commitments this spring across D1 and D2 programs.' },
   { tag: 'Technology', title: 'Scout AI Player Reports Now Live for All Families', date: 'May 18, 2026', body: 'Every UDC athlete now receives an AI-generated development report each month — tracking exit velocity, swing efficiency, and a personalized growth plan.' },
   { tag: 'Community', title: 'Annual Cougars Grind Clinic Raises $12K for Youth Baseball', date: 'May 10, 2026', body: 'Coaches and alumni hosted 200+ local kids for a free skills day, keeping the blue-collar give-back tradition alive since 1992.' },
