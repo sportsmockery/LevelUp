@@ -14,7 +14,7 @@ export default function HittersPage() {
   }, []);
 
   return (
-    <main className="hitters-root relative min-h-screen overflow-x-hidden bg-[#0B1D36] text-[#F8FAFC] antialiased">
+    <main className="hitters-root relative min-h-screen overflow-x-hidden bg-[#0A0A0A] text-[#F8FAFC] antialiased">
       <Navbar onLaunch={launchScout} />
       <Hero onLaunch={launchScout} />
       <About />
@@ -32,9 +32,18 @@ export default function HittersPage() {
       <style jsx global>{`
         .hitters-root {
           background:
-            radial-gradient(1200px 600px at 80% -10%, rgba(200, 16, 46, 0.12), transparent 60%),
-            radial-gradient(1000px 500px at 0% 30%, rgba(29, 78, 216, 0.1), transparent 55%),
-            #0b1d36;
+            radial-gradient(1100px 560px at 78% -12%, rgba(255, 255, 255, 0.07), transparent 60%),
+            radial-gradient(900px 500px at 8% 28%, rgba(150, 156, 165, 0.06), transparent 55%),
+            radial-gradient(1200px 800px at 50% 120%, rgba(255, 255, 255, 0.04), transparent 60%),
+            #0a0a0a;
+        }
+        /* brushed-chrome text for headline accents */
+        .h-chrome-text {
+          background: linear-gradient(180deg, #ffffff 0%, #d7dade 48%, #9aa0a8 100%);
+          -webkit-background-clip: text;
+          background-clip: text;
+          -webkit-text-fill-color: transparent;
+          color: transparent;
         }
         .hitters-grid {
           background-image:
@@ -48,7 +57,7 @@ export default function HittersPage() {
           height: 6px;
         }
         .hitters-scroll::-webkit-scrollbar-thumb {
-          background: rgba(200, 16, 46, 0.5);
+          background: rgba(255,255,255,0.4);
           border-radius: 3px;
         }
         .hitters-root input[type='range']::-webkit-slider-thumb {
@@ -58,7 +67,7 @@ export default function HittersPage() {
           width: 16px;
           border-radius: 9999px;
           background: #f8fafc;
-          border: 3px solid #c8102e;
+          border: 3px solid #c9cdd2;
           cursor: pointer;
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
         }
@@ -67,7 +76,7 @@ export default function HittersPage() {
           width: 16px;
           border-radius: 9999px;
           background: #f8fafc;
-          border: 3px solid #c8102e;
+          border: 3px solid #c9cdd2;
           cursor: pointer;
         }
       `}</style>

@@ -3,13 +3,14 @@
 // All "AI" runs client-side with deterministic, realistic mock logic.
 // ============================================================================
 
+// Hitters / UDC brand: premium monochrome — matte black, brushed silver, white
 export const BRAND = {
-  navy: '#0B1D36',
-  navyDeep: '#081325',
-  red: '#C8102E',
-  redBright: '#E11D3A',
+  black: '#0A0A0A',
+  charcoal: '#141416',
+  silver: '#C9CDD2',
+  silverBright: '#E6E8EB',
   light: '#F8FAFC',
-  emerald: '#10B981',
+  steel: '#9AA0A8',
 } as const;
 
 // ----------------------------------------------------------------------------

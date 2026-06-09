@@ -40,7 +40,7 @@ export function Navbar({ onLaunch }: { onLaunch: () => void }) {
     <header
       className={cn(
         'fixed inset-x-0 top-0 z-50 transition-all duration-300',
-        scrolled ? 'border-b border-white/10 bg-[#0B1D36]/80 backdrop-blur-2xl' : 'bg-transparent'
+        scrolled ? 'border-b border-white/10 bg-[#0A0A0A]/80 backdrop-blur-2xl' : 'bg-transparent'
       )}
     >
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3.5">
@@ -78,7 +78,7 @@ export function Navbar({ onLaunch }: { onLaunch: () => void }) {
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden border-t border-white/10 bg-[#0B1D36]/95 backdrop-blur-2xl lg:hidden"
+            className="overflow-hidden border-t border-white/10 bg-[#0A0A0A]/95 backdrop-blur-2xl lg:hidden"
           >
             <div className="flex flex-col gap-1 px-5 py-4">
               {NAV_LINKS.map((l) => (
@@ -110,21 +110,21 @@ export function Hero({ onLaunch }: { onLaunch: () => void }) {
     <section id="top" className="relative flex min-h-screen items-center overflow-hidden pt-20">
       {/* Background gradient + glows */}
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-40 top-20 size-[520px] rounded-full bg-[#C8102E]/20 blur-[140px]" />
-        <div className="absolute -right-40 bottom-0 size-[520px] rounded-full bg-[#1d4ed8]/15 blur-[140px]" />
+        <div className="absolute -left-40 top-20 size-[520px] rounded-full bg-[#C9CDD2]/20 blur-[140px]" />
+        <div className="absolute -right-40 bottom-0 size-[520px] rounded-full bg-[#3A3A3D]/15 blur-[140px]" />
         <div className="hitters-grid absolute inset-0 opacity-[0.5]" />
       </div>
 
       <div className="relative mx-auto grid w-full max-w-7xl gap-12 px-5 py-16 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
         <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7 }}>
           <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-white/80 backdrop-blur-xl">
-            <Star className="size-3.5 text-[#C8102E]" /> Chicagoland&apos;s Premier Travel Club · Est. 1992
+            <Star className="size-3.5 text-[#C9CDD2]" /> Chicagoland&apos;s Premier Travel Club · Est. 1992
           </span>
 
           <h1 className="mt-6 font-heading text-5xl font-bold leading-[1.04] text-white sm:text-6xl lg:text-7xl">
             Blue-Collar Grit.
             <br />
-            <span className="text-[#C8102E]">AI-Powered</span> Intelligence.
+            <span className="h-chrome-text">AI-Powered</span> Intelligence.
           </h1>
 
           <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/65">
@@ -156,8 +156,8 @@ export function Hero({ onLaunch }: { onLaunch: () => void }) {
         >
           <Glass className="p-6">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-[#C8102E]">
-                <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[#C8102E] opacity-60" /><span className="relative inline-flex size-2 rounded-full bg-[#C8102E]" /></span>
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-[#C9CDD2]">
+                <span className="relative flex size-2"><span className="absolute inline-flex size-full animate-ping rounded-full bg-[#C9CDD2] opacity-60" /><span className="relative inline-flex size-2 rounded-full bg-[#C9CDD2]" /></span>
                 Scout AI · Live
               </div>
               <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold text-white/70">14U · SS</span>
@@ -168,14 +168,14 @@ export function Hero({ onLaunch }: { onLaunch: () => void }) {
                 <div className="text-sm text-white/55">Marcus Delgado</div>
                 <div className="font-heading text-4xl font-bold text-white">91<span className="text-lg text-white/40"> / 100</span></div>
               </div>
-              <div className="rounded-xl bg-[#10B981]/15 px-3 py-1.5 text-xs font-bold text-[#10B981]">▲ +18% efficiency</div>
+              <div className="rounded-xl bg-[#E6E8EB]/15 px-3 py-1.5 text-xs font-bold text-[#E6E8EB]">▲ +18% efficiency</div>
             </div>
 
             <div className="mt-5 h-28">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={PLAYERS[0].trend}>
                   <YAxis hide domain={['dataMin - 2', 'dataMax + 2']} />
-                  <Line type="monotone" dataKey="ev" stroke="#C8102E" strokeWidth={3} dot={false} />
+                  <Line type="monotone" dataKey="ev" stroke="#C9CDD2" strokeWidth={3} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -190,7 +190,7 @@ export function Hero({ onLaunch }: { onLaunch: () => void }) {
               ))}
             </div>
           </Glass>
-          <div className="absolute -bottom-4 -right-4 -z-10 size-32 rounded-full bg-[#C8102E]/30 blur-3xl" />
+          <div className="absolute -bottom-4 -right-4 -z-10 size-32 rounded-full bg-[#C9CDD2]/30 blur-3xl" />
         </motion.div>
       </div>
     </section>
@@ -230,7 +230,7 @@ export function About() {
           {STATS.map((s, i) => (
             <Reveal key={s.label} delay={i * 0.08}>
               <Glass className="p-6 text-center" hover>
-                <div className="font-heading text-4xl font-bold text-[#C8102E] sm:text-5xl">
+                <div className="font-heading text-4xl font-bold text-[#C9CDD2] sm:text-5xl">
                   <StatNumber value={s.value} suffix={s.suffix} />
                 </div>
                 <div className="mt-2 text-xs font-semibold uppercase tracking-wider text-white/55">{s.label}</div>
@@ -266,7 +266,7 @@ export function Teams() {
             <Glass className="overflow-hidden">
               <div className="grid gap-8 p-8 lg:grid-cols-[1.2fr_1fr] lg:p-10">
                 <div>
-                  <span className="inline-flex items-center gap-2 rounded-full bg-[#C8102E] px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
+                  <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-black">
                     <Star className="size-3" /> Flagship Team
                   </span>
                   <h3 className="mt-4 font-heading text-3xl font-bold text-white">{spotlight.name}</h3>
@@ -282,7 +282,7 @@ export function Teams() {
                 </div>
                 <div className="grid grid-cols-2 gap-3 self-center">
                   {[['Barrel %', 'Top 8%'], ['Team OPS', '.948'], ['Fielding %', '.971'], ['Tournaments', '11']].map(([k, v]) => (
-                    <div key={k} className="rounded-xl border border-white/10 bg-[#081325]/60 p-4 text-center">
+                    <div key={k} className="rounded-xl border border-white/10 bg-[#141416]/60 p-4 text-center">
                       <div className="font-heading text-2xl font-bold text-white">{v}</div>
                       <div className="mt-1 text-[11px] uppercase tracking-wider text-white/45">{k}</div>
                     </div>
@@ -307,7 +307,7 @@ export function Teams() {
                 <p className="mt-3 flex-1 text-sm text-white/60">{t.highlight}</p>
                 <button
                   onClick={() => setActive(t)}
-                  className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-[#C8102E] transition hover:gap-2"
+                  className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-[#C9CDD2] transition hover:gap-2"
                 >
                   View Roster <ChevronRight className="size-4" />
                 </button>
@@ -325,15 +325,15 @@ export function Teams() {
 function Metric({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
     <div>
-      <div className={cn('font-heading text-2xl font-bold', accent ? 'text-[#C8102E]' : 'text-white')}>{value}</div>
+      <div className={cn('font-heading text-2xl font-bold', accent ? 'text-[#C9CDD2]' : 'text-white')}>{value}</div>
       <div className="text-[11px] uppercase tracking-wider text-white/45">{label}</div>
     </div>
   );
 }
 
 function gradeColor(g: number) {
-  if (g >= 90) return 'bg-[#10B981]/15 text-[#10B981]';
-  if (g >= 84) return 'bg-[#C8102E]/15 text-[#C8102E]';
+  if (g >= 90) return 'bg-[#E6E8EB]/15 text-[#E6E8EB]';
+  if (g >= 84) return 'bg-[#C9CDD2]/15 text-[#C9CDD2]';
   return 'bg-white/10 text-white/70';
 }
 
@@ -352,14 +352,14 @@ function RosterModal({ team, onClose }: { team: Team | null; onClose: () => void
           >
             <Glass className="p-7">
               <button onClick={onClose} className="absolute right-4 top-4 rounded-lg p-1.5 text-white/50 hover:bg-white/10 hover:text-white"><X className="size-5" /></button>
-              <div className="text-xs font-semibold uppercase tracking-widest text-[#C8102E]">{team.age} · AI Grade {team.aiGrade}</div>
+              <div className="text-xs font-semibold uppercase tracking-widest text-[#C9CDD2]">{team.age} · AI Grade {team.aiGrade}</div>
               <h3 className="mt-1 font-heading text-2xl font-bold text-white">{team.name}</h3>
               <p className="mt-1 text-sm text-white/55">{team.coach} · {team.record} · {team.highlight}</p>
 
               <div className="mt-6 space-y-2">
                 {team.roster.map((p) => (
                   <div key={p.name} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#C8102E]/15 text-xs font-bold text-[#C8102E]">{p.pos}</span>
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[#C9CDD2]/15 text-xs font-bold text-[#C9CDD2]">{p.pos}</span>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-semibold text-white">{p.name}</div>
                       <div className="truncate text-xs text-white/50">{p.note}</div>
@@ -369,8 +369,8 @@ function RosterModal({ team, onClose }: { team: Team | null; onClose: () => void
                 ))}
               </div>
 
-              <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-[#C8102E]/25 bg-[#C8102E]/[0.06] p-3.5">
-                <Brain className="mt-0.5 size-4.5 shrink-0 text-[#C8102E]" />
+              <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-[#C9CDD2]/25 bg-[#C9CDD2]/[0.06] p-3.5">
+                <Brain className="mt-0.5 size-4.5 shrink-0 text-[#C9CDD2]" />
                 <p className="text-xs leading-relaxed text-white/70">
                   <span className="font-semibold text-white">AI Insight:</span> This group grades in the upper tier for its age,
                   driven by quality at-bats and defensive efficiency. Continued strength gains project additional game power.
@@ -419,7 +419,7 @@ export function FeaturedPlayers() {
             >
               <Glass className="h-full p-5 transition-all duration-300 group-hover:-translate-y-1 group-hover:border-white/20" >
                 <div className="flex items-center justify-between">
-                  <div className="flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#C8102E] to-[#7a0a1d] font-heading text-xl font-bold text-white">
+                  <div className="flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#34343a] to-[#0c0c0e] ring-1 ring-white/15 font-heading text-xl font-bold text-white">
                     {p.name.split(' ').map((n) => n[0]).join('')}
                   </div>
                   <span className={cn('rounded-lg px-2.5 py-1 text-xs font-bold', gradeColor(p.aiGrade))}>AI {p.aiGrade}</span>
@@ -434,7 +434,7 @@ export function FeaturedPlayers() {
                 </div>
 
                 <div className="mt-4 flex items-start gap-2 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                  <TrendingUp className="mt-0.5 size-4 shrink-0 text-[#10B981]" />
+                  <TrendingUp className="mt-0.5 size-4 shrink-0 text-[#E6E8EB]" />
                   <p className="text-xs leading-snug text-white/65">{p.insight}</p>
                 </div>
               </Glass>
@@ -450,7 +450,7 @@ export function FeaturedPlayers() {
 
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-[#081325]/50 py-2">
+    <div className="rounded-lg border border-white/10 bg-[#141416]/50 py-2">
       <div className="font-heading text-sm font-bold text-white">{value}</div>
       <div className="text-[10px] uppercase tracking-wider text-white/40">{label}</div>
     </div>
@@ -467,7 +467,7 @@ function PlayerModal({ player, onClose }: { player: Player | null; onClose: () =
             <Glass className="p-7">
               <button onClick={onClose} className="absolute right-4 top-4 rounded-lg p-1.5 text-white/50 hover:bg-white/10 hover:text-white"><X className="size-5" /></button>
               <div className="flex items-center gap-4">
-                <div className="flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#C8102E] to-[#7a0a1d] font-heading text-2xl font-bold text-white">
+                <div className="flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#34343a] to-[#0c0c0e] ring-1 ring-white/15 font-heading text-2xl font-bold text-white">
                   {player.name.split(' ').map((n) => n[0]).join('')}
                 </div>
                 <div>
@@ -479,7 +479,7 @@ function PlayerModal({ player, onClose }: { player: Player | null; onClose: () =
 
               <div className="mt-6 grid grid-cols-3 gap-3 sm:grid-cols-6">
                 {([['AVG', player.avg.toFixed(3).replace(/^0/, '')], ['OBP', player.obp.toFixed(3).replace(/^0/, '')], ['OPS', player.ops.toFixed(3)], ['Max EV', `${player.exitVeloMax}`], ['60yd', player.sixtyYard.toFixed(2)], ['AI', `${player.aiGrade}`]] as const).map(([k, v]) => (
-                  <div key={k} className="rounded-xl border border-white/10 bg-[#081325]/50 py-3 text-center">
+                  <div key={k} className="rounded-xl border border-white/10 bg-[#141416]/50 py-3 text-center">
                     <div className="font-heading text-lg font-bold text-white">{v}</div>
                     <div className="text-[10px] uppercase tracking-wider text-white/40">{k}</div>
                   </div>
@@ -492,15 +492,15 @@ function PlayerModal({ player, onClose }: { player: Player | null; onClose: () =
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={player.trend} margin={{ top: 6, right: 6, left: -24, bottom: 0 }}>
                       <YAxis domain={['dataMin - 3', 'dataMax + 3']} tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }} />
-                      <Tooltip contentStyle={{ background: '#081325', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 12 }} labelStyle={{ color: '#fff' }} />
-                      <Line type="monotone" dataKey="ev" stroke="#C8102E" strokeWidth={3} dot={{ fill: '#C8102E', r: 3 }} />
+                      <Tooltip contentStyle={{ background: '#141416', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 12, fontSize: 12 }} labelStyle={{ color: '#fff' }} />
+                      <Line type="monotone" dataKey="ev" stroke="#C9CDD2" strokeWidth={3} dot={{ fill: '#C9CDD2', r: 3 }} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
-              <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-[#C8102E]/25 bg-[#C8102E]/[0.06] p-4">
-                <Brain className="mt-0.5 size-5 shrink-0 text-[#C8102E]" />
+              <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-[#C9CDD2]/25 bg-[#C9CDD2]/[0.06] p-4">
+                <Brain className="mt-0.5 size-5 shrink-0 text-[#C9CDD2]" />
                 <p className="text-sm leading-relaxed text-white/75"><span className="font-semibold text-white">LevelUp Scout AI:</span> {player.insight}</p>
               </div>
             </Glass>
@@ -533,7 +533,7 @@ export function Schedule() {
             <button
               key={a}
               onClick={() => setFilter(a)}
-              className={cn('rounded-full px-4 py-1.5 text-xs font-semibold transition', filter === a ? 'bg-[#C8102E] text-white' : 'border border-white/15 bg-white/5 text-white/70 hover:text-white')}
+              className={cn('rounded-full px-4 py-1.5 text-xs font-semibold transition', filter === a ? 'bg-white text-black' : 'border border-white/15 bg-white/5 text-white/70 hover:text-white')}
             >
               {a}
             </button>
@@ -546,7 +546,7 @@ export function Schedule() {
               <Glass className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between" hover>
                 <div className="flex items-center gap-4">
                   <div className="w-14 shrink-0 text-center">
-                    <div className="text-[10px] font-bold uppercase tracking-wider text-[#C8102E]">{g.date.split(' ')[0]}</div>
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-[#C9CDD2]">{g.date.split(' ')[0]}</div>
                     <div className="font-heading text-2xl font-bold leading-none text-white">{g.date.split(' ')[1].replace(',', '')}</div>
                   </div>
                   <div>
@@ -563,13 +563,13 @@ export function Schedule() {
 
                 <div className="flex items-center gap-3 sm:justify-end">
                   {g.status === 'final' && g.result ? (
-                    <span className={cn('rounded-lg px-3 py-1.5 text-sm font-bold', g.result.win ? 'bg-[#10B981]/15 text-[#10B981]' : 'bg-white/10 text-white/60')}>
+                    <span className={cn('rounded-lg px-3 py-1.5 text-sm font-bold', g.result.win ? 'bg-[#E6E8EB]/15 text-[#E6E8EB]' : 'bg-white/10 text-white/60')}>
                       {g.result.win ? 'W' : 'L'} {g.result.us}–{g.result.them}
                     </span>
                   ) : (
                     <button
                       onClick={() => setPreview(preview === g.id ? null : g.id)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#C8102E]/40 bg-[#C8102E]/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#C8102E]/20"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-[#C9CDD2]/40 bg-[#C9CDD2]/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#C9CDD2]/20"
                     >
                       <Brain className="size-3.5" /> AI Game Preview
                     </button>
@@ -579,8 +579,8 @@ export function Schedule() {
               <AnimatePresence>
                 {preview === g.id && (
                   <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                    <div className="mt-2 flex items-start gap-2.5 rounded-xl border border-[#C8102E]/25 bg-[#C8102E]/[0.06] p-4">
-                      <Brain className="mt-0.5 size-4.5 shrink-0 text-[#C8102E]" />
+                    <div className="mt-2 flex items-start gap-2.5 rounded-xl border border-[#C9CDD2]/25 bg-[#C9CDD2]/[0.06] p-4">
+                      <Brain className="mt-0.5 size-4.5 shrink-0 text-[#C9CDD2]" />
                       <p className="text-sm leading-relaxed text-white/75">
                         <span className="font-semibold text-white">Key Matchup Insight:</span> {g.ageGroup} projects with a favorable barrel-rate edge.
                         Win the early innings with quality at-bats and the model gives UDC a strong advantage. Watch the bullpen depth in the middle frames.
@@ -623,7 +623,7 @@ export function Development() {
             return (
               <Reveal key={p.title} delay={i * 0.07}>
                 <Glass className="flex h-full gap-4 p-6" hover>
-                  <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[#C8102E]/15 text-[#C8102E]"><Icon className="size-6" /></span>
+                  <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[#C9CDD2]/15 text-[#C9CDD2]"><Icon className="size-6" /></span>
                   <div>
                     <h3 className="font-heading text-lg font-bold text-white">{p.title}</h3>
                     <p className="mt-1.5 text-sm leading-relaxed text-white/60">{p.body}</p>
@@ -646,7 +646,7 @@ export function Tryouts() {
     <section id="tryouts" className="relative py-24">
       <div className="mx-auto max-w-6xl px-5">
         <Glass className="relative overflow-hidden p-8 sm:p-12">
-          <div className="pointer-events-none absolute -right-20 -top-20 size-72 rounded-full bg-[#C8102E]/20 blur-[100px]" />
+          <div className="pointer-events-none absolute -right-20 -top-20 size-72 rounded-full bg-[#C9CDD2]/20 blur-[100px]" />
           <div className="relative grid gap-10 lg:grid-cols-[1fr_1.1fr]">
             <div>
               <SectionEyebrow>2026 Tryouts</SectionEyebrow>
@@ -659,7 +659,7 @@ export function Tryouts() {
               <div className="mt-6 space-y-3">
                 {['Full skills evaluation (hit, run, throw, field)', 'AI metrics: exit velo, 60-yard, pop/arm', 'Same-day feedback from UDC coaching staff', 'Private & make-up tryouts available on request'].map((s) => (
                   <div key={s} className="flex items-center gap-2.5 text-sm text-white/75">
-                    <span className="flex size-5 items-center justify-center rounded-full bg-[#C8102E]/20"><ChevronRight className="size-3 text-[#C8102E]" /></span>
+                    <span className="flex size-5 items-center justify-center rounded-full bg-[#C9CDD2]/20"><ChevronRight className="size-3 text-[#C9CDD2]" /></span>
                     {s}
                   </div>
                 ))}
@@ -673,8 +673,8 @@ export function Tryouts() {
             <div className="space-y-3">
               {TRYOUTS.map((t, i) => (
                 <Reveal key={t.age} delay={i * 0.06}>
-                  <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-[#081325]/60 p-4">
-                    <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[#C8102E]/15 text-[#C8102E]"><Calendar className="size-6" /></div>
+                  <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-[#141416]/60 p-4">
+                    <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-[#C9CDD2]/15 text-[#C9CDD2]"><Calendar className="size-6" /></div>
                     <div className="min-w-0 flex-1">
                       <div className="font-heading text-base font-bold text-white">{t.age}</div>
                       <div className="text-sm text-white/55">{t.date} · {t.time}</div>
@@ -707,7 +707,7 @@ export function News() {
           {NEWS.map((n, i) => (
             <Reveal key={n.title} delay={i * 0.06}>
               <Glass className="flex h-full flex-col p-6" hover>
-                <span className="w-fit rounded-full bg-[#C8102E]/15 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-[#C8102E]">{n.tag}</span>
+                <span className="w-fit rounded-full bg-[#C9CDD2]/15 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-[#C9CDD2]">{n.tag}</span>
                 <h3 className="mt-3 font-heading text-lg font-bold text-white">{n.title}</h3>
                 <p className="mt-2 flex-1 text-sm leading-relaxed text-white/60">{n.body}</p>
                 <div className="mt-4 text-xs font-medium text-white/40">{n.date}</div>
@@ -721,7 +721,7 @@ export function News() {
           {TESTIMONIALS.map((t, i) => (
             <Reveal key={t.name} delay={i * 0.08}>
               <Glass className="flex h-full flex-col p-6">
-                <Quote className="size-7 text-[#C8102E]/60" />
+                <Quote className="size-7 text-[#C9CDD2]/60" />
                 <p className="mt-3 flex-1 text-sm leading-relaxed text-white/75">&quot;{t.quote}&quot;</p>
                 <div className="mt-4 text-xs font-semibold uppercase tracking-wider text-white/45">{t.name}</div>
               </Glass>
@@ -738,7 +738,7 @@ export function News() {
 // ============================================================================
 export function Footer() {
   return (
-    <footer className="relative border-t border-white/10 bg-[#081325]">
+    <footer className="relative border-t border-white/10 bg-[#141416]">
       <div className="mx-auto max-w-7xl px-5 py-14">
         <div className="grid gap-10 lg:grid-cols-[1.4fr_1fr_1fr]">
           <div>
@@ -747,7 +747,7 @@ export function Footer() {
               Chicagoland&apos;s premier travel baseball organization. Developing elite players and
               great people since 1992 — blue-collar grit, AI-powered intelligence.
             </p>
-            <div className="mt-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#C8102E]">
+            <div className="mt-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#C9CDD2]">
               <MapPin className="size-4" /> Proudly Chicagoland · Tinley Park · Frankfort · Joliet, IL
             </div>
           </div>
@@ -799,7 +799,7 @@ export function FloatingScoutButton({ onClick }: { onClick: () => void }) {
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.8, y: 20 }}
           onClick={onClick}
-          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-[#C8102E] px-5 py-3.5 font-bold text-white shadow-[0_10px_40px_-6px_rgba(200,16,46,0.7)] transition hover:bg-[#E11D3A] hover:-translate-y-0.5"
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-[linear-gradient(180deg,#ffffff_0%,#dfe2e6_55%,#b3b8bf_100%)] px-5 py-3.5 font-bold text-black shadow-[0_10px_40px_-6px_rgba(255,255,255,0.4),inset_0_1px_0_rgba(255,255,255,0.9)] transition hover:-translate-y-0.5 hover:brightness-105"
         >
           <Brain className="size-5" />
           <span className="hidden text-sm sm:inline">Scout AI</span>
