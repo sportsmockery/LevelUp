@@ -177,6 +177,8 @@ export default function OLIQPage() {
   const [inputMode, setInputMode] = useState<'upload' | 'link'>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState('');
+  const [cookie, setCookie] = useState('');
+  const [showAuth, setShowAuth] = useState(false);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [prompt, setPrompt] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
@@ -253,7 +255,7 @@ export default function OLIQPage() {
         const exRes = await fetch('/api/ol/extract', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: trimmedUrl }),
+          body: JSON.stringify({ url: trimmedUrl, cookie: cookie.trim() || undefined }),
         });
         const exData = await exRes.json();
         if (!exRes.ok) {
@@ -309,11 +311,12 @@ export default function OLIQPage() {
       setProgress(0);
       setStatusMessage('');
     }
-  }, [inputMode, file, trimmedUrl, pdfFile, prompt, athlete, hasProfile]);
+  }, [inputMode, file, trimmedUrl, cookie, pdfFile, prompt, athlete, hasProfile]);
 
   const reset = () => {
     setFile(null);
     setVideoUrl('');
+    setCookie('');
     setPdfFile(null);
     setPrompt('');
     setResult(null);
@@ -538,10 +541,53 @@ export default function OLIQPage() {
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-sky-500/60"
               />
               <p className="text-zinc-500 text-xs mt-2">
-                Works with direct video/stream links (.mp4, .mov, .m3u8) — these are read on our
-                server. Player/embed pages that need a login (YouTube, Hudl) can&apos;t be opened —
-                download the clip and use Upload instead.
+                Works with direct video/stream links (.mp4, .mov, .m3u8) — read on our server. For
+                a private Hudl clip, paste the <span className="text-zinc-300">.m3u8</span> stream
+                URL from your browser&apos;s Network tab and add your session cookie below.
               </p>
+
+              <button
+                type="button"
+                onClick={() => setShowAuth((v) => !v)}
+                className="mt-3 text-xs text-sky-400 hover:text-sky-300"
+              >
+                {showAuth ? '− Hide' : '+ Private stream (Hudl login)'}
+              </button>
+
+              {showAuth && (
+                <div className="mt-3 space-y-2">
+                  <label className="block text-[10px] font-medium text-zinc-500 tracking-widest">
+                    SESSION COOKIE (OPTIONAL — FOR PRIVATE STREAMS)
+                  </label>
+                  <textarea
+                    value={cookie}
+                    onChange={(e) => setCookie(e.target.value)}
+                    rows={2}
+                    placeholder="Paste the Cookie header from the .m3u8 request (DevTools → Network → Headers → Request Headers → cookie)"
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-sky-500/60 resize-none"
+                  />
+                  <details className="text-[11px] text-zinc-500">
+                    <summary className="cursor-pointer text-zinc-400 hover:text-zinc-300">
+                      How to get the stream URL + cookie
+                    </summary>
+                    <ol className="list-decimal ml-4 mt-2 space-y-1">
+                      <li>Open the Hudl video in your browser (logged in) and press play.</li>
+                      <li>Open DevTools (F12) → <span className="text-zinc-300">Network</span> tab → filter <span className="text-zinc-300">m3u8</span>.</li>
+                      <li>
+                        Right-click the <span className="text-zinc-300">.m3u8</span> request →
+                        Copy → Copy URL. Paste it in the link box above.
+                      </li>
+                      <li>
+                        On that same request, under Headers → Request Headers, copy the
+                        <span className="text-zinc-300"> cookie</span> value and paste it here.
+                      </li>
+                    </ol>
+                    <p className="mt-2">
+                      Your cookie is used only to fetch this clip and is never stored.
+                    </p>
+                  </details>
+                </div>
+              )}
             </div>
           )}
 
