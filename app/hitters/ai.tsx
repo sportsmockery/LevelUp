@@ -6,10 +6,10 @@ import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer,
 } from 'recharts';
 import {
-  Brain, Target, TrendingUp, Zap, Download, Share2, Sparkles, Trophy,
-  ChevronRight, Activity, Crosshair, Dumbbell,
+  Target, TrendingUp, Zap, Download, Share2, Sparkles, Trophy,
+  ChevronRight, Activity, Dumbbell,
 } from 'lucide-react';
-import { Glass, RedButton, GhostButton } from './ui';
+import { Glass, RedButton, GhostButton, BaseballIcon } from './ui';
 import {
   type Position, type ToolGrades, type ScoutInput, type ScoutReport,
   type TrainInput, type TrainWeek, type PredictResult,
@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils';
 type Tab = 'scout' | 'train' | 'predict';
 
 const TABS: { id: Tab; label: string; icon: React.ElementType; desc: string }[] = [
-  { id: 'scout', label: 'Scout AI', icon: Crosshair, desc: 'Instant prospect evaluation' },
+  { id: 'scout', label: 'Scout AI', icon: BaseballIcon, desc: 'Instant prospect evaluation' },
   { id: 'train', label: 'Train AI', icon: Dumbbell, desc: 'Personalized development plan' },
   { id: 'predict', label: 'Predict AI', icon: Activity, desc: 'Matchup forecaster' },
 ];
@@ -139,7 +139,7 @@ function ScoutPanel() {
       {/* Inputs */}
       <Glass className="p-6">
         <h3 className="flex items-center gap-2 font-heading text-lg font-bold text-white">
-          <Crosshair className="size-5 text-[#C9CDD2]" /> Build a Prospect
+          <BaseballIcon className="size-5 text-[#C9CDD2]" /> Build a Prospect
         </h3>
         <p className="mt-1 text-sm text-white/50">Load a preset or dial in the tools.</p>
 
@@ -198,7 +198,7 @@ function ScoutPanel() {
 
         <RedButton className="mt-7 w-full" onClick={analyze} disabled={loading}>
           {loading ? 'Analyzing…' : 'Analyze with Scout AI'}
-          {!loading && <Brain className="size-4" />}
+          {!loading && <BaseballIcon className="size-4" />}
         </RedButton>
       </Glass>
 
@@ -210,7 +210,7 @@ function ScoutPanel() {
               <div className="relative size-16">
                 <div className="absolute inset-0 rounded-full border-2 border-white/10" />
                 <div className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-[#C9CDD2]" />
-                <Brain className="absolute inset-0 m-auto size-7 text-[#C9CDD2]" />
+                <BaseballIcon className="absolute inset-0 m-auto size-7 text-[#C9CDD2]" />
               </div>
               <div className="mt-6 h-5 text-sm font-medium text-white/70">{LOAD_STEPS[loadStep]}</div>
               <div className="mt-3 flex gap-1.5">
@@ -224,7 +224,7 @@ function ScoutPanel() {
           ) : (
             <motion.div key="empty" className="flex h-full min-h-[460px] flex-col items-center justify-center text-center">
               <div className="flex size-16 items-center justify-center rounded-2xl bg-white/5">
-                <Crosshair className="size-8 text-white/30" />
+                <BaseballIcon className="size-8 text-white/30" />
               </div>
               <p className="mt-5 max-w-xs text-sm text-white/40">
                 Configure the prospect on the left and run Scout AI to generate a full scouting report card.

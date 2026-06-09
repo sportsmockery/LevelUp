@@ -5,6 +5,31 @@ import { cn } from '@/lib/utils';
 import * as React from 'react';
 
 // ----------------------------------------------------------------------------
+// BaseballIcon — custom lucide-style icon (lucide has no baseball). Scout AI mark.
+// ----------------------------------------------------------------------------
+export function BaseballIcon({ className, ...props }: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="24"
+      height="24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+      {...props}
+    >
+      <circle cx="12" cy="12" r="9.5" />
+      <path d="M5.2 5.2c2.4 2 3.7 4.4 3.7 6.8s-1.3 4.8-3.7 6.8" />
+      <path d="M18.8 5.2c-2.4 2-3.7 4.4-3.7 6.8s1.3 4.8 3.7 6.8" />
+    </svg>
+  );
+}
+
+// ----------------------------------------------------------------------------
 // Photo — renders an <img> from /public; on load error shows `fallback`.
 // Lets real team photos drop into public/ paths with graceful degradation.
 // ----------------------------------------------------------------------------

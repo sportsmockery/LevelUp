@@ -9,7 +9,7 @@ import {
   Menu, X, ChevronRight, ArrowRight, MapPin, Calendar, Trophy, Users,
   TrendingUp, Brain, Quote, Star, Shield, Target, Gauge, ChevronLeft,
 } from 'lucide-react';
-import { Glass, RedButton, GhostButton, Reveal, HittersLogo, StatNumber, SectionEyebrow, Photo, PlayerAvatar } from './ui';
+import { Glass, RedButton, GhostButton, Reveal, HittersLogo, StatNumber, SectionEyebrow, Photo, PlayerAvatar, BaseballIcon } from './ui';
 import { PLAYERS, TEAMS, GAMES, TRYOUTS, NEWS, TESTIMONIALS, type Player, type Team } from './data';
 import { cn } from '@/lib/utils';
 
@@ -60,7 +60,7 @@ export function Navbar({ onLaunch }: { onLaunch: () => void }) {
 
         <div className="flex items-center gap-3">
           <RedButton className="hidden px-4 py-2.5 text-xs sm:inline-flex" onClick={onLaunch}>
-            <Brain className="size-4" /> Launch Scout AI
+            <BaseballIcon className="size-4" /> Launch Scout AI
           </RedButton>
           <button
             className="rounded-lg p-2 text-white lg:hidden"
@@ -92,7 +92,7 @@ export function Navbar({ onLaunch }: { onLaunch: () => void }) {
                 </a>
               ))}
               <RedButton className="mt-2 w-full" onClick={() => { setOpen(false); onLaunch(); }}>
-                <Brain className="size-4" /> Launch Scout AI
+                <BaseballIcon className="size-4" /> Launch Scout AI
               </RedButton>
             </div>
           </motion.div>
@@ -144,7 +144,7 @@ export function Hero({ onLaunch }: { onLaunch: () => void }) {
 
           <div className="mt-8 flex flex-wrap gap-4">
             <RedButton className="px-7 py-3.5 text-base" onClick={onLaunch}>
-              <Brain className="size-5" /> Launch Scout AI
+              <BaseballIcon className="size-5" /> Launch Scout AI
             </RedButton>
             <GhostButton className="px-7 py-3.5 text-base" onClick={() => document.getElementById('tryouts')?.scrollIntoView({ behavior: 'smooth' })}>
               View 2026 Tryouts <ArrowRight className="size-4" />
@@ -807,7 +807,7 @@ export function FloatingScoutButton({ onClick }: { onClick: () => void }) {
           onClick={onClick}
           className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-[linear-gradient(180deg,#ffffff_0%,#dfe2e6_55%,#b3b8bf_100%)] px-5 py-3.5 font-bold text-black shadow-[0_10px_40px_-6px_rgba(255,255,255,0.4),inset_0_1px_0_rgba(255,255,255,0.9)] transition hover:-translate-y-0.5 hover:brightness-105"
         >
-          <Brain className="size-5" />
+          <BaseballIcon className="size-5" />
           <span className="hidden text-sm sm:inline">Scout AI</span>
         </motion.button>
       )}
