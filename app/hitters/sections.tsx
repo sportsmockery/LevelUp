@@ -44,7 +44,7 @@ export function Navbar({ onLaunch }: { onLaunch: () => void }) {
       )}
     >
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3.5">
-        <a href="#top" aria-label="Hitters Baseball home"><HittersLogo className="h-12" /></a>
+        <a href="#top" aria-label="Hitters Baseball home"><HittersLogo className="h-12" priority /></a>
 
         <div className="hidden items-center gap-1 lg:flex">
           {NAV_LINKS.map((l) => (
