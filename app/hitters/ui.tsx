@@ -1,6 +1,7 @@
 'use client';
 
 import { motion, type Variants } from 'framer-motion';
+import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import * as React from 'react';
 
@@ -166,15 +167,18 @@ export function SectionEyebrow({ children }: { children: React.ReactNode }) {
 // black & white SVG recreation (gradients preserved) if the file is missing.
 // To use the official artwork, add it at: public/hitters-logo.png
 // ----------------------------------------------------------------------------
-export function HittersLogo({ className }: { className?: string }) {
+export function HittersLogo({ className, priority }: { className?: string; priority?: boolean }) {
   const [useRaster, setUseRaster] = React.useState(true);
   if (useRaster) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
+      <Image
         src="/hitters-logo.png"
         alt="Hitters Baseball — Feel the Power"
-        className={cn('w-auto object-contain', className)}
+        width={1488}
+        height={1000}
+        sizes="160px"
+        priority={priority}
+        className={cn('h-auto w-auto object-contain', className)}
         onError={() => setUseRaster(false)}
       />
     );
