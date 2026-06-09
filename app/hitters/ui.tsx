@@ -33,22 +33,24 @@ export function Photo({
   );
 }
 
-// Player headshot/action photo with monochrome monogram fallback.
+// Player headshot/action photo with monochrome jersey-number fallback.
 export function PlayerAvatar({
   id,
   name,
+  number,
   className,
   textClassName,
 }: {
   id: string;
   name: string;
+  number?: number;
   className?: string;
   textClassName?: string;
 }) {
-  const initials = name.split(' ').map((n) => n[0]).join('');
+  const label = number != null ? number : name.split(' ').map((n) => n[0]).join('');
   const mono = (
     <div className="flex size-full items-center justify-center bg-gradient-to-br from-[#34343a] to-[#0c0c0e] font-heading font-bold text-white">
-      <span className={textClassName}>{initials}</span>
+      <span className={cn('italic', textClassName)}>{label}</span>
     </div>
   );
   return (

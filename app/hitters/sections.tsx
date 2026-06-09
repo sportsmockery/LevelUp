@@ -429,11 +429,11 @@ export function FeaturedPlayers() {
             >
               <Glass className="h-full p-5 transition-all duration-300 group-hover:-translate-y-1 group-hover:border-white/20" >
                 <div className="flex items-center justify-between">
-                  <PlayerAvatar id={p.id} name={p.name} className="size-14 rounded-2xl" textClassName="text-xl" />
+                  <PlayerAvatar id={p.id} name={p.name} number={p.number} className="size-14 rounded-2xl" textClassName="text-xl" />
                   <span className={cn('rounded-lg px-2.5 py-1 text-xs font-bold', gradeColor(p.aiGrade))}>AI {p.aiGrade}</span>
                 </div>
                 <div className="mt-4 text-base font-bold text-white">{p.name}</div>
-                <div className="text-sm text-white/50">{p.position} · {p.team.replace('Upper Deck ', '')} · &apos;{String(p.gradYear).slice(2)}</div>
+                <div className="text-sm text-white/50">#{p.number} · {p.position} · Class of &apos;{String(p.gradYear).slice(2)}</div>
 
                 <div className="mt-4 grid grid-cols-3 gap-2 text-center">
                   <MiniStat label="AVG" value={p.avg.toFixed(3).replace(/^0/, '')} />
@@ -475,9 +475,9 @@ function PlayerModal({ player, onClose }: { player: Player | null; onClose: () =
             <Glass className="p-7">
               <button onClick={onClose} className="absolute right-4 top-4 rounded-lg p-1.5 text-white/50 hover:bg-white/10 hover:text-white"><X className="size-5" /></button>
               <div className="flex items-center gap-4">
-                <PlayerAvatar id={player.id} name={player.name} className="size-16 shrink-0 rounded-2xl" textClassName="text-2xl" />
+                <PlayerAvatar id={player.id} name={player.name} number={player.number} className="size-16 shrink-0 rounded-2xl" textClassName="text-2xl" />
                 <div>
-                  <h3 className="font-heading text-2xl font-bold text-white">{player.name}</h3>
+                  <h3 className="font-heading text-2xl font-bold text-white">#{player.number} {player.name}</h3>
                   <div className="text-sm text-white/55">{player.position} · {player.team} · Class of {player.gradYear}</div>
                   <div className="mt-1 text-xs text-white/45">{player.height} · B/T: {player.bats}/{player.throws} · Age {player.age}</div>
                 </div>
