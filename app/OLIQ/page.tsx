@@ -13,6 +13,7 @@ import {
   X,
   User,
   Pencil,
+  Link as LinkIcon,
 } from 'lucide-react';
 
 type Athlete = {
@@ -70,7 +71,14 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
-async function extractFrames(file: File, count: number): Promise<string[]> {
+// Extract evenly-spaced frames from a video source (object URL or remote URL).
+// For remote URLs we request CORS access so the canvas isn't tainted; if the
+// host doesn't allow it, frame capture throws a SecurityError that we surface.
+function extractFramesFromSource(
+  src: string,
+  count: number,
+  opts: { crossOrigin: boolean; revoke: boolean },
+): Promise<string[]> {
   return new Promise((resolve, reject) => {
     const video = document.createElement('video');
     const canvas = document.createElement('canvas');
@@ -80,10 +88,14 @@ async function extractFrames(file: File, count: number): Promise<string[]> {
       return;
     }
     const frames: string[] = [];
+    const cleanup = () => {
+      if (opts.revoke) URL.revokeObjectURL(src);
+    };
 
     video.preload = 'auto';
     video.muted = true;
     video.playsInline = true;
+    if (opts.crossOrigin) video.crossOrigin = 'anonymous';
 
     video.onloadedmetadata = () => {
       const targetW = 768;
@@ -91,6 +103,7 @@ async function extractFrames(file: File, count: number): Promise<string[]> {
       canvas.height = Math.round(targetW * (video.videoHeight / video.videoWidth));
       const duration = video.duration;
       if (!isFinite(duration) || duration <= 0) {
+        cleanup();
         reject(new Error('Could not read video duration'));
         return;
       }
@@ -99,7 +112,7 @@ async function extractFrames(file: File, count: number): Promise<string[]> {
 
       const captureNext = () => {
         if (currentFrame >= count) {
-          URL.revokeObjectURL(video.src);
+          cleanup();
           resolve(frames);
           return;
         }
@@ -107,8 +120,18 @@ async function extractFrames(file: File, count: number): Promise<string[]> {
       };
 
       video.onseeked = () => {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        frames.push(canvas.toDataURL('image/jpeg', 0.8));
+        try {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          frames.push(canvas.toDataURL('image/jpeg', 0.8));
+        } catch {
+          cleanup();
+          reject(
+            new Error(
+              'Could not read frames from this link. The host blocks cross-origin access (CORS). Use a direct, CORS-enabled video URL, or upload the file instead.',
+            ),
+          );
+          return;
+        }
         currentFrame++;
         captureNext();
       };
@@ -116,9 +139,27 @@ async function extractFrames(file: File, count: number): Promise<string[]> {
       captureNext();
     };
 
-    video.onerror = () => reject(new Error('Failed to load video'));
-    video.src = URL.createObjectURL(file);
+    video.onerror = () => {
+      cleanup();
+      reject(
+        new Error(
+          'Failed to load video from this link. Make sure it points directly to a video file (e.g. .mp4/.mov), not an embed/watch page.',
+        ),
+      );
+    };
+    video.src = src;
   });
+}
+
+function extractFrames(file: File, count: number): Promise<string[]> {
+  return extractFramesFromSource(URL.createObjectURL(file), count, {
+    crossOrigin: false,
+    revoke: true,
+  });
+}
+
+function extractFramesFromUrl(url: string, count: number): Promise<string[]> {
+  return extractFramesFromSource(url, count, { crossOrigin: true, revoke: false });
 }
 
 function athleteSummary(a: Athlete): string {
@@ -137,7 +178,9 @@ export default function OLIQPage() {
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileLoaded, setProfileLoaded] = useState(false);
 
+  const [inputMode, setInputMode] = useState<'upload' | 'link'>('upload');
   const [file, setFile] = useState<File | null>(null);
+  const [videoUrl, setVideoUrl] = useState('');
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [prompt, setPrompt] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
@@ -192,8 +235,12 @@ export default function OLIQPage() {
     }
   };
 
+  const trimmedUrl = videoUrl.trim();
+  const hasVideo = inputMode === 'upload' ? Boolean(file) : trimmedUrl.length > 0;
+
   const handleAnalyze = useCallback(async () => {
-    if (!file) return;
+    if (inputMode === 'upload' && !file) return;
+    if (inputMode === 'link' && !trimmedUrl) return;
     setAnalyzing(true);
     setProgress(0);
     setError('');
@@ -201,7 +248,10 @@ export default function OLIQPage() {
     try {
       setStatusMessage('Extracting key frames...');
       setProgress(10);
-      const frames = await extractFrames(file, FRAME_COUNT);
+      const frames =
+        inputMode === 'upload'
+          ? await extractFrames(file as File, FRAME_COUNT)
+          : await extractFramesFromUrl(trimmedUrl, FRAME_COUNT);
       setProgress(30);
 
       let pdfPayload: { name: string; data: string } | undefined;
@@ -247,10 +297,11 @@ export default function OLIQPage() {
       setProgress(0);
       setStatusMessage('');
     }
-  }, [file, pdfFile, prompt, athlete, hasProfile]);
+  }, [inputMode, file, trimmedUrl, pdfFile, prompt, athlete, hasProfile]);
 
   const reset = () => {
     setFile(null);
+    setVideoUrl('');
     setPdfFile(null);
     setPrompt('');
     setResult(null);
@@ -398,35 +449,88 @@ export default function OLIQPage() {
             </div>
           ) : null}
 
-          {/* Video upload */}
-          <div
-            className="border-2 border-dashed border-zinc-700 rounded-3xl p-10 text-center cursor-pointer hover:border-sky-500 transition-colors"
-            onClick={() => inputRef.current?.click()}
-          >
-            <input
-              ref={inputRef}
-              type="file"
-              accept="video/*"
-              className="hidden"
-              onChange={(e) => {
-                setFile(e.target.files?.[0] || null);
+          {/* Video source: upload or link */}
+          <div className="grid grid-cols-2 gap-2 mb-4 p-1 bg-zinc-900 border border-zinc-800 rounded-2xl">
+            <button
+              type="button"
+              onClick={() => {
+                setInputMode('upload');
                 setError('');
               }}
-            />
-            {file ? (
-              <div className="space-y-3">
-                <Video className="w-12 h-12 mx-auto text-sky-400" />
-                <p className="text-white font-medium">{file.name}</p>
-                <p className="text-zinc-400 text-sm">{(file.size / 1024 / 1024).toFixed(1)} MB</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <Upload className="w-12 h-12 mx-auto text-zinc-500" />
-                <p className="text-zinc-300 font-medium">Tap to select OL film</p>
-                <p className="text-zinc-500 text-sm">MP4, MOV — single play works best</p>
-              </div>
-            )}
+              className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                inputMode === 'upload' ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              <Upload className="w-4 h-4" />
+              Upload
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setInputMode('link');
+                setError('');
+              }}
+              className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                inputMode === 'link' ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              <LinkIcon className="w-4 h-4" />
+              Video Link
+            </button>
           </div>
+
+          {inputMode === 'upload' ? (
+            <div
+              className="border-2 border-dashed border-zinc-700 rounded-3xl p-10 text-center cursor-pointer hover:border-sky-500 transition-colors"
+              onClick={() => inputRef.current?.click()}
+            >
+              <input
+                ref={inputRef}
+                type="file"
+                accept="video/*"
+                className="hidden"
+                onChange={(e) => {
+                  setFile(e.target.files?.[0] || null);
+                  setError('');
+                }}
+              />
+              {file ? (
+                <div className="space-y-3">
+                  <Video className="w-12 h-12 mx-auto text-sky-400" />
+                  <p className="text-white font-medium">{file.name}</p>
+                  <p className="text-zinc-400 text-sm">{(file.size / 1024 / 1024).toFixed(1)} MB</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <Upload className="w-12 h-12 mx-auto text-zinc-500" />
+                  <p className="text-zinc-300 font-medium">Tap to select OL film</p>
+                  <p className="text-zinc-500 text-sm">MP4, MOV — single play works best</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="border-2 border-dashed border-zinc-700 rounded-3xl p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Video className="w-5 h-5 text-sky-400" />
+                <p className="text-zinc-300 font-medium text-sm">Paste a direct video link</p>
+              </div>
+              <input
+                type="url"
+                inputMode="url"
+                value={videoUrl}
+                onChange={(e) => {
+                  setVideoUrl(e.target.value);
+                  setError('');
+                }}
+                placeholder="https://example.com/film/play.mp4"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-sky-500/60"
+              />
+              <p className="text-zinc-500 text-xs mt-2">
+                Must link directly to a CORS-enabled video file (.mp4/.mov). Embed/watch pages
+                (YouTube, Hudl) can&apos;t be read in-browser — upload those instead.
+              </p>
+            </div>
+          )}
 
           <div className="mt-6">
             <label className="block text-xs font-medium text-zinc-400 mb-2">
@@ -496,7 +600,7 @@ export default function OLIQPage() {
             </div>
           )}
 
-          {file && !analyzing && (
+          {hasVideo && !analyzing && (
             <button
               onClick={handleAnalyze}
               className="w-full mt-6 bg-gradient-to-r from-sky-400 to-blue-600 text-black font-heading font-bold py-4 rounded-2xl text-lg"
