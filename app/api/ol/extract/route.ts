@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { spawn } from 'node:child_process';
-import { promises as fs } from 'node:fs';
+import { promises as fs, existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import ffmpegStatic from 'ffmpeg-static';
@@ -15,7 +15,27 @@ const MAX_HTML_BYTES = 2 * 1024 * 1024;
 const BROWSER_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
-const ffmpegPath = (ffmpegStatic as unknown as string) || 'ffmpeg';
+// Resolve the ffmpeg binary at runtime. After bundling, ffmpeg-static's
+// exported path can point at a non-existent location (e.g. /ROOT/...), so we
+// verify it exists and fall back to the real node_modules path under cwd.
+function resolveFfmpegPath(): string {
+  const exported = (ffmpegStatic as unknown as string) || '';
+  const candidates = [
+    exported,
+    path.join(process.cwd(), 'node_modules', 'ffmpeg-static', 'ffmpeg'),
+    exported ? path.join(process.cwd(), 'node_modules', 'ffmpeg-static', path.basename(exported)) : '',
+  ].filter(Boolean);
+  for (const c of candidates) {
+    try {
+      if (existsSync(c)) return c;
+    } catch {
+      /* keep looking */
+    }
+  }
+  return exported || 'ffmpeg';
+}
+
+const ffmpegPath = resolveFfmpegPath();
 
 type Auth = { cookie: string; referer: string };
 
