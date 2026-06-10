@@ -6,6 +6,10 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '10mb',
     },
   },
+  // Keep ffmpeg-static OUT of the server bundle so its internal __dirname (and
+  // therefore the binary path) resolves to the real node_modules location at
+  // runtime instead of a bundler placeholder like /ROOT/...
+  serverExternalPackages: ['ffmpeg-static'],
   // Bundle the ffmpeg-static binary with the OLIQ server-side frame extractor
   // so the executable is present in the serverless function at runtime.
   outputFileTracingIncludes: {
