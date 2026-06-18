@@ -8,20 +8,24 @@ export const SITE = {
   url: "https://www.palatinepanthers.com",
   founded: 1966,
   tagline: "Welcome to the Den.",
-  // NOTE (assumption): contact details below are realistic placeholders for the
-  // Palatine Panthers / PAFA. Confirm and replace with verified info before launch.
-  email: "info@palatinepanthers.com",
-  phone: "(847) 555-0166",
+  email: "pafa@palatinepanthers.com",
+  mailingAddress: "250 E. Wood Street, Palatine, IL 60067",
+  // PAFA has no general phone line — these are the published board contacts.
+  contacts: [
+    { name: "Rick Zapata", role: "President", phone: "847-348-8331" },
+    { name: "Shane Jones", role: "Vice President", phone: "773-383-2427" },
+  ],
   venue: {
     name: "Ost Field",
-    street: "Ost Rd & N Plum Grove Rd",
+    street: "250 E Wood St",
     city: "Palatine",
     region: "IL",
     postalCode: "60067",
-    // Approx. coordinates for Palatine, IL — refine if exact field coords are known.
-    lat: 42.1103,
-    lng: -88.0342,
-    mapsQuery: "Ost+Field+Palatine+IL",
+    // NOTE: approximate, Palatine-area coordinates — verify the exact field pin
+    // in Google Maps before launch. (The researched 41.679 value plots ~30mi SW.)
+    lat: 42.112,
+    lng: -88.03,
+    mapsQuery: "Ost+Field+250+E+Wood+St+Palatine+IL+60067",
   },
   affiliation: {
     name: "Bill George Youth Football League",
@@ -30,9 +34,8 @@ export const SITE = {
 } as const;
 
 export const SOCIALS = [
-  { label: "Facebook", href: "https://www.facebook.com/palatinepanthers", icon: "facebook" },
-  { label: "Instagram", href: "https://www.instagram.com/palatinepanthers", icon: "instagram" },
-  { label: "YouTube", href: "https://www.youtube.com/@palatinepanthers", icon: "youtube" },
+  { label: "Facebook", href: "https://www.facebook.com/PAFAfootball", icon: "facebook" },
+  { label: "Instagram", href: "https://www.instagram.com/pafafootball", icon: "instagram" },
 ] as const;
 
 export const PRIMARY_NAV = [
@@ -86,8 +89,8 @@ export const PROGRAMS: Program[] = [
     tagline: "Friday night lights start here.",
     blurb:
       "Full-contact, age- and weight-bracketed teams competing in the Bill George Youth Football League. USA Football Heads Up certified coaches teach proper technique first — so the game is safer and the fundamentals last a lifetime.",
-    season: "Practices begin Aug 1 · Games Sept–Nov",
-    price: "From $295",
+    season: "Practice begins Jul 30 · Games Aug 29–Nov",
+    price: "From $565",
     benefits: [
       "Heads Up tackle certification",
       "Weight-bracketed for fair, safe play",
@@ -104,8 +107,8 @@ export const PROGRAMS: Program[] = [
     tagline: "Where the love of the game begins.",
     blurb:
       "Non-contact, fast, and fun. Our littlest Panthers learn the basics — catching, running, teamwork, and good sportsmanship — in a high-energy environment built entirely around confidence and joy.",
-    season: "Saturdays · Sept–Oct",
-    price: "From $150",
+    season: "Fall season at Ost Field",
+    price: "See registration",
     benefits: [
       "No contact — pure fundamentals & fun",
       "Every player plays every game",
@@ -117,17 +120,17 @@ export const PROGRAMS: Program[] = [
     name: "Cheerleading",
     icon: "sparkles",
     accent: "gold",
-    grades: "Grades K–8",
-    ages: "Ages 5–14",
+    grades: "All ages welcome",
+    ages: "Sideline & spirit",
     tagline: "Heart of the sideline.",
     blurb:
-      "Spirit, stunting, and showmanship. Panther cheer builds strength, rhythm, and unstoppable confidence — cheering on our teams under the lights and competing at BGYFL showcases.",
-    season: "Practices begin Aug · Performs Sept–Nov",
-    price: "From $225",
+      "Spirit, stunting, and showmanship. Panther cheer builds strength, rhythm, and unstoppable confidence — cheering on our teams under the lights at Ost Field.",
+    season: "Performs every home game",
+    price: "See registration",
     benefits: [
-      "Sideline & competition routines",
+      "Sideline routines & game-day spirit",
       "Strength, dance & teamwork",
-      "Performs at every home game",
+      "Cheers on every Panther squad",
     ],
   },
   {
@@ -135,13 +138,13 @@ export const PROGRAMS: Program[] = [
     name: "Summer Camp",
     icon: "sun",
     accent: "blue",
-    grades: "Grades K–8",
-    ages: "Ages 5–14",
+    grades: "8U–Varsity",
+    ages: "Ages 7–14",
     tagline: "Get a head start at the Den.",
     blurb:
-      "A week of skills, speed, agility, and fun at Ost Field before the season kicks off. Meet your coaches, make new teammates, and walk in on day one ready to compete.",
-    season: "July 13–16, 2026 · 9am–12pm",
-    price: "From $120",
+      "Skills, speed, agility, and fun at Ost Field before the season kicks off. Meet your coaches, make new teammates, and walk in on day one ready to compete.",
+    season: "July 13–16, 2026 · 5:30–7:00pm",
+    price: "See registration",
     benefits: [
       "Position & agility training",
       "Meet your coaches early",
@@ -150,53 +153,89 @@ export const PROGRAMS: Program[] = [
   },
 ];
 
-export interface UpcomingGame {
+export interface SeasonEvent {
   id: string;
-  opponent: string;
-  /** Whether the Panthers are hosting */
-  home: boolean;
+  title: string;
+  category: "Football" | "Camp" | "Team" | "Community";
   /** ISO 8601 with timezone */
   start: string;
   end: string;
-  venueName: string;
-  venueAddress: string;
-  mapsQuery: string;
+  locationName: string;
+  /** Present when the venue is a mappable address. */
+  locationAddress?: string;
+  mapsQuery?: string;
   note?: string;
 }
 
-// Fall 2026 BGYFL slate (illustrative — replace with the official schedule).
-export const UPCOMING_GAMES: UpcomingGame[] = [
+// Confirmed 2026 key dates from the PAFA events page. The 9-game BGYFL slate
+// (Week 1 kicks off Aug 29) is not yet published — swap in opponent matchups
+// here once it is released.
+export const OST_FIELD_ADDRESS = "250 E Wood St, Palatine, IL 60067";
+const OST_MAPS = "Ost+Field+250+E+Wood+St+Palatine+IL+60067";
+
+export const SEASON_EVENTS: SeasonEvent[] = [
   {
-    id: "pafa-2026-09-12",
-    opponent: "Schaumburg Chargers",
-    home: true,
-    start: "2026-09-12T18:30:00-05:00",
-    end: "2026-09-12T20:30:00-05:00",
-    venueName: "Ost Field",
-    venueAddress: "Ost Rd & N Plum Grove Rd, Palatine, IL 60067",
-    mapsQuery: "Ost+Field+Palatine+IL",
-    note: "Home Opener · Under the Lights",
+    id: "pafa-2026-06-27-equip",
+    title: "Equipment Pickup #1",
+    category: "Team",
+    start: "2026-06-27T08:30:00-05:00",
+    end: "2026-06-27T12:00:00-05:00",
+    locationName: "Ost Field",
+    locationAddress: OST_FIELD_ADDRESS,
+    mapsQuery: OST_MAPS,
+    note: "Gear up for 2026",
   },
   {
-    id: "pafa-2026-09-19",
-    opponent: "Arlington Cardinals",
-    home: false,
-    start: "2026-09-19T13:00:00-05:00",
-    end: "2026-09-19T15:00:00-05:00",
-    venueName: "Recreation Park",
-    venueAddress: "500 E Miner St, Arlington Heights, IL 60004",
-    mapsQuery: "Recreation+Park+Arlington+Heights+IL",
+    id: "pafa-2026-07-13-camp",
+    title: "Summer Camp Begins",
+    category: "Camp",
+    start: "2026-07-13T17:30:00-05:00",
+    end: "2026-07-13T19:00:00-05:00",
+    locationName: "Ost Field",
+    locationAddress: OST_FIELD_ADDRESS,
+    mapsQuery: OST_MAPS,
+    note: "8U / 9U / 10U · July 13–16",
   },
   {
-    id: "pafa-2026-09-26",
-    opponent: "Hoffman Estates Hawks",
-    home: true,
-    start: "2026-09-26T18:30:00-05:00",
-    end: "2026-09-26T20:30:00-05:00",
-    venueName: "Ost Field",
-    venueAddress: "Ost Rd & N Plum Grove Rd, Palatine, IL 60067",
-    mapsQuery: "Ost+Field+Palatine+IL",
-    note: "Panther Pride Night",
+    id: "pafa-2026-07-20-equip",
+    title: "Final Equipment Pickup",
+    category: "Team",
+    start: "2026-07-20T18:00:00-05:00",
+    end: "2026-07-20T20:00:00-05:00",
+    locationName: "Ost Field",
+    locationAddress: OST_FIELD_ADDRESS,
+    mapsQuery: OST_MAPS,
+  },
+  {
+    id: "pafa-2026-07-30-practice",
+    title: "First Practice",
+    category: "Football",
+    start: "2026-07-30T18:00:00-05:00",
+    end: "2026-07-30T20:00:00-05:00",
+    locationName: "Ost Field",
+    locationAddress: OST_FIELD_ADDRESS,
+    mapsQuery: OST_MAPS,
+    note: "The 2026 season starts here",
+  },
+  {
+    id: "pafa-2026-08-21-jamboree",
+    title: "Panther Jamboree",
+    category: "Football",
+    start: "2026-08-21T18:00:00-05:00",
+    end: "2026-08-21T19:00:00-05:00",
+    locationName: "Ost Field",
+    locationAddress: OST_FIELD_ADDRESS,
+    mapsQuery: OST_MAPS,
+    note: "Preseason showcase under the lights",
+  },
+  {
+    id: "pafa-2026-08-29-week1",
+    title: "Season Week 1",
+    category: "Football",
+    start: "2026-08-29T08:00:00-05:00",
+    end: "2026-08-29T19:00:00-05:00",
+    locationName: "Matchups & times TBD",
+    note: "BGYFL regular season kickoff",
   },
 ];
 
@@ -275,9 +314,11 @@ export const ADMIN_NAV = [
   { label: "Settings", href: `${BASE}/clear/settings` },
 ] as const;
 
-/** Key dates surfaced in the UI for urgency/trust. */
+/** Confirmed 2026 key dates surfaced in the UI for urgency/trust. */
 export const KEY_DATES = {
-  earlyBirdDeadline: "July 15, 2026",
-  seasonKickoff: "September 12, 2026",
+  balanceDue: "June 19, 2026",
   campWeek: "July 13–16, 2026",
+  practiceBegins: "July 30, 2026",
+  jamboree: "August 21, 2026",
+  seasonKickoff: "August 29, 2026",
 } as const;

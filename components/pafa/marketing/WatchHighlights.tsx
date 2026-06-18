@@ -1,19 +1,19 @@
-"use client";
+import { Facebook, Instagram, Film } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import Button from "@/components/pafa/ui/Button";
+import { SOCIALS } from "@/lib/pafa/constants";
 
-import { Play, X } from "lucide-react";
-import { Dialog as DialogPrimitive } from "radix-ui";
-import { useState } from "react";
+const SOCIAL_ICONS: Record<string, LucideIcon> = {
+  facebook: Facebook,
+  instagram: Instagram,
+};
 
 /**
- * Highlights reel. The YouTube iframe is only mounted when the modal opens, so
- * it never blocks the main thread or hurts LCP/INP on initial load.
- * Replace VIDEO_ID with the real Panthers highlight reel.
+ * Highlights / clips. PAFA has no YouTube channel yet, so this points families
+ * to the official Facebook + Instagram where game clips and photos are posted.
+ * When a highlight reel exists, swap this for an embedded/lazy-loaded player.
  */
-const VIDEO_ID = "dQw4w9WgXcQ"; // TODO: replace with official Panthers highlights ID
-
 export default function WatchHighlights() {
-  const [open, setOpen] = useState(false);
-
   return (
     <section id="highlights" aria-labelledby="highlights-heading" className="scroll-mt-24">
       <div className="glass-panel-strong relative overflow-hidden rounded-2xl">
@@ -21,58 +21,41 @@ export default function WatchHighlights() {
         <div className="relative grid items-center gap-8 p-8 md:grid-cols-2 md:p-12">
           <div>
             <p className="mb-2 text-sm font-semibold tracking-widest text-brand-gold uppercase">
-              Watch Highlights
+              Catch the Action
             </p>
             <h2 id="highlights-heading" className="text-display text-4xl md:text-5xl">
-              Feel the Friday Night Energy
+              Friday Night Highlights
             </h2>
             <p className="mt-3 max-w-md text-text-secondary">
-              Big hits, big plays, and the roar of the Den. See what a season with the
-              Palatine Panthers really looks like.
+              Big hits, big plays, and the roar of the Den. We post game clips, photos,
+              and Panther moments all season long — follow along and tag your player.
             </p>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              {SOCIALS.map((s) => {
+                const Icon = SOCIAL_ICONS[s.icon];
+                return (
+                  <Button key={s.label} variant="secondary" size="lg" className="gap-2" asChild>
+                    <a href={s.href} target="_blank" rel="noopener noreferrer">
+                      {Icon && <Icon className="size-5" aria-hidden="true" />}
+                      Follow on {s.label}
+                    </a>
+                  </Button>
+                );
+              })}
+            </div>
           </div>
 
-          <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
-            <DialogPrimitive.Trigger
-              aria-label="Play Palatine Panthers highlight reel"
-              className="group bg-media-placeholder relative flex w-full items-center justify-center overflow-hidden rounded-xl border border-border-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60"
-              style={{ aspectRatio: "16 / 9" }}
-            >
-              <span className="flex size-16 items-center justify-center rounded-full bg-brand-gold text-brand-black shadow-glow-gold transition-transform duration-200 group-hover:scale-110">
-                <Play className="size-7 translate-x-0.5 fill-current" aria-hidden="true" />
-              </span>
-              <span className="absolute bottom-3 left-4 text-sm font-medium text-text-secondary">
-                2025 Season Highlights · 2:14
-              </span>
-            </DialogPrimitive.Trigger>
-
-            <DialogPrimitive.Portal>
-              <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm" />
-              <DialogPrimitive.Content className="fixed top-1/2 left-1/2 z-50 w-[92vw] max-w-4xl -translate-x-1/2 -translate-y-1/2 focus:outline-none">
-                <DialogPrimitive.Title className="sr-only">
-                  Palatine Panthers Highlights
-                </DialogPrimitive.Title>
-                <div className="relative overflow-hidden rounded-xl bg-black" style={{ aspectRatio: "16 / 9" }}>
-                  {open && (
-                    <iframe
-                      className="absolute inset-0 size-full"
-                      src={`https://www.youtube-nocookie.com/embed/${VIDEO_ID}?autoplay=1&rel=0`}
-                      title="Palatine Panthers Highlights"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                      loading="lazy"
-                    />
-                  )}
-                </div>
-                <DialogPrimitive.Close
-                  className="absolute -top-3 -right-3 rounded-full bg-bg-panel p-2 text-text-secondary ring-1 ring-border-strong hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/60"
-                  aria-label="Close video"
-                >
-                  <X className="size-5" />
-                </DialogPrimitive.Close>
-              </DialogPrimitive.Content>
-            </DialogPrimitive.Portal>
-          </DialogPrimitive.Root>
+          <div
+            className="bg-media-placeholder relative flex items-center justify-center overflow-hidden rounded-xl border border-border-default"
+            style={{ aspectRatio: "16 / 9" }}
+            role="img"
+            aria-label="Palatine Panthers game-day moments"
+          >
+            <Film className="size-12 text-text-muted/50" aria-hidden="true" />
+            <span className="absolute bottom-3 left-4 text-sm font-medium text-text-secondary">
+              Clips posted all season on social
+            </span>
+          </div>
         </div>
       </div>
     </section>

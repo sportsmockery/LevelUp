@@ -1,4 +1,4 @@
-import { SITE, SOCIALS, UPCOMING_GAMES } from "@/lib/pafa/constants";
+import { SITE, SOCIALS, SEASON_EVENTS } from "@/lib/pafa/constants";
 
 /**
  * JSON-LD structured data: SportsOrganization (with SportsTeam semantics) plus
@@ -17,7 +17,13 @@ export default function StructuredData() {
     foundingDate: String(SITE.founded),
     url: SITE.url,
     email: SITE.email,
-    telephone: SITE.phone,
+    telephone: SITE.contacts[0]?.phone,
+    contactPoint: SITE.contacts.map((c) => ({
+      "@type": "ContactPoint",
+      name: c.name,
+      contactType: c.role,
+      telephone: c.phone,
+    })),
     memberOf: { "@type": "SportsOrganization", name: SITE.affiliation.name },
     sameAs: SOCIALS.map((s) => s.href),
     address: {
@@ -35,21 +41,19 @@ export default function StructuredData() {
     },
   };
 
-  const events = UPCOMING_GAMES.map((g) => ({
+  const events = SEASON_EVENTS.map((e) => ({
     "@context": "https://schema.org",
     "@type": "SportsEvent",
-    name: `Palatine Panthers ${g.home ? "vs" : "@"} ${g.opponent}`,
-    startDate: g.start,
-    endDate: g.end,
+    name: `Palatine Panthers — ${e.title}`,
+    startDate: e.start,
+    endDate: e.end,
     eventStatus: "https://schema.org/EventScheduled",
     eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
     location: {
       "@type": "Place",
-      name: g.venueName,
-      address: g.venueAddress,
+      name: e.locationName,
+      ...(e.locationAddress ? { address: e.locationAddress } : {}),
     },
-    homeTeam: { "@type": "SportsTeam", name: g.home ? SITE.name : g.opponent },
-    awayTeam: { "@type": "SportsTeam", name: g.home ? g.opponent : SITE.name },
     organizer: { "@type": "SportsOrganization", name: SITE.name, url: SITE.url },
   }));
 

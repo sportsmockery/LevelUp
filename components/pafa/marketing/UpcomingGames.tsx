@@ -3,7 +3,7 @@ import { MapPin } from "lucide-react";
 import Badge from "@/components/pafa/ui/Badge";
 import Button from "@/components/pafa/ui/Button";
 import AddToCalendarButton from "@/components/pafa/marketing/AddToCalendarButton";
-import { BASE, UPCOMING_GAMES } from "@/lib/pafa/constants";
+import { BASE, SEASON_EVENTS, type SeasonEvent } from "@/lib/pafa/constants";
 
 const fmtDate = new Intl.DateTimeFormat("en-US", {
   weekday: "short",
@@ -17,76 +17,77 @@ const fmtTime = new Intl.DateTimeFormat("en-US", {
   timeZone: "America/Chicago",
 });
 
+const categoryVariant: Record<SeasonEvent["category"], "gold" | "blue" | "neutral"> = {
+  Football: "gold",
+  Camp: "blue",
+  Team: "neutral",
+  Community: "neutral",
+};
+
 export default function UpcomingGames() {
   return (
     <section id="schedule" aria-labelledby="games-heading" className="scroll-mt-24">
       <div className="mb-10 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
         <div>
           <p className="mb-2 text-sm font-semibold tracking-widest text-brand-gold uppercase">
-            Upcoming Games
+            Mark Your Calendar
           </p>
           <h2 id="games-heading" className="text-display text-4xl md:text-5xl">
-            See You Under the Lights
+            Upcoming at the Den
           </h2>
+          <p className="mt-3 max-w-xl text-text-secondary">
+            The 2026 BGYFL game schedule drops soon (Week 1 kicks off Aug 29). Here are
+            the key dates every Panther family needs.
+          </p>
         </div>
         <Button variant="ghost" asChild>
           <Link href={`${BASE}/schedule`}>Full schedule →</Link>
         </Button>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
-        {UPCOMING_GAMES.map((game) => (
-          <article key={game.id} className="glass-panel flex flex-col rounded-xl p-6">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {SEASON_EVENTS.map((event) => (
+          <article key={event.id} className="glass-panel flex flex-col rounded-xl p-6">
             <div className="flex items-center justify-between">
-              <Badge variant={game.home ? "gold" : "neutral"}>
-                {game.home ? "Home" : "Away"}
-              </Badge>
+              <Badge variant={categoryVariant[event.category]}>{event.category}</Badge>
               <time
-                dateTime={game.start}
+                dateTime={event.start}
                 className="font-mono text-sm tabular-nums text-text-secondary"
               >
-                {fmtDate.format(new Date(game.start))}
+                {fmtDate.format(new Date(event.start))}
               </time>
             </div>
 
-            <div className="mt-5 flex flex-col items-center gap-1 text-center">
-              <span className="text-display text-2xl text-text-primary">
-                Panthers
-              </span>
-              <span className="text-sm font-medium text-text-muted">
-                {game.home ? "vs" : "@"}
-              </span>
-              <span className="text-display text-2xl text-text-primary">
-                {game.opponent}
-              </span>
-            </div>
+            <h3 className="text-display mt-5 text-2xl text-text-primary">
+              {event.title}
+            </h3>
 
-            {game.note && (
-              <p className="mt-3 text-center text-sm font-medium text-brand-gold">
-                {game.note}
-              </p>
+            {event.note && (
+              <p className="mt-2 text-sm font-medium text-brand-gold">{event.note}</p>
             )}
 
-            <div className="mt-4 flex items-center justify-center gap-2 text-sm text-text-secondary">
+            <div className="mt-4 flex items-center gap-2 text-sm text-text-secondary">
               <span className="font-mono tabular-nums">
-                {fmtTime.format(new Date(game.start))}
+                {fmtTime.format(new Date(event.start))}
               </span>
               <span aria-hidden="true">·</span>
-              <span>{game.venueName}</span>
+              <span>{event.locationName}</span>
             </div>
 
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-2 border-t border-border-subtle pt-4">
-              <AddToCalendarButton game={game} />
-              <Button variant="ghost" size="sm" className="gap-1.5" asChild>
-                <a
-                  href={`https://www.google.com/maps/dir/?api=1&destination=${game.mapsQuery}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <MapPin className="size-4" aria-hidden="true" />
-                  Directions
-                </a>
-              </Button>
+            <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-border-subtle pt-4">
+              <AddToCalendarButton event={event} />
+              {event.mapsQuery && (
+                <Button variant="ghost" size="sm" className="gap-1.5" asChild>
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${event.mapsQuery}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <MapPin className="size-4" aria-hidden="true" />
+                    Directions
+                  </a>
+                </Button>
+              )}
             </div>
           </article>
         ))}
