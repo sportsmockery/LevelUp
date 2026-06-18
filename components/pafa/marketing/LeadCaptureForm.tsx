@@ -7,15 +7,36 @@ import { PROGRAMS } from "@/lib/pafa/constants";
 
 export default function LeadCaptureForm() {
   const [submitted, setSubmitted] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [pending, setPending] = useState(false);
   const [email, setEmail] = useState("");
   const [program, setProgram] = useState("");
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    // The async network call runs off the event handler's critical path, so the
+    // interaction stays well under the INP budget; UI updates drive feedback.
     e.preventDefault();
-    // TODO: wire to PAFA CRM / email provider (e.g. /api/pafa/leads).
-    // Kept lightweight + synchronous so the interaction stays well under the
-    // INP budget; replace with a non-blocking fetch when the endpoint exists.
-    setSubmitted(true);
+    setError("");
+    setPending(true);
+    try {
+      const res = await fetch("/api/pafa/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, program, source: "season-guide" }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setError(data.error ?? "Something went wrong. Please try again.");
+        return;
+      }
+      setMessage(data.message ?? "You're on the list!");
+      setSubmitted(true);
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setPending(false);
+    }
   };
 
   return (
@@ -40,9 +61,7 @@ export default function LeadCaptureForm() {
             className="flex items-center gap-3 rounded-xl border border-status-success/30 bg-status-success/10 p-6"
           >
             <CheckCircle2 className="size-8 shrink-0 text-status-success" aria-hidden="true" />
-            <p className="text-text-primary">
-              You&apos;re on the list! Check your inbox for the Panther Season Guide.
-            </p>
+            <p className="text-text-primary">{message}</p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
@@ -88,8 +107,19 @@ export default function LeadCaptureForm() {
               </select>
             </div>
 
-            <Button type="submit" variant="primary" size="lg" className="w-full">
-              Send Me the Guide
+            {error && (
+              <p role="alert" className="text-sm text-status-danger">
+                {error}
+              </p>
+            )}
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              className="w-full"
+              disabled={pending}
+            >
+              {pending ? "Sending…" : "Send Me the Guide"}
             </Button>
             <p className="text-xs text-text-muted">
               We respect your privacy. Unsubscribe anytime.
