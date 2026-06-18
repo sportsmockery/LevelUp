@@ -2,7 +2,7 @@
 
 import { CalendarPlus } from "lucide-react";
 import Button from "@/components/pafa/ui/Button";
-import type { UpcomingGame } from "@/lib/pafa/constants";
+import type { SeasonEvent } from "@/lib/pafa/constants";
 
 /** ISO -> iCalendar UTC stamp (YYYYMMDDTHHMMSSZ). */
 function toICSDate(iso: string): string {
@@ -13,24 +13,24 @@ function escapeICS(text: string): string {
   return text.replace(/([,;\\])/g, "\\$1").replace(/\n/g, "\\n");
 }
 
-export default function AddToCalendarButton({ game }: { game: UpcomingGame }) {
+export default function AddToCalendarButton({ event }: { event: SeasonEvent }) {
   const handleDownload = () => {
-    const title = `Panthers ${game.home ? "vs" : "@"} ${game.opponent}`;
+    const location = event.locationAddress
+      ? `${event.locationName}, ${event.locationAddress}`
+      : event.locationName;
     const lines = [
       "BEGIN:VCALENDAR",
       "VERSION:2.0",
       "PRODID:-//Palatine Panthers//PAFA//EN",
       "CALSCALE:GREGORIAN",
       "BEGIN:VEVENT",
-      `UID:${game.id}@palatinepanthers.com`,
+      `UID:${event.id}@palatinepanthers.com`,
       `DTSTAMP:${toICSDate(new Date().toISOString())}`,
-      `DTSTART:${toICSDate(game.start)}`,
-      `DTEND:${toICSDate(game.end)}`,
-      `SUMMARY:${escapeICS(title)}`,
-      `LOCATION:${escapeICS(`${game.venueName}, ${game.venueAddress}`)}`,
-      `DESCRIPTION:${escapeICS(
-        `Palatine Panthers ${game.home ? "home" : "away"} game${game.note ? ` — ${game.note}` : ""}. Go Panthers!`,
-      )}`,
+      `DTSTART:${toICSDate(event.start)}`,
+      `DTEND:${toICSDate(event.end)}`,
+      `SUMMARY:${escapeICS(`Panthers — ${event.title}`)}`,
+      `LOCATION:${escapeICS(location)}`,
+      `DESCRIPTION:${escapeICS(event.note ? `${event.note}. Go Panthers!` : "Go Panthers!")}`,
       "END:VEVENT",
       "END:VCALENDAR",
     ];
@@ -39,7 +39,7 @@ export default function AddToCalendarButton({ game }: { game: UpcomingGame }) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `panthers-${game.id}.ics`;
+    a.download = `panthers-${event.id}.ics`;
     document.body.appendChild(a);
     a.click();
     a.remove();

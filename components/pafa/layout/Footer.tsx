@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Facebook, Instagram, Youtube, MapPin, Mail, Phone } from "lucide-react";
+import { Facebook, Instagram, MapPin, Mail, Phone } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
   PROGRAMS,
@@ -14,7 +14,6 @@ import NewsletterForm from "@/components/pafa/layout/NewsletterForm";
 const SOCIAL_ICONS: Record<string, LucideIcon> = {
   facebook: Facebook,
   instagram: Instagram,
-  youtube: Youtube,
 };
 
 export default function Footer() {
@@ -49,12 +48,20 @@ export default function Footer() {
                   {SITE.email}
                 </a>
               </li>
-              <li className="flex items-center gap-2">
-                <Phone className="size-4 shrink-0 text-brand-gold" aria-hidden="true" />
-                <a href={`tel:${SITE.phone.replace(/[^\d+]/g, "")}`} className="hover:text-text-primary">
-                  {SITE.phone}
-                </a>
-              </li>
+              {SITE.contacts.map((c) => (
+                <li key={c.name} className="flex items-center gap-2">
+                  <Phone className="size-4 shrink-0 text-brand-gold" aria-hidden="true" />
+                  <span>
+                    <a
+                      href={`tel:${c.phone.replace(/[^\d+]/g, "")}`}
+                      className="hover:text-text-primary"
+                    >
+                      {c.phone}
+                    </a>
+                    <span className="text-text-muted"> · {c.name}, {c.role}</span>
+                  </span>
+                </li>
+              ))}
             </ul>
           </div>
 

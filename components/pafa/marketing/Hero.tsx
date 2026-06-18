@@ -83,7 +83,8 @@ export default function Hero() {
           </dl>
 
           <p className="text-sm text-brand-gold-bright">
-            ⏳ Early-bird registration closes {KEY_DATES.earlyBirdDeadline} — lock in your spot.
+            🏈 2026 practice begins {KEY_DATES.practiceBegins} at Ost Field — spots are
+            limited. Reach out to join the waitlist.
           </p>
         </div>
 
