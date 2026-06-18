@@ -1,88 +1,114 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import Hero from "@/components/pafa/marketing/Hero";
 import FeatureGrid from "@/components/pafa/marketing/FeatureGrid";
+import ProgramCards from "@/components/pafa/marketing/ProgramCards";
+import FamilyPortalTeaser from "@/components/pafa/marketing/FamilyPortalTeaser";
+import UpcomingGames from "@/components/pafa/marketing/UpcomingGames";
+import MomentsGallery from "@/components/pafa/marketing/MomentsGallery";
+import WatchHighlights from "@/components/pafa/marketing/WatchHighlights";
+import Testimonials from "@/components/pafa/marketing/Testimonials";
+import LeadCaptureForm from "@/components/pafa/marketing/LeadCaptureForm";
 import SponsorWall from "@/components/pafa/marketing/SponsorWall";
-import GameCard from "@/components/pafa/schedule/GameCard";
+import StickyMobileCTA from "@/components/pafa/marketing/StickyMobileCTA";
+import StructuredData from "@/components/pafa/marketing/StructuredData";
 import Button from "@/components/pafa/ui/Button";
-import { Card, CardBody } from "@/components/pafa/ui/Card";
-import { BASE, PROGRAM_SLUGS } from "@/lib/pafa/constants";
+import { BASE, SITE } from "@/lib/pafa/constants";
+
+const description =
+  "Palatine Panthers (PAFA) — youth tackle & flag football, cheerleading, and summer camp for grades K–8 in Palatine, IL. Heads Up certified coaching, real community, and Friday night lights at Ost Field since 1966. Register today.";
+
+export const metadata: Metadata = {
+  title: {
+    absolute: "Palatine Panthers Youth Football & Cheer — Grades K–8 | Palatine, IL",
+  },
+  description,
+  alternates: { canonical: `${BASE}` },
+  keywords: [
+    "Palatine youth football",
+    "PAFA",
+    "Palatine Panthers",
+    "youth tackle football",
+    "flag football Palatine",
+    "youth cheerleading Palatine IL",
+    "BGYFL",
+    "Ost Field",
+  ],
+  openGraph: {
+    type: "website",
+    siteName: SITE.name,
+    title: "Palatine Panthers — Welcome to the Den",
+    description,
+    url: SITE.url,
+    images: [
+      {
+        url: "/pafa/media/hero-poster.svg",
+        width: 1600,
+        height: 900,
+        alt: "Palatine Panthers under the Friday night lights at Ost Field",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Palatine Panthers — Welcome to the Den",
+    description,
+    images: ["/pafa/media/hero-poster.svg"],
+  },
+};
 
 export default function HomePage() {
   return (
     <>
+      {/* Preload the LCP hero poster. React 19 hoists this into <head>. */}
+      <link
+        rel="preload"
+        as="image"
+        href="/pafa/media/hero-poster.svg"
+        fetchPriority="high"
+      />
+
+      <StructuredData />
+
       <Hero />
-      <div className="mx-auto max-w-7xl space-y-16 px-6 py-12">
+
+      <div className="mx-auto max-w-7xl space-y-24 px-6 py-20">
         <FeatureGrid />
-
-        <section>
-          <h2 className="text-display mb-8 text-4xl">Programs</h2>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {PROGRAM_SLUGS.map((slug) => (
-              <Card key={slug}>
-                <CardBody className="space-y-4">
-                  <h3 className="font-sans font-semibold text-text-primary">
-                    {/* COPY: program name */}
-                  </h3>
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href={`${BASE}/programs/${slug}`}>Learn more</Link>
-                  </Button>
-                </CardBody>
-              </Card>
-            ))}
-          </div>
-        </section>
-
-        <section>
-          <h2 className="text-display mb-8 text-4xl">Live now</h2>
-          <div className="grid gap-6 md:grid-cols-3">
-            <GameCard />
-            <GameCard />
-            <GameCard />
-          </div>
-        </section>
-
-        <section>
-          <h2 className="text-display mb-8 text-4xl">Latest news</h2>
-          <div className="grid gap-6 md:grid-cols-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Card key={i}>
-                <CardBody className="space-y-3">
-                  <div
-                    data-image-slot="news-thumbnail"
-                    aria-hidden="true"
-                    className="aspect-[16/9] rounded-lg border border-border-subtle bg-bg-elevated"
-                  />
-                  <h3 className="font-sans font-semibold text-text-primary">
-                    {/* COPY: news headline */}
-                  </h3>
-                  <p className="text-sm text-text-muted">
-                    {/* COPY: news date */}
-                  </p>
-                </CardBody>
-              </Card>
-            ))}
-          </div>
-        </section>
-
+        <ProgramCards />
+        <FamilyPortalTeaser />
+        <UpcomingGames />
+        <MomentsGallery />
+        <WatchHighlights />
+        <Testimonials />
+        <LeadCaptureForm />
         <SponsorWall />
 
-        <section className="glass-panel-strong rounded-2xl p-8 text-center">
-          <h2 className="text-display mb-4 text-4xl">
-            {/* COPY: get involved heading */}
-          </h2>
-          <p className="mb-6 text-text-secondary">
-            {/* COPY: get involved sub */}
-          </p>
-          <div className="flex justify-center gap-3">
-            <Button variant="primary" size="lg" asChild>
-              <Link href={`${BASE}/register`}>Register</Link>
-            </Button>
-            <Button variant="secondary" size="lg" asChild>
-              <Link href={`${BASE}/volunteer`}>Volunteer</Link>
-            </Button>
+        {/* Final conversion CTA */}
+        <section className="bg-field-hero glass-panel-strong relative overflow-hidden rounded-2xl p-10 text-center md:p-16">
+          <div className="bg-grid-overlay" aria-hidden="true" />
+          <div className="relative">
+            <h2 className="text-display text-4xl md:text-6xl">
+              Ready to Join the Den?
+            </h2>
+            <p className="mx-auto mt-4 max-w-xl text-lg text-text-secondary">
+              Spots fill fast every season. Secure your young Panther&apos;s place today
+              and become part of a Palatine tradition more than 50 years strong.
+            </p>
+            <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+              <Button variant="primary" size="lg" asChild>
+                <Link href={`${BASE}/register`}>Register Now →</Link>
+              </Button>
+              <Button variant="secondary" size="lg" asChild>
+                <Link href={`${BASE}/volunteer`}>Volunteer or Coach</Link>
+              </Button>
+            </div>
           </div>
         </section>
       </div>
+
+      {/* Spacer so the sticky mobile CTA never covers footer content */}
+      <div className="h-20 lg:hidden" aria-hidden="true" />
+      <StickyMobileCTA />
     </>
   );
 }

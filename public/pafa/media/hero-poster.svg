@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" role="img" aria-label="Palatine Panthers playing under the Friday night lights at Ost Field">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0b1326"/>
+      <stop offset="55%" stop-color="#070b16"/>
+      <stop offset="100%" stop-color="#05070c"/>
+    </linearGradient>
+    <radialGradient id="lightGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#e8d49a" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#e8d49a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="field" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0c2a16"/>
+      <stop offset="100%" stop-color="#06160c"/>
+    </linearGradient>
+    <linearGradient id="crest" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e8d49a"/>
+      <stop offset="100%" stop-color="#cBae6a"/>
+    </linearGradient>
+    <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e8d49a" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#e8d49a" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#sky)"/>
+
+  <!-- stadium light beams -->
+  <polygon points="250,120 120,620 540,620" fill="url(#beam)"/>
+  <polygon points="1350,120 1060,620 1480,620" fill="url(#beam)"/>
+
+  <!-- light banks -->
+  <g fill="#11192b">
+    <rect x="232" y="150" width="36" height="470"/>
+    <rect x="1332" y="150" width="36" height="470"/>
+    <rect x="180" y="96" width="140" height="60" rx="6"/>
+    <rect x="1280" y="96" width="140" height="60" rx="6"/>
+  </g>
+  <g fill="#e8d49a">
+    <circle cx="210" cy="126" r="7"/><circle cx="240" cy="126" r="7"/><circle cx="270" cy="126" r="7"/><circle cx="300" cy="126" r="7"/>
+    <circle cx="1310" cy="126" r="7"/><circle cx="1340" cy="126" r="7"/><circle cx="1370" cy="126" r="7"/><circle cx="1400" cy="126" r="7"/>
+  </g>
+  <circle cx="250" cy="126" r="170" fill="url(#lightGlow)"/>
+  <circle cx="1350" cy="126" r="170" fill="url(#lightGlow)"/>
+
+  <!-- crowd / stand silhouette -->
+  <rect x="0" y="560" width="1600" height="80" fill="#0a0f1c"/>
+  <g fill="#0d1424" opacity="0.9">
+    <rect x="0" y="540" width="1600" height="24"/>
+  </g>
+
+  <!-- field with perspective yard lines -->
+  <polygon points="0,640 1600,640 1600,900 0,900" fill="url(#field)"/>
+  <g stroke="#1f5a33" stroke-width="3" opacity="0.55">
+    <line x1="300" y1="640" x2="120" y2="900"/>
+    <line x1="560" y1="640" x2="470" y2="900"/>
+    <line x1="800" y1="640" x2="800" y2="900"/>
+    <line x1="1040" y1="640" x2="1130" y2="900"/>
+    <line x1="1300" y1="640" x2="1480" y2="900"/>
+  </g>
+  <g stroke="#2a7344" stroke-width="2" opacity="0.4">
+    <line x1="0" y1="710" x2="1600" y2="710"/>
+    <line x1="0" y1="790" x2="1600" y2="790"/>
+  </g>
+
+  <!-- Panther crest -->
+  <g transform="translate(800 360)">
+    <path d="M0,-118 L104,-60 L104,40 Q104,118 0,150 Q-104,118 -104,40 L-104,-60 Z"
+          fill="#070b16" stroke="url(#crest)" stroke-width="6"/>
+    <text x="0" y="44" text-anchor="middle" font-family="Oswald, Arial Narrow, sans-serif"
+          font-weight="700" font-size="150" fill="url(#crest)">P</text>
+  </g>
+
+  <!-- venue wordmark -->
+  <text x="800" y="600" text-anchor="middle" font-family="Oswald, Arial Narrow, sans-serif"
+        letter-spacing="14" font-size="34" fill="#cbd5e1" opacity="0.8">OST FIELD · PALATINE, IL</text>
+
+  <!-- vignette -->
+  <rect width="1600" height="900" fill="black" opacity="0.18"/>
+</svg>

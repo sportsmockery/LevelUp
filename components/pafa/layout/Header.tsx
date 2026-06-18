@@ -19,14 +19,20 @@ export default function Header() {
   return (
     <header className="glass-panel-subtle fixed top-0 right-0 left-0 z-50 w-full border-b border-border-subtle">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
-        <Link href={BASE} className="flex items-center gap-3">
-          <div
-            data-image-slot="logo"
+        <Link href={BASE} className="flex items-center gap-3" aria-label={`${SITE.name} home`}>
+          <span
             aria-hidden="true"
-            className="h-10 w-10 rounded-md border border-border-subtle bg-bg-elevated"
-          />
-          <span className="text-display text-2xl text-text-primary">
-            {SITE.shortName}
+            className="flex size-10 items-center justify-center rounded-md bg-brand-gold text-display text-xl text-brand-black"
+          >
+            P
+          </span>
+          <span className="flex flex-col leading-none">
+            <span className="text-display text-2xl text-text-primary">
+              {SITE.name}
+            </span>
+            <span className="text-[10px] tracking-widest text-text-muted uppercase">
+              Est. {SITE.founded}
+            </span>
           </span>
         </Link>
 
@@ -52,7 +58,7 @@ export default function Header() {
             Sign In
           </Button>
           <Button variant="primary" size="sm" asChild>
-            <Link href={`${BASE}/register`}>Register</Link>
+            <Link href={`${BASE}/register`}>Join the Pride</Link>
           </Button>
         </div>
 
@@ -96,7 +102,7 @@ export default function Header() {
                 <Button variant="ghost">Sign In</Button>
                 <Button variant="primary" asChild>
                   <Link href={`${BASE}/register`} onClick={() => setOpen(false)}>
-                    Register
+                    Join the Pride
                   </Link>
                 </Button>
               </div>

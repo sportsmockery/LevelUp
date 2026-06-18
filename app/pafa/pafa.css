@@ -105,4 +105,46 @@
     background-size: 64px 64px;
     mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
   }
+
+  /* "Friday night lights" stadium gradient — zero-asset, CLS-safe poster
+     used behind the hero photo and as a fallback if the image 404s. */
+  .pafa-theme .bg-field-hero {
+    background:
+      radial-gradient(120% 80% at 50% -10%, rgba(232, 212, 154, 0.22) 0%, transparent 45%),
+      radial-gradient(90% 60% at 15% 10%, rgba(59, 130, 246, 0.20) 0%, transparent 55%),
+      radial-gradient(90% 60% at 85% 0%, rgba(124, 58, 237, 0.14) 0%, transparent 55%),
+      linear-gradient(180deg, #0a0d15 0%, #07090f 55%, #05070c 100%);
+  }
+
+  /* Soft field-turf hatch used on media placeholders so empty slots still
+     read as intentional, branded surfaces (no broken-image flashes). */
+  .pafa-theme .bg-media-placeholder {
+    background:
+      radial-gradient(80% 80% at 30% 20%, rgba(59, 130, 246, 0.14) 0%, transparent 60%),
+      radial-gradient(80% 80% at 80% 80%, rgba(209, 191, 129, 0.12) 0%, transparent 60%),
+      var(--color-bg-elevated);
+  }
+
+  .pafa-theme .text-gradient-gold {
+    background: linear-gradient(180deg, var(--color-brand-gold-bright) 0%, var(--color-brand-gold) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .pafa-theme .scroll-hint {
+    animation: pafa-bounce 2.2s ease-in-out infinite;
+  }
+
+  @keyframes pafa-bounce {
+    0%, 100% { transform: translateY(0); opacity: 0.7; }
+    50% { transform: translateY(6px); opacity: 1; }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pafa-theme .scroll-hint,
+  .pafa-theme .animate-ping {
+    animation: none !important;
+  }
 }
