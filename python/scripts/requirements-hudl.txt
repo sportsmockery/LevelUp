@@ -1,0 +1,8 @@
+# Dependencies for scripts/hudl_downloader.py only.
+# Kept separate from python/requirements.txt so the ML server / Colab image
+# is not forced to install these.
+#
+# ffmpeg is also required for the HLS fallback path, installed via the OS
+# package manager (apt-get install ffmpeg / brew install ffmpeg), not pip.
+requests>=2.31.0
+beautifulsoup4>=4.12.0
