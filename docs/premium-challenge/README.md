@@ -56,8 +56,8 @@ Three claims, three screens:
 - **We know our tail** — drag SPX to −10% and IV to +80% and watch the book reprice and the
   kill switches trip. Replay Feb 2018, Mar 2020, Oct 2022 and watch it de-risk.
 - **The record is real** — every trade hash-chained and written *before* the order is sent,
-  with the chain head committed daily to public git. A `/theta/verify` page lets him check the
+  with the chain head committed daily to public git. A `/options/verify` page lets him check the
   whole history himself without an account.
 
-Built as `app/theta` in this repo, reusing the existing Next.js 16 / Supabase / Recharts stack
+Built as `app/options` in this repo, reusing the existing Next.js 16 / Supabase / Recharts stack
 and the `python/` FastAPI pattern for the backtest engine. **Demo-ready in four weeks.**

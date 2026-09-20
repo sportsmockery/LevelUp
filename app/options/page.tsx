@@ -1,6 +1,6 @@
 import { supabaseServer } from '@/lib/supabase-server';
-import { KILLSWITCH_LADDER } from '@/lib/theta/types';
-import { computeRulesVersion, RULE_COUNT } from '@/lib/theta/rules';
+import { KILLSWITCH_LADDER } from '@/lib/options/types';
+import { computeRulesVersion, RULE_COUNT } from '@/lib/options/rules';
 import { PageHeader, PendingPanel, StatTile } from './_components/phase-shell';
 
 export const dynamic = 'force-dynamic';
@@ -91,7 +91,7 @@ export default async function ThetaLivePage() {
           <p className="mt-1 max-w-2xl text-sm text-slate-400">
             Rulebook §9. Evaluated before every order submission rather than on a schedule.
             Encoded in{' '}
-            <code className="font-mono text-xs text-slate-300">lib/theta/types.ts</code>.
+            <code className="font-mono text-xs text-slate-300">lib/options/types.ts</code>.
           </p>
 
           <div className="mt-5 overflow-x-auto">

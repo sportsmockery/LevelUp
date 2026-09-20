@@ -19,13 +19,13 @@ import { cn } from '@/lib/utils';
  * so it is deliberately not alphabetical or grouped by feature.
  */
 const NAV = [
-  { href: '/theta',             label: 'Live',         icon: Activity,     beat: '0:00' },
-  { href: '/theta/blotter',     label: 'Blotter',      icon: ListChecks,   beat: '1:00' },
-  { href: '/theta/risk',        label: 'Risk',         icon: ShieldAlert,  beat: '2:30' },
-  { href: '/theta/scenario',    label: 'Scenario',     icon: Zap,          beat: '3:30' },
-  { href: '/theta/replay',      label: 'Replay',       icon: History,      beat: '4:30' },
-  { href: '/theta/probability', label: 'Probability',  icon: ScatterChart, beat: '5:30' },
-  { href: '/theta/verify',      label: 'Verify',       icon: GitBranch,    beat: null   },
+  { href: '/options',             label: 'Live',         icon: Activity,     beat: '0:00' },
+  { href: '/options/blotter',     label: 'Blotter',      icon: ListChecks,   beat: '1:00' },
+  { href: '/options/risk',        label: 'Risk',         icon: ShieldAlert,  beat: '2:30' },
+  { href: '/options/scenario',    label: 'Scenario',     icon: Zap,          beat: '3:30' },
+  { href: '/options/replay',      label: 'Replay',       icon: History,      beat: '4:30' },
+  { href: '/options/probability', label: 'Probability',  icon: ScatterChart, beat: '5:30' },
+  { href: '/options/verify',      label: 'Verify',       icon: GitBranch,    beat: null   },
 ];
 
 function Sidebar() {

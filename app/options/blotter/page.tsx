@@ -1,5 +1,5 @@
-import { RULE_CATALOG, RULE_COUNT, computeRulesVersion } from '@/lib/theta/rules';
-import type { RuleScope } from '@/lib/theta/types';
+import { RULE_CATALOG, RULE_COUNT, computeRulesVersion } from '@/lib/options/rules';
+import type { RuleScope } from '@/lib/options/types';
 import { PageHeader, PendingPanel } from '../_components/phase-shell';
 
 const SCOPE_ORDER: { scope: RuleScope; title: string; note: string }[] = [
@@ -43,7 +43,7 @@ export default function ThetaBlotterPage() {
           </div>
           <p className="mt-1 max-w-2xl text-sm text-slate-400">
             The declarative half of the engine, live from{' '}
-            <code className="font-mono text-xs text-slate-300">lib/theta/rules.ts</code>. Each
+            <code className="font-mono text-xs text-slate-300">lib/options/rules.ts</code>. Each
             threshold traces to a numbered section of the rulebook; changing one produces a new
             version hash and is committed before it takes effect.
           </p>

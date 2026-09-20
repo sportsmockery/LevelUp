@@ -1,7 +1,7 @@
 # ThetaDesk — Web App Build Plan
 
 **Working name:** ThetaDesk (placeholder)
-**Route:** `/theta` inside the existing LevelUp Next.js app
+**Route:** `/options` inside the existing LevelUp Next.js app
 **Date:** 2026-09-20
 **Companion doc:** `01-RULEBOOK.md` — the app is an executable implementation of that rulebook
 
@@ -30,7 +30,7 @@ the live track that follows it, it is out of scope for v1.
 
 `sportsmockery/LevelUp` already runs as a multi-tenant demo factory — `app/pafa`,
 `app/sunvista`, `app/wod`, `app/windcreek`, `app/hs` are each independent client surfaces on
-shared infrastructure. Adding `app/theta` costs nothing and inherits:
+shared infrastructure. Adding `app/options` costs nothing and inherits:
 
 - **Next.js 16 App Router + React 19** — server components for the heavy data reads
 - **Tailwind 4 + shadcn/radix** — the dashboard chrome exists already
@@ -40,7 +40,7 @@ shared infrastructure. Adding `app/theta` costs nothing and inherits:
 - **`python/`** — there is already a FastAPI-on-Colab pattern in this repo for GPU work. The
   same pattern serves the backtest engine, which is compute-heavy and belongs in Python.
 
-Namespace every table `td_*` and every route under `/theta` so it stays fully isolated from
+Namespace every table `td_*` and every route under `/options` so it stays fully isolated from
 the wrestling and dental systems.
 
 ---
@@ -69,12 +69,12 @@ than any return number.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│  BROWSER  — levelupwrestlingapp.com/theta                           │
+│  BROWSER  — levelupwrestlingapp.com/options                         │
 │  Next.js 16 RSC · Tailwind 4 · shadcn · Recharts 3                  │
 └───────────────┬─────────────────────────────────────────────────────┘
                 │
 ┌───────────────▼─────────────────────────────────────────────────────┐
-│  NEXT.JS API ROUTES  app/api/theta/*                                │
+│  NEXT.JS API ROUTES  app/api/options/*                              │
 │  live · blotter · trace · risk · scenario · replay · mc · leaderboard│
 └──────┬────────────────────────────────┬─────────────────────────────┘
        │                                │
@@ -268,7 +268,7 @@ ex-dividend check.
 
 ## 8. Backtest engine
 
-Python, event-driven, in `python/theta/`. Credibility lives or dies here.
+Python, event-driven, in `python/options/`. Credibility lives or dies here.
 
 **Loop:** for each trading day → load immutable chain snapshot → mark open positions at NBBO →
 run management rules → run entry rules → apply fills → update BP and equity → evaluate
@@ -347,7 +347,7 @@ Feeds the 5:30 slide.
 
 - **Broker:** Alpaca paper account (free, real options API, modern REST) for Phase 5;
   IBKR or tastytrade if/when real capital goes on.
-- **Orchestration:** Vercel Cron → `app/api/theta/cron/*` with a service-role secret and an
+- **Orchestration:** Vercel Cron → `app/api/options/cron/*` with a service-role secret and an
   idempotency key per (date, job) so a retry can't double-submit.
 - **Order handling:** multi-leg orders as a single combo where the broker supports it, limit
   at mid, three price-improvement steps toward the natural over 90 seconds, then cancel. Never
@@ -377,7 +377,7 @@ entry_hash = SHA256(prev_hash ‖ canonical_json(payload))
 - **Daily anchor, 16:05 ET:** the chain head hash is written to `audit/anchors/YYYY-MM-DD.json`
   and committed to this public repo. GitHub's commit timestamp is a third-party witness we
   don't control. Cost: zero. Persuasive power on a skeptical audience: very high.
-- **Public verifier:** `/theta/verify` re-walks the entire chain in the browser from the public
+- **Public verifier:** `/options/verify` re-walks the entire chain in the browser from the public
   view and shows a green/red result per anchor. He can run it himself, on his own machine,
   without an account.
 
@@ -389,7 +389,7 @@ Assumes one focused developer with agent assistance. Demo-ready in four weeks.
 
 | Phase | Window | Deliverable | Done when |
 |---|---|---|---|
-| **0 — Decisions** | Sep 21–23 | Vendor accounts, rulebook signed off, `app/theta` scaffold, `td_*` migration | Migration applied; empty dashboard deploys |
+| **0 — Decisions** | Sep 21–23 | Vendor accounts, rulebook signed off, `app/options` scaffold, `td_*` migration | Migration applied; empty dashboard deploys |
 | **1 — Data** | Sep 24–30 | Ingestion jobs, 10-year backfill for the universe, IV metrics pipeline | IV rank for any universe name on any historical date, in one query |
 | **2 — Backtest** | Oct 1–7 | Event-driven engine with all 10 correctness requirements (§8) | PUT-index replication within tolerance |
 | **3 — Strategy + validation** | Oct 8–14 | Rule engine with persisted traces; §9 protocol executed end to end | OOS results produced exactly once, sensitivity heat maps published |
@@ -447,7 +447,7 @@ Not a return number. Three outcomes, in order of how much they matter:
 1. He asks a question the app can answer *live, on screen, in the meeting* — a specific trade,
    a specific date, a specific shock. That's the moment the conversation stops being about
    whether AI can trade.
-2. He sends the `/theta/verify` link to someone on his desk to try to break.
+2. He sends the `/options/verify` link to someone on his desk to try to break.
 3. He proposes terms.
 
 ---
@@ -458,7 +458,7 @@ Not a return number. Three outcomes, in order of how much they matter:
    publishes a curve, term length, drawdown DQ).
 2. Open ORATS/Polygon trial accounts and pull a one-week sample for five universe names —
    validate field coverage before committing to a tier.
-3. Scaffold `app/theta` + the `td_*` migration and deploy an empty shell, so the URL exists
+3. Scaffold `app/options` + the `td_*` migration and deploy an empty shell, so the URL exists
    from day one.
 4. Build Phase 1. Do not skip ahead to the UI; the UI is a week of work on top of correct data
    and worthless on top of bad data.
