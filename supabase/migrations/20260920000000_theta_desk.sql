@@ -54,11 +54,12 @@ CREATE TABLE IF NOT EXISTS td_contracts (
   symbol      text NOT NULL REFERENCES td_underlyings(symbol) ON DELETE CASCADE,
   expiry      date NOT NULL,
   strike      numeric(12,4) NOT NULL,
-  right       char(1) NOT NULL CHECK (right IN ('C', 'P')),
+  -- Not named "right": that is a reserved word in Postgres.
+  opt_right   char(1) NOT NULL CHECK (opt_right IN ('C', 'P')),
   multiplier  integer NOT NULL DEFAULT 100
 );
 
-CREATE INDEX IF NOT EXISTS td_contracts_lookup_idx ON td_contracts (symbol, expiry, strike, right);
+CREATE INDEX IF NOT EXISTS td_contracts_lookup_idx ON td_contracts (symbol, expiry, strike, opt_right);
 
 -- =========================================================================
 -- 3. Market data — immutable and versioned
