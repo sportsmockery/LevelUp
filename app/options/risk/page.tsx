@@ -1,14 +1,15 @@
-import { PageHeader, PendingPanel } from '../_components/phase-shell';
+import { GUTTER, PageHeader, PendingPanel } from '../_components/phase-shell';
+import { cn } from '@/lib/utils';
 
 export default function ThetaRiskPage() {
   return (
-    <div className="pb-16">
+    <div className="pb-14">
       <PageHeader
         eyebrow="Beat 2:30 — Risk"
         title="What the book is actually carrying"
         blurb="Beta-weighted net delta, net theta and vega, buying-power utilization, sector concentration, and the kill-switch ladder with the current rung lit. Showing a skeptical trader the de-risking machinery is worth more than showing him the returns."
       />
-      <div className="px-8 py-7">
+      <div className={cn('py-6 sm:py-7', GUTTER)}>
         <PendingPanel
           phase="Phase 3–5"
           heading="Live risk panel"

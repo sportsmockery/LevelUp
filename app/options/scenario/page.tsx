@@ -1,14 +1,15 @@
-import { PageHeader, PendingPanel } from '../_components/phase-shell';
+import { GUTTER, PageHeader, PendingPanel } from '../_components/phase-shell';
+import { cn } from '@/lib/utils';
 
 export default function ThetaScenarioPage() {
   return (
-    <div className="pb-16">
+    <div className="pb-14">
       <PageHeader
         eyebrow="Beat 3:30 — Scenario"
         title="Shock the book and watch what breaks"
         blurb="The client drags the sliders himself: SPX down 10% overnight, IV up 80%. Instant repriced P&L per position, which kill switches trip, and what buying power survives. This is the question every trading principal actually asks."
       />
-      <div className="px-8 py-7">
+      <div className={cn('py-6 sm:py-7', GUTTER)}>
         <PendingPanel
           phase="Phase 3–4"
           heading="Scenario shocker"

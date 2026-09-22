@@ -1,14 +1,15 @@
-import { PageHeader, PendingPanel } from '../_components/phase-shell';
+import { GUTTER, PageHeader, PendingPanel } from '../_components/phase-shell';
+import { cn } from '@/lib/utils';
 
 export default function ThetaReplayPage() {
   return (
-    <div className="pb-16">
+    <div className="pb-14">
       <PageHeader
         eyebrow="Beat 4:30 — Replay"
         title="What happens when it goes wrong"
         blurb="One click replays the engine through February 2018, March 2020 and October 2022 against historical chain data — the ladder stepping down, positions closing, buying power contracting. A strategy that has never been shown failing has not been shown."
       />
-      <div className="px-8 py-7">
+      <div className={cn('py-6 sm:py-7', GUTTER)}>
         <PendingPanel
           phase="Phase 2–4"
           heading="Historical stress replay"

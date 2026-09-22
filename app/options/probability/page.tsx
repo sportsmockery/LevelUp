@@ -1,14 +1,15 @@
-import { PageHeader, PendingPanel } from '../_components/phase-shell';
+import { GUTTER, PageHeader, PendingPanel } from '../_components/phase-shell';
+import { cn } from '@/lib/utils';
 
 export default function ThetaProbabilityPage() {
   return (
-    <div className="pb-16">
+    <div className="pb-14">
       <PageHeader
         eyebrow="Beat 5:30 — Probability"
         title="The honest answer to the 100% question"
         blurb="A Monte Carlo cone over the forward twelve months, with an aggression slider. Drag it to the configuration whose median outcome is +100% and watch the probability of a 20% drawdown climb past half. This is the beat that wins the room — an instrument that volunteers its own probability of ruin is not something a vendor has handed him before."
       />
-      <div className="px-8 py-7">
+      <div className={cn('py-6 sm:py-7', GUTTER)}>
         <PendingPanel
           phase="Phase 3–4"
           heading="Probability cone"

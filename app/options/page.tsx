@@ -1,7 +1,15 @@
 import { supabaseServer } from '@/lib/supabase-server';
-import { KILLSWITCH_LADDER } from '@/lib/options/types';
+import { KILLSWITCH_LADDER, type KillswitchRung } from '@/lib/options/types';
 import { computeRulesVersion, RULE_COUNT } from '@/lib/options/rules';
-import { PageHeader, PendingPanel, StatTile } from './_components/phase-shell';
+import {
+  GUTTER,
+  PageHeader,
+  PendingPanel,
+  ScaffoldNotice,
+  StatRow,
+  StatTile,
+} from './_components/phase-shell';
+import { cn } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,28 +30,56 @@ async function loadAccounts(): Promise<AccountRow[] | null> {
   return data as AccountRow[];
 }
 
-export default async function ThetaLivePage() {
+/** Colour ramp for the ladder, coolest rung to hottest. */
+const RUNG_STRIPE = ['bg-teal-500', 'bg-yellow-500', 'bg-amber-600', 'bg-orange-700', 'bg-red-600'];
+
+function rungFields(rung: KillswitchRung) {
+  const halt = rung.state === 'HALT';
+  return {
+    halt,
+    drawdown: rung.drawdownFloor === 0 ? '< 8%' : `>= ${(rung.drawdownFloor * 100).toFixed(0)}%`,
+    maxBp: `${(rung.maxBpUtilization * 100).toFixed(0)}%`,
+    structures:
+      rung.maxBpUtilization === 0
+        ? 'flat everything'
+        : rung.definedRiskOnly
+          ? 'defined-risk only'
+          : 'all',
+    newPositions:
+      rung.maxNewPositionsPerWeek === null
+        ? 'unrestricted'
+        : rung.maxNewPositionsPerWeek === 0
+          ? halt
+            ? 'contest forfeited'
+            : 'none'
+          : `${rung.maxNewPositionsPerWeek}/wk, ${rung.sizeMultiplier * 100}% size`,
+  };
+}
+
+const LADDER_COLS = 'md:grid-cols-[110px_84px_72px_minmax(0,1fr)_minmax(0,1.1fr)]';
+
+export default async function OptionsLivePage() {
   const accounts = await loadAccounts();
   const rulesVersion = computeRulesVersion();
 
   return (
-    <div className="pb-16">
+    <div className="pb-14">
       <PageHeader
         eyebrow="Beat 0:00 — Live"
         title="Equity curve and chain verification"
         blurb="The opening screen of the client demo: $10,000 to today against SPY and the CBOE PutWrite index, with the audit chain's latest anchor linked through to its public commit."
       />
 
-      <div className="px-8 py-7">
-        <div className="flex flex-wrap border-b border-slate-800 pb-5">
+      <div className={cn('py-6 sm:py-7', GUTTER)}>
+        <StatRow>
           <StatTile label="Starting equity" value="$10,000" unit="BOTH SIDES" />
           <StatTile label="Rules version" value={rulesVersion} unit={`${RULE_COUNT} RULES`} tone="accent" />
           <StatTile label="Drawdown cap" value="20%" unit="FORFEITURE LINE" />
           <StatTile label="Track started" value="—" unit="PHASE 6" tone="muted" />
-          <StatTile label="Chain entries" value="0" unit="NOT YET LIVE" tone="muted" />
-        </div>
+          <StatTile label="Chain entries" value="0" unit="NOT YET LIVE" tone="muted" wide />
+        </StatRow>
 
-        <section className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <section className="mt-7 grid gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
           <PendingPanel
             phase="Phase 1–2"
             heading="Equity curve"
@@ -54,7 +90,7 @@ export default async function ThetaLivePage() {
             ]}
           />
 
-          <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-5">
+          <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-4 sm:p-5">
             <div className="font-mono text-[10px] uppercase tracking-[0.1em] text-slate-500">
               Tracked books
             </div>
@@ -62,7 +98,7 @@ export default async function ThetaLivePage() {
               <p className="mt-4 text-sm leading-relaxed text-slate-400">
                 Migration not applied yet, or Supabase credentials are unavailable in this
                 environment. Apply{' '}
-                <code className="font-mono text-xs text-slate-300">
+                <code className="break-all font-mono text-xs text-slate-300">
                   20260920000000_theta_desk.sql
                 </code>{' '}
                 to seed the four books.
@@ -72,7 +108,7 @@ export default async function ThetaLivePage() {
             ) : (
               <ul className="mt-4 space-y-3">
                 {accounts.map((a) => (
-                  <li key={a.id} className="flex items-baseline justify-between gap-4">
+                  <li key={a.id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5">
                     <span className="text-sm text-slate-200">{a.label}</span>
                     <span className="font-mono text-[10px] uppercase tracking-wider text-slate-500">
                       {a.kind}
@@ -84,79 +120,88 @@ export default async function ThetaLivePage() {
           </div>
         </section>
 
-        <section className="mt-10">
+        <section className="mt-9">
           <h2 className="text-sm font-semibold tracking-tight text-slate-200">
             Kill-switch ladder
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-slate-400">
             Rulebook §9. Evaluated before every order submission rather than on a schedule.
             Encoded in{' '}
-            <code className="font-mono text-xs text-slate-300">lib/options/types.ts</code>.
+            <code className="font-mono text-xs whitespace-nowrap text-slate-300">lib/options/types.ts</code>.
           </p>
 
-          <div className="mt-5 overflow-x-auto">
-            <table className="w-full min-w-[620px] border-collapse">
-              <thead>
-                <tr className="border-b border-slate-800">
-                  {['State', 'Drawdown', 'Max BP', 'Structures', 'New positions'].map((h) => (
-                    <th
-                      key={h}
-                      className="pb-2.5 pr-6 text-left font-mono text-[10px] uppercase tracking-[0.1em] font-medium text-slate-500"
-                    >
-                      {h}
-                    </th>
+          {/* Column headings only where there are columns to head. */}
+          <div
+            className={cn(
+              'mt-5 hidden gap-x-4 border-b border-slate-800 pb-2.5 pl-4 md:grid',
+              LADDER_COLS
+            )}
+          >
+            {['State', 'Drawdown', 'Max BP', 'Structures', 'New positions'].map((h) => (
+              <span
+                key={h}
+                className="font-mono text-[10px] uppercase tracking-[0.1em] text-slate-500"
+              >
+                {h}
+              </span>
+            ))}
+          </div>
+
+          <div className="mt-3 space-y-2 md:mt-0 md:space-y-0">
+            {KILLSWITCH_LADDER.map((rung, i) => {
+              const f = rungFields(rung);
+              return (
+                <div
+                  key={rung.state}
+                  className={cn(
+                    'relative grid grid-cols-2 gap-x-4 gap-y-2.5 rounded-md border border-slate-800 py-3 pl-4 pr-3 sm:grid-cols-4',
+                    'md:items-baseline md:gap-y-0 md:rounded-none md:border-0 md:border-b md:border-slate-800/60 md:py-3 md:pr-0',
+                    LADDER_COLS,
+                    f.halt && 'border-red-900/60 bg-red-950/20 md:bg-transparent'
+                  )}
+                >
+                  <span
+                    aria-hidden
+                    className={cn(
+                      'absolute bottom-0 left-0 top-0 w-1 rounded-l-md md:rounded-none',
+                      RUNG_STRIPE[i]
+                    )}
+                  />
+                  <span
+                    className={cn(
+                      'col-span-2 text-sm font-semibold sm:col-span-4 md:col-span-1',
+                      f.halt ? 'text-red-400' : 'text-slate-200'
+                    )}
+                  >
+                    {rung.state}
+                  </span>
+
+                  {/* Each cell carries its own label on a phone, where there is
+                      no column heading to read it from. */}
+                  {(
+                    [
+                      ['Drawdown', f.drawdown],
+                      ['Max BP', f.maxBp],
+                      ['Structures', f.structures],
+                      ['New positions', f.newPositions],
+                    ] as const
+                  ).map(([label, value]) => (
+                    <div key={label} className="min-w-0">
+                      <div className="font-mono text-[9px] uppercase tracking-[0.1em] text-slate-600 md:hidden">
+                        {label}
+                      </div>
+                      <div className="mt-0.5 font-mono text-xs tabular-nums text-slate-400 md:mt-0">
+                        {value}
+                      </div>
+                    </div>
                   ))}
-                </tr>
-              </thead>
-              <tbody>
-                {KILLSWITCH_LADDER.map((rung) => {
-                  const halt = rung.state === 'HALT';
-                  return (
-                    <tr key={rung.state} className="border-b border-slate-800/60">
-                      <td
-                        className={`py-3 pr-6 text-sm font-semibold ${
-                          halt ? 'text-red-400' : 'text-slate-200'
-                        }`}
-                      >
-                        {rung.state}
-                      </td>
-                      <td className="py-3 pr-6 font-mono text-xs tabular-nums text-slate-400">
-                        {rung.drawdownFloor === 0
-                          ? '< 8%'
-                          : `>= ${(rung.drawdownFloor * 100).toFixed(0)}%`}
-                      </td>
-                      <td className="py-3 pr-6 font-mono text-xs tabular-nums text-slate-400">
-                        {(rung.maxBpUtilization * 100).toFixed(0)}%
-                      </td>
-                      <td className="py-3 pr-6 font-mono text-xs text-slate-400">
-                        {rung.maxBpUtilization === 0
-                          ? 'flat everything'
-                          : rung.definedRiskOnly
-                            ? 'defined-risk only'
-                            : 'all'}
-                      </td>
-                      <td className="py-3 pr-6 font-mono text-xs tabular-nums text-slate-400">
-                        {rung.maxNewPositionsPerWeek === null
-                          ? 'unrestricted'
-                          : rung.maxNewPositionsPerWeek === 0
-                            ? halt
-                              ? 'contest forfeited'
-                              : 'none'
-                            : `${rung.maxNewPositionsPerWeek}/wk, ${rung.sizeMultiplier * 100}% size`}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                </div>
+              );
+            })}
           </div>
         </section>
 
-        <p className="mt-10 max-w-3xl font-mono text-[11px] leading-relaxed text-slate-600">
-          Phase 0 scaffold. No market data is connected, no orders can be placed, and no track
-          record is represented. Nothing on this surface is an offer, a solicitation, or
-          investment advice.
-        </p>
+        <ScaffoldNotice className="mt-9" />
       </div>
     </div>
   );
