@@ -43,22 +43,52 @@ capacity-constrained edge. It is not a 100%/year edge at controlled risk.
 - Defined-risk spreads are the only structure that gets a \$10k account into double digits
   monthly. A \$5-wide put credit spread collecting \$1.00 uses \$400 of buying power for \$100
   of max profit. Managed at 50%, that's ~12.5% on deployed capital per ~25-day cycle.
-- Run six of those continuously (~\$2,400 BP, 24% utilization), at a realistic ~75% win rate
-  with a 2× credit stop, and expectancy lands near **10–15%/year net**.
+- Run six of those continuously (~\$2,400 BP, 24% utilization), at a realistic ~75–80% win rate,
+  and expectancy lands near **10–15%/year net**.
 - To reach 100% you must push buying-power utilization toward 70–80% and shorten duration.
   The same configuration that produces +100% in a benign vol year produces **-40% to -60% in
   a February 2018 or March 2020** event.
 
+**The management rules cost expectancy, and the arithmetic is unforgiving.** A 50%-of-credit
+profit target against a 2× credit stop makes a winner **a quarter the size of a loser**. At that
+payoff ratio the break-even win rate is **80%** — the strategy must win four out of five merely
+to tread water. On the more generous profile (rolled at 21 DTE, the hard stop rarely reached),
+the average winner is ~0.6× credit against an average loser of ~1.8×, which still needs 75%.
+The hard stop in §7.3 is a deliberate trade: it buys a bounded tail and pays for it in
+expectancy.
+
 **So the defensible claim is:**
 
-> Target **25–40% CAGR** with a hard **20% max drawdown** limit, fully mechanical and fully
-> auditable. 100% is available as a documented high-aggression configuration whose
+> Target **10–18% CAGR** with a hard **20% max drawdown** limit, fully mechanical and fully
+> auditable. A high-VRP year could reach the mid-20s; a flat-vol year could return low single
+> digits. 100% is available as a documented high-aggression configuration whose
 > probability-of-ruin we will show you on screen, and which we do not recommend.
+
+For reference, the CBOE PutWrite index — the passive version of this trade — has historically
+returned high single digits. A systematic book with entry filters (IVR ≥ 25, VRP > 2 vol points)
+should beat it, because it sells only when premium is actually rich rather than continuously.
+That improvement is the edge, and it is measured in single-digit percentage points, not
+multiples.
+
+**Why this is still the stronger pitch.** At \$10,000 the strategy is *capital-constrained*, not
+skill-constrained: contract granularity and Reg-T buying power set the ceiling, and 15% of
+\$10,000 is \$1,500. The challenge is a **process demonstration, not an earnings demonstration** —
+and the process is what scales. The same rules at \$250k or \$1M are a materially different
+conversation in absolute dollars, with the same drawdown profile. Say that explicitly rather
+than letting him do the arithmetic and conclude the strategy is trivial.
 
 A trading firm principal has heard "100% a year" from a hundred people. He has never heard
 "here is my probability cone, here is my tail, here is my kill switch, and here is a
-tamper-evident log you can audit line by line." **That** is what wins the business. The app in
-`02-BUILD-PLAN.md` is built to deliver exactly that in under seven minutes.
+tamper-evident log you can audit line by line." **That** is what wins the business — and a
+target the instrument itself supports is part of it. A number your own model contradicts is
+worse than a smaller number it corroborates, because he will run this arithmetic in his head.
+The app in `02-BUILD-PLAN.md` is built to deliver exactly that in under seven minutes.
+
+> **Revision note (2026-09-24).** This section previously claimed 25–40% CAGR while its own
+> bullets said 10–15%. The Monte Carlo at `/options/probability`, parameterised from the
+> management rules in §7.3, puts the median near +9%. The claim has been brought down to match
+> the arithmetic. The parameters were *not* retuned to preserve the original number — doing so
+> would be precisely the overfitting `02-BUILD-PLAN.md` §9 exists to prevent.
 
 ---
 
