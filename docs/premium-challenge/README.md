@@ -33,14 +33,22 @@ by leverage:
 Say this to the client plainly. Mechanical premium selling harvests the variance risk premium —
 a real, documented, capacity-constrained edge. It is not a 100%/year edge at controlled risk.
 On \$10,000, a cash-secured put book maxes out near 8–15%/year because each position ties up
-the full strike notional. Defined-risk spreads get you to roughly 25–40% CAGR at a 20% drawdown
-cap. Reaching 100% requires pushing buying-power utilization to 70–80% — and the identical
-configuration that returns +100% in a calm year returns −40% to −60% through a February 2018 or
-March 2020.
+the full strike notional. Defined-risk spreads do better, but not dramatically: a 50%-of-credit
+profit target against a 2× credit stop makes a winner a quarter the size of a loser, so the
+strategy needs an **80% win rate just to break even**. Reaching 100% requires pushing
+buying-power utilization to 70–80% — and the identical configuration that returns +100% in a
+calm year returns −40% to −60% through a February 2018 or March 2020.
 
-So the claim is **25–40% CAGR, fully mechanical, fully auditable, with a hard 20% drawdown
+So the claim is **10–18% CAGR, fully mechanical, fully auditable, with a hard 20% drawdown
 limit** — and 100% shown on screen as a high-aggression configuration with its
-probability-of-ruin attached.
+probability-of-ruin attached. For reference, the CBOE PutWrite index returns high single digits;
+entry filters that sell only when premium is rich should beat it by single-digit points, which
+is what a real edge in this trade looks like.
+
+At \$10,000 the strategy is capital-constrained rather than skill-constrained — 15% of \$10,000
+is \$1,500. **The challenge is a process demonstration, not an earnings demonstration**, and the
+process is what scales to \$250k or \$1M with the same drawdown profile. Say that explicitly
+rather than letting him reach it himself.
 
 A trading principal has heard "100% a year" from a hundred people. He has never heard "here is
 my probability cone, here is my tail, here is my kill switch, and here is a tamper-evident log
