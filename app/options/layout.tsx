@@ -11,6 +11,7 @@ import {
   History,
   GitBranch,
   ScatterChart,
+  Swords,
   Menu,
   X,
 } from 'lucide-react';
@@ -28,6 +29,7 @@ const NAV = [
   { href: '/options/scenario',    label: 'Scenario',    icon: Zap,          beat: '3:30' },
   { href: '/options/replay',      label: 'Replay',      icon: History,      beat: '4:30' },
   { href: '/options/probability', label: 'Probability', icon: ScatterChart, beat: '5:30' },
+  { href: '/options/head-to-head', label: 'Head to head', icon: Swords,      beat: '6:30' },
   { href: '/options/verify',      label: 'Verify',      icon: GitBranch,    beat: null   },
 ];
 
