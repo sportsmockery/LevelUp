@@ -1,25 +1,17 @@
-import { GUTTER, PageHeader, PendingPanel } from '../_components/phase-shell';
+import { GUTTER, PageHeader } from '../_components/phase-shell';
+import ReplayClient from './replay-client';
 import { cn } from '@/lib/utils';
 
-export default function ThetaReplayPage() {
+export default function OptionsReplayPage() {
   return (
     <div className="pb-14">
       <PageHeader
         eyebrow="Beat 4:30 — Replay"
-        title="What happens when it goes wrong"
-        blurb="One click replays the engine through February 2018, March 2020 and October 2022 against historical chain data — the ladder stepping down, positions closing, buying power contracting. A strategy that has never been shown failing has not been shown."
+        title="Ten years, year by year"
+        blurb="The published rules run against the actual S&P path and the actual VIX at every entry, 2016 to 2026 — including whether the strike we would have sold was really breached. Costs charged. Two negative years, a drawdown that came within two points of the forfeiture line, and a bug in our own kill switch that only this run exposed."
       />
       <div className={cn('py-6 sm:py-7', GUTTER)}>
-        <PendingPanel
-          phase="Phase 2–4"
-          heading="Historical stress replay"
-          items={[
-            'Deterministic playback of a backtest run, seeded and reproducible from (config, rules_version, data_version, seed).',
-            'Regime slices reported individually rather than averaged: Q1 2018, March 2020, the 2022 bear, the 2023-24 low-vol melt-up.',
-            'Kill-switch transitions surfaced on the timeline at the moment they fired.',
-            'Out-of-sample windows labelled as such, per the pre-registered protocol in build plan §9.',
-          ]}
-        />
+        <ReplayClient />
       </div>
     </div>
   );
